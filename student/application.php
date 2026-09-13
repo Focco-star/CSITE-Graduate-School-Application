@@ -1,7 +1,25 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
 
+// Ensure session is started and pull current student details dynamically
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+$sessionUser = $_SESSION['user'] ?? [];
 $mockStudent = currentStudentProfile($mockStudent);
+
+// Override profile values with logged-in user data if available
+if (!empty($sessionUser)) {
+    $mockStudent['name']  = $sessionUser['full_name'] ?? $sessionUser['name'] ?? $mockStudent['name'];
+    $mockStudent['email'] = $sessionUser['email'] ?? $mockStudent['email'];
+    if (!empty($sessionUser['program'])) {
+        $mockStudent['program'] = $sessionUser['program'];
+    }
+    if (!empty($sessionUser['program_name'])) {
+        $mockStudent['program_name'] = $sessionUser['program_name'];
+    }
+}
 
 $pageTitle   = 'Application';
 $role        = 'student';
@@ -14,10 +32,10 @@ $stages      = [];
 foreach ($workflow['stages'] as $s) {
     $stages[$s['key']] = $s;
 }
-$isThesis    = $track === 'thesis';
-$appSuccess  = '';
-$appError    = '';
-$uploadError = '';
+$isThesis      = $track === 'thesis';
+$appSuccess    = '';
+$appError      = '';
+$uploadError   = '';
 $uploadSuccess = '';
 
 $progress = getStudentProgress($mockStudent['email'], $track);
@@ -90,6 +108,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
         ]);
         $appSuccess = 'Application submitted successfully for "' . $title . '".';
         $mockStudent = currentStudentProfile($mockStudent);
+        if (!empty($sessionUser)) {
+            $mockStudent['name']  = $sessionUser['full_name'] ?? $sessionUser['name'] ?? $mockStudent['name'];
+            $mockStudent['email'] = $sessionUser['email'] ?? $mockStudent['email'];
+        }
         $track = getTrackForProgram($mockStudent['program']);
         $trackLabel = getTrackLabel($track);
     }

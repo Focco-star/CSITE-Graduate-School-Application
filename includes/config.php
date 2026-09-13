@@ -4,7 +4,7 @@
 define('SITE_NAME', 'CSITE Graduate School Application');
 define('SITE_SHORT', 'CSITE Grad App');
 define('SITE_TAGLINE', 'Capstone & Thesis Presentation Application System');
-define('BASE_URL', '/CSITE_Grad');
+define('BASE_URL', '/CSITE-Graduate-School-Application');
 
 define('COLOR_PRIMARY', '#060297');
 define('COLOR_ACCENT', '#FFB82B');
@@ -72,7 +72,7 @@ $mockStudent = [
 
 $mockCoordinator = [
     'id'   => 'GPC-001',
-    'name' => 'Ma\'am Precious',
+    'name' => 'Ma\'am Precious Opinion',
     'role' => 'Graduate Program Coordinator – CSITE',
     'email'=> 'gpc-csite@adzu.edu.ph',
 ];
