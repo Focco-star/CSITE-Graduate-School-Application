@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php'; // Ensure DB class is loaded
 
 $registerError = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -11,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $confirm = $_POST['confirmPassword'] ?? '';
     $age = trim($_POST['age'] ?? '');
     $gender = $_POST['gender'] ?? '';
+    $middleInitial = strtoupper(trim($_POST['middleInitial'] ?? ''));
 
     if ($first === '' || $last === '' || $email === '' || $program === '' || $password === '') {
         $registerError = 'Please complete all required fields.';
@@ -24,26 +26,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $registerError = 'Password must be at least 8 characters and include one uppercase letter and one number.';
     } else {
         try {
-            $registered = addRegisteredStudent([
-                'firstName' => $first,
-                'lastName' => $last,
-                'middleInitial' => trim($_POST['middleInitial'] ?? ''),
-                'age' => $age,
-                'gender' => $gender,
-                'program' => $program,
-                'email' => $email,
+            $pdo = DB::getConnection();
+
+            // 1. Check if email already exists
+            $existingUser = DB::find('users', ['email' => $email]);
+            if ($existingUser) {
+                throw new LogicException('An account with this email address already exists.');
+            }
+
+            // Determine track from helper function
+            $track = getTrackForProgram($program);
+            $fullName = implode(' ', array_filter([$first, $middleInitial, $last]));
+
+            $pdo->beginTransaction();
+
+            // 2. Insert into users table
+            $user = DB::insert('users', [
+                'full_name' => $fullName,
+                'email'     => $email,
+                'password'  => password_hash($password, PASSWORD_DEFAULT),
+                'role'      => 'student'
             ]);
-            saveAccount([
-                'firstName' => $registered['firstName'],
-                'lastName' => $registered['lastName'],
-                'middleInitial' => $registered['middleInitial'] ?? '',
-                'age' => $registered['age'] ?? '',
-                'gender' => $registered['gender'] ?? '',
-                'email' => $registered['email'],
-                'program' => $registered['program'],
-            ], $password);
-            redirectTo('student/dashboard.php');
-        } catch (LogicException $e) {
+
+            // 3. Insert into students table
+            DB::insert('students', [
+                'user_id'        => $user['user_id'],
+                'first_name'     => $first,
+                'last_name'      => $last,
+                'middle_initial' => $middleInitial,
+                'age'            => (int) $age,
+                'gender'         => $gender,
+                'program'        => PROGRAMS[$program] ?? $program,
+                'track'          => $track,
+                'enrollment_date'=> date('Y-m-d')
+            ]);
+
+            $pdo->commit();
+
+            // Set session variables and redirect
+            $_SESSION['user'] = $user;
+            redirectTo('student/login.php');
+
+        } catch (Exception $e) {
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             $registerError = $e->getMessage();
         }
     }

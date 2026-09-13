@@ -1,14 +1,50 @@
 <?php
+session_start();
+
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
 
 $loginError = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['username'] ?? '');
-    $result = authenticateStudent($email, (string) ($_POST['password'] ?? ''));
-    if ($result['ok']) {
-        redirectTo('student/dashboard.php');
+    $email    = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
+
+    if (empty($email) || empty($password)) {
+        $loginError = 'Please enter both your email and password.';
+    } else {
+        // Query database for user by email
+        $user = DB::find('users', ['email' => $email]);
+
+        if (password_verify($password, $user['password'])) {
+            session_regenerate_id(true); // Generates a fresh session ID and clears old session file
+            $_SESSION['user'] = $user;
+            header('Location: ' . url('student/dashboard.php'));
+            exit;
+        }
+        
+        if ($user && password_verify($password, $user['password'])) {
+            if ($user['role'] !== 'student') {
+                $loginError = 'Access denied. Account is not registered as a student.';
+            } else {
+                // Fetch student profile details
+                $student = DB::find('students', ['user_id' => $user['user_id']]);
+
+                // Store active session variables
+                $_SESSION['user_id']    = $user['user_id'];
+                $_SESSION['student_id'] = $student['student_id'] ?? null;
+                $_SESSION['full_name']  = $user['full_name'];
+                $_SESSION['email']      = $user['email'];
+                $_SESSION['role']       = $user['role'];
+
+                // Redirect to dashboard
+                header('Location: ' . url('student/dashboard.php'));
+                exit;
+            }
+        } else {
+            $loginError = 'Invalid email address or password.';
+        }
     }
-    $loginError = $result['message'];
 }
 
 $pageTitle = 'Student Login';
@@ -35,7 +71,7 @@ require_once __DIR__ . '/../includes/slideshow.php';
                 <label for="username">ADZU Email</label>
                 <div class="input-icon-wrap">
                     <i class="fas fa-envelope"></i>
-                    <input type="email" id="username" name="username" placeholder="yourname@adzu.edu.ph" required>
+                    <input type="email" id="username" name="username" placeholder="yourname@adzu.edu.ph" value="<?= htmlspecialchars($_POST['username'] ?? '') ?>" required>
                 </div>
             </div>
             <div class="form-group" style="margin-bottom:1.75rem;">

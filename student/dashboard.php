@@ -1,25 +1,42 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
 
-$mockStudent = currentStudentProfile($mockStudent);
+// Ensure user is authenticated as a student
+if (empty($_SESSION['user']) || ($_SESSION['user']['role'] ?? '') !== 'student') {
+    redirectTo('student/login.php');
+}
+
+$user = $_SESSION['user'];
+
+// Fetch the student's complete profile record from MySQL
+$student = DB::find('students', ['user_id' => $user['user_id']]);
+
+if (!$student) {
+    die("Student profile not found.");
+}
 
 $pageTitle   = 'Dashboard';
 $role        = 'student';
 $currentPage = 'dashboard';
-$userName    = $mockStudent['name'];
-$track       = $mockStudent['track'];
+$userName    = $user['full_name'];
+$track       = $student['track'] ?? 'thesis';
 $trackLabel  = getTrackLabel($track);
 $workflow    = getWorkflow($track);
-$stages      = $workflow['stages'];
-$progress    = getStudentProgress($mockStudent['email'], $track);
-$currentIdx  = 0;
+$stages      = $workflow['stages'] ?? [];
+
+// Fetch stage progress dynamically using student's email
+$progress   = getStudentProgress($user['email'], $track);
+$currentIdx = 0;
+
 foreach ($progress as $i => $p) {
-    if (!in_array($p['stageStatus'], ['completed', 'approved'], true)) {
+    if (!in_array($p['stageStatus'] ?? '', ['completed', 'approved'], true)) {
         $currentIdx = $i;
         break;
     }
     $currentIdx = $i;
 }
+
 $activeStage = $progress[$currentIdx] ?? ($progress[0] ?? null);
 $activeLabel = $stages[$currentIdx]['shortLabel'] ?? '—';
 
@@ -27,14 +44,14 @@ require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="page-header">
-    <h2>Welcome, <?= htmlspecialchars(explode(' ', $mockStudent['name'])[0]) ?>!</h2>
-    <p><?= htmlspecialchars($mockStudent['program_name']) ?> (<?= htmlspecialchars($mockStudent['program']) ?>) — <?= htmlspecialchars($trackLabel) ?> Track</p>
+    <h2>Welcome, <?= htmlspecialchars($student['first_name'] ?? explode(' ', $userName)[0]) ?>!</h2>
+    <p><?= htmlspecialchars($student['program']) ?> — <?= htmlspecialchars($trackLabel) ?> Track</p>
 </div>
 
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-icon blue"><i class="fas fa-book"></i></div>
-        <div class="stat-value"><?= htmlspecialchars($mockStudent['program']) ?></div>
+        <div class="stat-value" style="font-size:1rem;"><?= htmlspecialchars($student['program']) ?></div>
         <div class="stat-label">Program</div>
     </div>
     <div class="stat-card">
@@ -44,7 +61,7 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
     <div class="stat-card">
         <div class="stat-icon purple"><i class="fas fa-clock"></i></div>
-        <div class="stat-value"><?= statusBadge($activeStage['stageStatus'] ?? $mockStudent['status']) ?></div>
+        <div class="stat-value"><?= statusBadge($activeStage['stageStatus'] ?? 'pending') ?></div>
         <div class="stat-label">Stage Status</div>
     </div>
     <div class="stat-card">
@@ -63,7 +80,7 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="stage-stepper" style="margin-bottom:1.5rem;padding-bottom:0.5rem;">
             <?php foreach ($stages as $idx => $stage):
                 $p = $progress[$idx] ?? null;
-                $isDone = $p && in_array($p['stageStatus'], ['completed', 'approved'], true);
+                $isDone = $p && in_array($p['stageStatus'] ?? '', ['completed', 'approved'], true);
                 $isActive = $idx === $currentIdx;
             ?>
             <div class="stage-stepper-item">
@@ -92,11 +109,11 @@ require_once __DIR__ . '/../includes/header.php';
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.5rem;">
                 <?php
                 $checks = [
-                    ['Paper Submitted', $activeStage['paper']['status'], $activeStage['paper']['submitted'] ?? ''],
-                    ['Adviser Endorsement', $activeStage['adviserEndorsement']['status'], $activeStage['adviserEndorsement']['submitted'] ?? ''],
-                    ['Coordinator Review', $activeStage['coordReview']['status'], ''],
-                    ['Grad School Endorsement', $activeStage['gradSchoolEndorsement']['status'], ''],
-                    ['Payment Recorded', $activeStage['payment']['status'], $activeStage['payment']['submitted'] ?? ''],
+                    ['Paper Submitted', $activeStage['paper']['status'] ?? 'pending', $activeStage['paper']['submitted'] ?? ''],
+                    ['Adviser Endorsement', $activeStage['adviserEndorsement']['status'] ?? 'pending', $activeStage['adviserEndorsement']['submitted'] ?? ''],
+                    ['Coordinator Review', $activeStage['coordReview']['status'] ?? 'pending', ''],
+                    ['Grad School Endorsement', $activeStage['gradSchoolEndorsement']['status'] ?? 'pending', ''],
+                    ['Payment Recorded', $activeStage['payment']['status'] ?? 'pending', $activeStage['payment']['submitted'] ?? ''],
                     ['Presentation', $activeStage['presentation']['status'] ?? 'pending', $activeStage['presentation']['date'] ?? ''],
                 ];
                 foreach ($checks as [$label, $state, $extra]):

@@ -1,12 +1,21 @@
 <?php
-
 require_once __DIR__ . '/config.php';
 
+// Start session if not already active
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $pageTitle   = $pageTitle ?? SITE_NAME;
-$role        = $role ?? 'public';
+$role        = $role ?? ($_SESSION['user']['role'] ?? 'public');
 $currentPage = $currentPage ?? '';
-$userName    = $userName ?? '';
 $bodyClass   = $bodyClass ?? '';
+
+// Fallback to fetch full_name or user_id name from active session if $userName is empty
+if (empty($userName) && !empty($_SESSION['user'])) {
+    $userName = $_SESSION['user']['full_name'] ?? $_SESSION['user']['name'] ?? '';
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -43,7 +52,7 @@ $bodyClass   = $bodyClass ?? '';
                     <?php endif; ?>
                 </span>
                 <?php endif; ?>
-                <a href="<?= $role === 'student' ? url('student/logout.php') : url('coordinator/login.php') ?>" class="btn btn-sm btn-outline" title="Logout">
+                <a href="<?= $role === 'student' ? url('student/logout.php') : url('coordinator/logout.php') ?>" class="btn btn-sm btn-outline" title="Logout">
                     <i class="fas fa-sign-out-alt"></i> <span class="hide-mobile">Logout</span>
                 </a>
             </div>
