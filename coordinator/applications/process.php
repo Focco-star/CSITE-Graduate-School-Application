@@ -1,12 +1,55 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Process Application';
 $role        = 'coordinator';
 $currentPage = 'applications';
 $userName    = $mockCoordinator['name'];
 
-$app = findApplication((int) ($_GET['id'] ?? 0)) ?? (storeGet('applications')[0] ?? null);
+$appId = (int) ($_GET['id'] ?? 0);
+$app = null;
+$isDatabaseApplication = false;
+
+if ($appId > 0) {
+    try {
+        $stmt = DB::getConnection()->prepare(
+            "SELECT
+                a.application_id AS id,
+                u.email AS studentEmail,
+                COALESCE(NULLIF(TRIM(CONCAT(s.first_name, ' ', IFNULL(s.middle_initial, ''), ' ', s.last_name)), ''), u.full_name) AS student,
+                CASE
+                    WHEN s.program LIKE '%Computer Science%' THEN 'MSCS'
+                    WHEN s.program LIKE '%Information Technology%' THEN 'MIT'
+                    WHEN s.program LIKE '%Mathematics%' THEN 'MATH'
+                    ELSE s.program
+                END AS program,
+                s.track,
+                s.adviser_name AS adviser,
+                a.presentation_stage AS stage,
+                a.paper_title AS title,
+                a.status,
+                a.submitted_at AS date
+             FROM applications a
+             INNER JOIN students s ON s.student_id = a.student_id
+             INNER JOIN users u ON u.user_id = s.user_id
+             WHERE a.application_id = :id
+             LIMIT 1"
+        );
+        $stmt->execute(['id' => $appId]);
+        $app = $stmt->fetch() ?: null;
+        if ($app) {
+            $app['stageKey'] = stageKeyFromLabel($app['stage']);
+            $isDatabaseApplication = true;
+        }
+    } catch (PDOException $e) {
+        $app = null;
+    }
+}
+
+if (!$app) {
+    $app = findApplication($appId) ?? (storeGet('applications')[0] ?? null);
+}
 $processSuccess = '';
 $processError = '';
 
@@ -15,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
     $stageKey = $_POST['stage'] ?? ($app['stageKey'] ?? 'proposal');
     $comment = trim($_POST['comment'] ?? '');
     $advance = ($_POST['advance'] ?? 'no') === 'yes';
-    $allowed = array_keys(STATUSES);
+    $allowed = ['submitted', 'under_review', 'for_payment', 'payment_recorded', 'ready_for_presentation', 'scheduled', 'approved', 'requires_revision', 'completed'];
     if (!in_array($status, $allowed, true)) {
         $processError = 'Select a valid application status.';
     } else {
@@ -38,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
                 $stageKey = $keys[$idx + 1];
             }
         }
-        $app = updateApplicationRecord((int) $app['id'], [
+        $updatedFields = [
             'status' => $status,
             'stageKey' => $stageKey,
             'stage' => $stages[$stageKey] ?? $app['stage'],
@@ -50,8 +93,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             'paymentDate' => trim($_POST['paymentDate'] ?? ''),
             'paymentAmount' => trim($_POST['paymentAmount'] ?? ''),
             'readyForPresentation' => isset($_POST['readyForPresentation']),
-        ]);
-        $processSuccess = 'Application updated. The student portal now shows this status.';
+        ];
+
+        try {
+            if ($isDatabaseApplication) {
+                $saveStatus = DB::getConnection()->prepare(
+                    'UPDATE applications
+                     SET status = :status, presentation_stage = :presentation_stage
+                     WHERE application_id = :application_id'
+                );
+                $saveStatus->execute([
+                    'status' => $status,
+                    'presentation_stage' => $updatedFields['stage'],
+                    'application_id' => (int) $app['id'],
+                ]);
+            }
+
+            // Keep existing prototype-session screens synchronized when the same record exists there.
+            if (findApplication((int) $app['id'])) {
+                updateApplicationRecord((int) $app['id'], $updatedFields);
+            }
+
+            $app = array_merge($app, $updatedFields);
+            $processSuccess = 'Application status updated and saved to the database.';
+        } catch (Throwable $e) {
+            $processError = 'Unable to save the application status. Please try again.';
+        }
     }
 }
 

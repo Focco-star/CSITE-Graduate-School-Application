@@ -7,7 +7,7 @@ CREATE TABLE `applications` (
   `student_id` int(11) NOT NULL,
   `presentation_stage` varchar(100) NOT NULL,
   `paper_title` text NOT NULL,
-  `status` enum('submitted','under_review','approved','requires_revision','completed') DEFAULT 'submitted',
+  `status` enum('submitted','under_review','for_payment','payment_recorded','ready_for_presentation','scheduled','approved','requires_revision','completed') DEFAULT 'submitted',
   `submitted_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
