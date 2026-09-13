@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
 
-// Ensure session is started and pull current student details dynamically
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -9,7 +9,6 @@ if (session_status() === PHP_SESSION_NONE) {
 $sessionUser = $_SESSION['user'] ?? [];
 $mockStudent = currentStudentProfile($mockStudent);
 
-// Override profile values with logged-in user data if available
 if (!empty($sessionUser)) {
     $mockStudent['name']  = $sessionUser['full_name'] ?? $sessionUser['name'] ?? $mockStudent['name'];
     $mockStudent['email'] = $sessionUser['email'] ?? $mockStudent['email'];
@@ -97,23 +96,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
     if ($title === '' || $adviser === '' || !isset($stages[$stageKey])) {
         $appError = 'Research title, adviser, and presentation stage are required.';
     } else {
-        addApplicationRecord([
-            'studentEmail' => $mockStudent['email'],
-            'student' => $mockStudent['name'],
-            'program' => $mockStudent['program'],
-            'stageKey' => $stageKey,
-            'title' => $title,
-            'adviser' => $adviser,
-            'abstract' => trim($_POST['abstract'] ?? ''),
-        ]);
-        $appSuccess = 'Application submitted successfully for "' . $title . '".';
-        $mockStudent = currentStudentProfile($mockStudent);
-        if (!empty($sessionUser)) {
-            $mockStudent['name']  = $sessionUser['full_name'] ?? $sessionUser['name'] ?? $mockStudent['name'];
-            $mockStudent['email'] = $sessionUser['email'] ?? $mockStudent['email'];
+        try {
+            $pdo = DB::getConnection();
+            $userId = (int) ($sessionUser['user_id'] ?? $_SESSION['user_id'] ?? 0);
+            $studentLookup = $pdo->prepare(
+                'SELECT s.student_id
+                 FROM students s
+                 INNER JOIN users u ON u.user_id = s.user_id
+                 WHERE s.user_id = :user_id OR u.email = :email
+                 ORDER BY s.student_id DESC
+                 LIMIT 1'
+            );
+            $studentLookup->execute([
+                'user_id' => $userId,
+                'email' => $mockStudent['email'],
+            ]);
+            $studentId = (int) ($studentLookup->fetchColumn() ?: 0);
+
+            if ($studentId <= 0) {
+                throw new RuntimeException('Your student profile was not found. Please sign in again or contact the coordinator.');
+            }
+
+            $pdo->beginTransaction();
+            $insertApplication = $pdo->prepare(
+                'INSERT INTO applications (student_id, presentation_stage, paper_title, status)
+                 VALUES (:student_id, :presentation_stage, :paper_title, :status)'
+            );
+            $insertApplication->execute([
+                'student_id' => $studentId,
+                'presentation_stage' => $stages[$stageKey]['label'],
+                'paper_title' => $title,
+                'status' => 'submitted',
+            ]);
+
+            $updateAdviser = $pdo->prepare(
+                'UPDATE students SET adviser_name = :adviser_name WHERE student_id = :student_id'
+            );
+            $updateAdviser->execute([
+                'adviser_name' => $adviser,
+                'student_id' => $studentId,
+            ]);
+            $pdo->commit();
+
+            // Keep the existing session-based screens in sync while the coordinator modules
+            // are gradually migrated to MySQL.
+            addApplicationRecord([
+                'studentEmail' => $mockStudent['email'],
+                'student' => $mockStudent['name'],
+                'program' => $mockStudent['program'],
+                'stageKey' => $stageKey,
+                'title' => $title,
+                'adviser' => $adviser,
+                'abstract' => trim($_POST['abstract'] ?? ''),
+            ]);
+
+            $appSuccess = 'Application submitted successfully for "' . $title . '".';
+            $mockStudent = currentStudentProfile($mockStudent);
+            if (!empty($sessionUser)) {
+                $mockStudent['name']  = $sessionUser['full_name'] ?? $sessionUser['name'] ?? $mockStudent['name'];
+                $mockStudent['email'] = $sessionUser['email'] ?? $mockStudent['email'];
+            }
+            $track = getTrackForProgram($mockStudent['program']);
+            $trackLabel = getTrackLabel($track);
+        } catch (Throwable $e) {
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $appError = $e instanceof RuntimeException
+                ? $e->getMessage()
+                : 'Unable to save your application. Please try again.';
         }
-        $track = getTrackForProgram($mockStudent['program']);
-        $trackLabel = getTrackLabel($track);
     }
 }
 
