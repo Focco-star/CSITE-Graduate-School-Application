@@ -42,29 +42,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // 2. Insert into users table
             $user = DB::insert('users', [
-                'full_name' => $fullName,
+                'full_name' => canonicalStudentName($first, $last, $middleInitial),
                 'email'     => $email,
                 'password'  => password_hash($password, PASSWORD_DEFAULT),
                 'role'      => 'student'
             ]);
 
-            // 3. Insert into students table
-            DB::insert('students', [
+            // 3. Insert into students table — the single source-of-truth identity.
+            $student = DB::insert('students', [
                 'user_id'        => $user['user_id'],
                 'first_name'     => $first,
                 'last_name'      => $last,
-                'middle_initial' => $middleInitial,
+                'middle_initial' => rtrim($middleInitial, '.'),
                 'age'            => (int) $age,
                 'gender'         => $gender,
                 'program'        => PROGRAMS[$program] ?? $program,
                 'track'          => $track,
                 'enrollment_date'=> date('Y-m-d')
             ]);
+            // The Students table expects a unique student number; generate one
+            // deterministically from the auto-increment student_id.
+            DB::update('students', ['student_number' => generateStudentNumber((int) $student['student_id'])], ['student_id' => (int) $student['student_id']]);
 
             $pdo->commit();
 
+            // Mirror the exact same identity into the shared session store so every
+            // student screen and coordinator fallback shows identical data.
+            upsertSessionStudent([
+                'email' => $email,
+                'first_name' => $first,
+                'last_name' => $last,
+                'middle_initial' => $middleInitial,
+                'age' => $age,
+                'gender' => $gender,
+                'program' => $program,
+                'enrollment_date' => date('Y-m-d'),
+            ]);
+
             // Set session variables and redirect
             $_SESSION['user'] = $user;
+            $_SESSION['user_id'] = (int) $user['user_id'];
+            $_SESSION['email'] = $email;
+            $_SESSION['full_name'] = $user['full_name'];
+            $_SESSION['role'] = 'student';
+            setFlash('success', 'Account created successfully. Please sign in to continue.');
             redirectTo('student/login.php');
 
         } catch (Exception $e) {

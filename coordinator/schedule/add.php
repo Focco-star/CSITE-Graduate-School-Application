@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Schedule Presentation';
 $role        = 'coordinator';
@@ -8,6 +9,13 @@ $userName    = $mockCoordinator['name'];
 
 $students = storeGet('students');
 $panelOpts = panelSelectOptions();
+$adviserOpts = ['Dr. Maria Santos', 'Dr. Juan Dela Cruz', 'Dr. Ana Reyes'];
+try {
+    $rows = DB::query("SELECT name FROM advisor_pool WHERE availability = 'available' ORDER BY name")->fetchAll();
+    if ($rows) $adviserOpts = array_column($rows, 'name');
+} catch (Throwable $e) {
+    // The schedule remains usable before the adviser-pool migration is imported.
+}
 $preselected = '';
 if (!empty($_GET['app'])) {
     $preApp = findApplication((int) $_GET['app']);
@@ -177,9 +185,7 @@ require_once __DIR__ . '/../../includes/header.php';
                     <label>Adviser <span class="required">*</span></label>
                     <select name="adviser" required>
                         <option value="">Select adviser</option>
-                        <option>Dr. Maria Santos</option>
-                        <option>Dr. Juan Dela Cruz</option>
-                        <option>Dr. Ana Reyes</option>
+                        <?php foreach ($adviserOpts as $adviser): ?><option><?= htmlspecialchars($adviser) ?></option><?php endforeach; ?>
                     </select>
                 </div>
             </div>

@@ -27,15 +27,7 @@ $stages      = $workflow['stages'] ?? [];
 
 // Fetch stage progress dynamically using student's email
 $progress   = getStudentProgress($user['email'], $track);
-$currentIdx = 0;
-
-foreach ($progress as $i => $p) {
-    if (!in_array($p['stageStatus'] ?? '', ['completed', 'approved'], true)) {
-        $currentIdx = $i;
-        break;
-    }
-    $currentIdx = $i;
-}
+$currentIdx = workflowCurrentIndex($progress, $stages);
 
 $activeStage = $progress[$currentIdx] ?? ($progress[0] ?? null);
 $activeLabel = $stages[$currentIdx]['shortLabel'] ?? '—';
@@ -80,21 +72,24 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="stage-stepper" style="margin-bottom:1.5rem;padding-bottom:0.5rem;">
             <?php foreach ($stages as $idx => $stage):
                 $p = $progress[$idx] ?? null;
-                $isDone = $p && in_array($p['stageStatus'] ?? '', ['completed', 'approved'], true);
+                $st = $p['stageStatus'] ?? 'not_started';
+                $isSubmitted = $p && !in_array($st, ['not_started', 'pending', 'draft', ''], true);
+                $isDone = in_array($st, ['completed', 'approved'], true) || $idx < $currentIdx;
+                $isHighlighted = $isSubmitted || $isDone;
                 $isActive = $idx === $currentIdx;
+                $statusLabel = $isSubmitted ? (STATUSES[$st]['label'] ?? 'Submitted') : 'Not Submitted';
+                $statusClass = $isSubmitted ? (STATUSES[$st]['class'] ?? 'status-submitted') : 'status-pending';
             ?>
             <div class="stage-stepper-item">
                 <div class="stage-stepper-btn" style="cursor:default;">
-                    <span class="stage-stepper-num <?= $isDone ? 'done' : ($isActive ? 'active' : '') ?>">
-                        <?= $isDone ? '<i class="fas fa-check"></i>' : ($idx + 1) ?>
+                    <span class="stage-stepper-num <?= $isHighlighted ? 'highlighted done' : '' ?>">
+                        <?= $idx + 1 ?>
                     </span>
-                    <span class="stage-stepper-label <?= $isActive ? 'is-active' : ($isDone ? 'is-done' : '') ?>"><?= htmlspecialchars($stage['shortLabel']) ?></span>
-                    <?php if ($p): ?>
-                    <span class="status-badge <?= (STATUSES[$p['stageStatus']]['class'] ?? 'status-pending') ?>" style="font-size:0.65rem;padding:2px 6px;"><?= htmlspecialchars(str_replace('_', ' ', $p['stageStatus'])) ?></span>
-                    <?php endif; ?>
+                    <span class="stage-stepper-label <?= $isActive ? 'is-active' : ($isHighlighted ? 'is-done' : '') ?>"><?= htmlspecialchars($stage['shortLabel']) ?></span>
+                    <span class="status-badge <?= $statusClass ?>" style="font-size:0.65rem;padding:2px 6px;"><?= htmlspecialchars($statusLabel) ?></span>
                 </div>
                 <?php if ($idx < count($stages) - 1): ?>
-                <div class="stage-stepper-line <?= $isDone ? 'done' : '' ?>"></div>
+                <div class="stage-stepper-line <?= $isHighlighted ? 'done' : '' ?>"></div>
                 <?php endif; ?>
             </div>
             <?php endforeach; ?>

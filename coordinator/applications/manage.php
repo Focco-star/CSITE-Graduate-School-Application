@@ -26,23 +26,53 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
     }
 }
 
-// Handle application deletion
-if (($_GET['delete'] ?? '') !== '') {
-    $deleteId = (int) $_GET['delete'];
-    if ($pdo && $deleteId > 0) {
+// Handle application archiving (soft-delete only — records are flagged, never removed).
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_id'])) {
+    $archiveId = (int) $_POST['archive_id'];
+    if ($pdo && $archiveId > 0) {
         try {
-            $stmt = $pdo->prepare("DELETE FROM applications WHERE application_id = :id");
-            $stmt->execute([':id' => $deleteId]);
+            $stmt = $pdo->prepare("UPDATE applications SET archived_at = NOW() WHERE application_id = :id AND archived_at IS NULL");
+            $stmt->execute([':id' => $archiveId]);
+            if ($stmt->rowCount() > 0) {
+                setFlash('success', 'Application archived successfully. The record is retained for reporting.');
+            } else {
+                setFlash('error', 'The application could not be archived. It may already be archived.');
+            }
         } catch (PDOException $e) {
-            // Silence error
+            setFlash('error', 'The application could not be archived. Apply the database migration and try again.');
         }
-    } elseif (function_exists('deleteApplicationRecord')) {
-        deleteApplicationRecord($deleteId);
+    } elseif (function_exists('archiveApplicationRecord')) {
+        archiveApplicationRecord($archiveId);
+        setFlash('success', 'Application archived successfully.');
     }
     redirectTo('coordinator/applications/manage.php');
 }
 
-// Fetch applications directly from database
+// Restore an archived application back to the active list.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_id'])) {
+    $restoreId = (int) $_POST['restore_id'];
+    if ($pdo && $restoreId > 0) {
+        try {
+            $stmt = $pdo->prepare("UPDATE applications SET archived_at = NULL WHERE application_id = :id AND archived_at IS NOT NULL");
+            $stmt->execute([':id' => $restoreId]);
+            setFlash('success', 'Application restored to the active application list.');
+        } catch (PDOException $e) {
+            setFlash('error', 'The application could not be restored. Try again.');
+        }
+    }
+    redirectTo('coordinator/applications/manage.php');
+}
+
+// Legacy GET-based delete links are removed from the UI. If one is still hit
+// (e.g. a stale bookmark), refuse it — coordinators must archive through the UI.
+if (($_GET['delete'] ?? '') !== '') {
+    setFlash('error', 'Applications can no longer be deleted from the website. Use Archive instead.');
+    redirectTo('coordinator/applications/manage.php');
+}
+
+// Fetch applications directly from database (active records only).
+// This is DB-authoritative: a row deleted straight from MySQL/phpMyAdmin simply
+// stops appearing here, with no session/store fallback to resurrect it.
 $applications = [];
 
 if ($pdo) {
@@ -51,7 +81,7 @@ if ($pdo) {
             SELECT 
                 a.application_id AS id,
                 COALESCE(
-                    NULLIF(TRIM(CONCAT(s.first_name, ' ', IFNULL(s.middle_initial, ''), ' ', s.last_name)), ''), 
+                    NULLIF(TRIM(CONCAT_WS(' ', s.first_name, NULLIF(TRIM(REPLACE(s.middle_initial, '.', '')), ''), s.last_name)), ''), 
                     u.full_name
                 ) AS student,
                 CASE 
@@ -68,6 +98,8 @@ if ($pdo) {
             FROM applications a
             JOIN students s ON a.student_id = s.student_id
             LEFT JOIN users u ON s.user_id = u.user_id
+            WHERE a.archived_at IS NULL
+              AND s.archived_at IS NULL
             ORDER BY a.submitted_at DESC
         ");
         $applications = $stmt->fetchAll();
@@ -83,6 +115,22 @@ require_once __DIR__ . '/../../includes/header.php';
     <h2>Application Management</h2>
     <p>View and process submitted student applications by track and program.</p>
 </div>
+<?php
+    $archivedAppCount = 0;
+    if ($pdo) {
+        try {
+            $archivedAppCount = (int) $pdo->query('SELECT COUNT(*) FROM applications WHERE archived_at IS NOT NULL')->fetchColumn();
+        } catch (PDOException $e) {
+            $archivedAppCount = 0;
+        }
+    }
+?>
+<?php if ($archivedAppCount > 0): ?>
+<div class="alert alert-info" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
+    <div><i class="fas fa-box-archive"></i> <strong><?= $archivedAppCount ?></strong> archived application<?= $archivedAppCount === 1 ? '' : 's' ?> are retained for reporting.</div>
+    <a href="<?= url('coordinator/applications/archived.php') ?>" class="btn btn-sm btn-outline"><i class="fas fa-box-archive"></i> View Archived Applications</a>
+</div>
+<?php endif; ?>
 
 <div class="card">
     <div class="card-header">
@@ -147,7 +195,7 @@ require_once __DIR__ . '/../../includes/header.php';
                         <td class="actions">
                             <a href="<?= url('coordinator/applications/view.php?id=' . $app['id']) ?>" class="btn btn-sm btn-outline" title="View"><i class="fas fa-eye"></i></a>
                             <a href="<?= url('coordinator/applications/process.php?id=' . $app['id']) ?>" class="btn btn-sm btn-primary" title="Process"><i class="fas fa-cog"></i></a>
-                            <?= function_exists('coordDeleteLink') ? coordDeleteLink(url('coordinator/applications/manage.php?delete=' . $app['id']), 'Delete this application? This cannot be undone.') : '' ?>
+                            <button type="button" class="btn btn-sm btn-danger" data-archive-open data-application-id="<?= (int) $app['id'] ?>" data-application-student="<?= htmlspecialchars($app['student']) ?>" data-application-title="<?= htmlspecialchars($app['title']) ?>" title="Archive"><i class="fas fa-box-archive"></i> Archive</button>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -159,5 +207,26 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 </div>
+
+<div class="modal-overlay" id="archiveApplicationModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="archiveApplicationTitle">
+        <div class="modal-header"><h3 id="archiveApplicationTitle">Archive application?</h3><button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button></div>
+        <div class="modal-body"><p>Archive the application for <strong id="archiveApplicationStudent"></strong>? The application will be removed from the active list, but its record and documents will be retained for reporting.</p><p style="margin-top:0.5rem;font-size:0.85rem;color:var(--gray-500);"><em id="archiveApplicationTitleText"></em></p></div>
+        <form method="post" action="<?= url('coordinator/applications/manage.php') ?>" class="modal-footer">
+            <input type="hidden" name="archive_id" id="archiveApplicationId">
+            <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
+            <button type="submit" class="btn btn-danger"><i class="fas fa-box-archive"></i> Archive Application</button>
+        </form>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('[data-archive-open]').forEach(button => button.addEventListener('click', () => {
+    document.getElementById('archiveApplicationId').value = button.dataset.applicationId;
+    document.getElementById('archiveApplicationStudent').textContent = button.dataset.applicationStudent;
+    document.getElementById('archiveApplicationTitleText').textContent = button.dataset.applicationTitle ? '\u201C' + button.dataset.applicationTitle + '\u201D' : '';
+    document.getElementById('archiveApplicationModal').classList.add('active');
+}));
+</script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
 
 $mockStudent = currentStudentProfile($mockStudent);
 
@@ -14,12 +15,7 @@ $stages      = $workflow['stages'];
 $progress    = getStudentProgress($mockStudent['email'], $track);
 $openKey     = $_GET['stage'] ?? '';
 if ($openKey === '') {
-    foreach ($progress as $p) {
-        if (!in_array($p['stageStatus'], ['completed', 'approved'], true)) {
-            $openKey = $p['stageKey'];
-            break;
-        }
-    }
+    $openKey = ($stages[workflowCurrentIndex($progress, $stages)]['key'] ?? '');
     $openKey = $openKey ?: ($stages[0]['key'] ?? 'proposal');
 }
 
@@ -36,18 +32,24 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="stage-stepper">
             <?php foreach ($stages as $idx => $stage):
                 $p = $progress[$idx] ?? null;
-                $isDone = $p && in_array($p['stageStatus'], ['completed', 'approved'], true);
+                $st = $p['stageStatus'] ?? 'not_started';
+                $isSubmitted = $p && !in_array($st, ['not_started', 'pending', 'draft', ''], true);
+                $isDone = in_array($st, ['completed', 'approved'], true) || $idx < workflowCurrentIndex($progress, $stages);
+                $isHighlighted = $isSubmitted || $isDone;
                 $isActive = $stage['key'] === $openKey;
+                $statusLabel = $isSubmitted ? (STATUSES[$st]['label'] ?? 'Submitted') : 'Not Submitted';
+                $statusClass = $isSubmitted ? (STATUSES[$st]['class'] ?? 'status-submitted') : 'status-pending';
             ?>
             <div class="stage-stepper-item">
                 <a href="<?= url('student/requirements.php?stage=' . urlencode($stage['key'])) ?>" class="stage-stepper-btn">
-                    <span class="stage-stepper-num <?= $isDone ? 'done' : ($isActive ? 'active' : '') ?>">
-                        <?= $isDone ? '<i class="fas fa-check"></i>' : ($idx + 1) ?>
+                    <span class="stage-stepper-num <?= $isHighlighted ? 'highlighted done' : '' ?>">
+                        <?= $idx + 1 ?>
                     </span>
-                    <span class="stage-stepper-label <?= $isActive ? 'is-active' : ($isDone ? 'is-done' : '') ?>"><?= htmlspecialchars($stage['shortLabel']) ?></span>
+                    <span class="stage-stepper-label <?= $isActive ? 'is-active' : ($isHighlighted ? 'is-done' : '') ?>"><?= htmlspecialchars($stage['shortLabel']) ?></span>
+                    <span class="status-badge <?= $statusClass ?>" style="font-size:0.65rem;padding:2px 6px;"><?= htmlspecialchars($statusLabel) ?></span>
                 </a>
                 <?php if ($idx < count($stages) - 1): ?>
-                <div class="stage-stepper-line <?= $isDone ? 'done' : '' ?>"></div>
+                <div class="stage-stepper-line <?= $isHighlighted ? 'done' : '' ?>"></div>
                 <?php endif; ?>
             </div>
             <?php endforeach; ?>
@@ -83,7 +85,7 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="card">
     <div class="card-header" style="background:<?= $isDone ? 'rgba(22,163,74,0.06)' : 'rgba(6,2,151,0.04)' ?>;">
         <h3 style="display:flex;align-items:center;gap:0.6rem;">
-            <span class="stage-stepper-num <?= $isDone ? 'done' : 'active' ?>" style="width:28px;height:28px;font-size:0.8rem;"><?= $isDone ? '<i class="fas fa-check"></i>' : ($idx + 1) ?></span>
+            <span class="stage-stepper-num <?= $isDone ? 'highlighted done' : 'active' ?>" style="width:28px;height:28px;font-size:0.8rem;"><?= $idx + 1 ?></span>
             <?= htmlspecialchars($stage['label']) ?>
             <?= statusBadge($p['stageStatus']) ?>
         </h3>

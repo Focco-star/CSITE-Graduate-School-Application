@@ -26,18 +26,20 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
     }
 }
 
-// Handle student record deletion from DB
-if (isset($_GET['delete']) && $_GET['delete'] !== '') {
-    $deleteId = (int) $_GET['delete'];
-    if ($pdo && $deleteId > 0) {
+// Archive student records instead of permanently deleting them.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_id'])) {
+    $archiveId = (int) $_POST['archive_id'];
+    if ($pdo && $archiveId > 0) {
         try {
-            $stmt = $pdo->prepare("DELETE FROM students WHERE student_id = :id");
-            $stmt->execute([':id' => $deleteId]);
+            $stmt = $pdo->prepare("UPDATE students SET archived_at = NOW() WHERE student_id = :id AND archived_at IS NULL");
+            $stmt->execute([':id' => $archiveId]);
+            setFlash('success', 'Student archived successfully. The record is retained for reporting.');
         } catch (PDOException $e) {
-            // Error handling fallback
+            setFlash('error', 'The student could not be archived. Apply the database migration and try again.');
         }
-    } elseif (function_exists('deleteStudentRecord')) {
-        deleteStudentRecord((string) $_GET['delete']);
+    } elseif (function_exists('archiveStudentRecord')) {
+        archiveStudentRecord((string) $archiveId);
+        setFlash('success', 'Student archived successfully.');
     }
     redirectTo('coordinator/students/manage.php');
 }
@@ -51,12 +53,12 @@ if ($pdo) {
             SELECT 
                 s.student_id AS id,
                 COALESCE(
-                    NULLIF(TRIM(CONCAT(s.first_name, ' ', IFNULL(s.middle_initial, ''), ' ', s.last_name)), ''), 
+                    NULLIF(TRIM(CONCAT_WS(' ', s.first_name, NULLIF(TRIM(REPLACE(s.middle_initial, '.', '')), ''), s.last_name)), ''), 
                     u.full_name
                 ) AS name,
                 COALESCE(s.program, 'MSCS') AS program,
                 s.track,
-                s.created_at AS enrollDate,
+                s.enrollment_date AS enrollDate,
                 latest_app.presentation_stage AS stageLabel,
                 latest_app.status AS status
             FROM students s
@@ -70,6 +72,7 @@ if ($pdo) {
                     GROUP BY student_id
                 ) a2 ON a1.student_id = a2.student_id AND a1.submitted_at = a2.max_submitted
             ) latest_app ON s.student_id = latest_app.student_id
+            WHERE s.archived_at IS NULL
             ORDER BY s.student_id ASC
         ");
         $students = $stmt->fetchAll();
@@ -78,9 +81,14 @@ if ($pdo) {
     }
 }
 
-// Fallback logic if database query returns empty or PDO isn't available
-if (empty($students) && function_exists('storeGet')) {
-    $students = storeGet('students') ?? [];
+// Fallback ONLY when the database is genuinely unavailable (PDO failed to
+// connect). When the DB is reachable, the MySQL result is authoritative: rows
+// deleted directly in phpMyAdmin must disappear from this view immediately,
+// never be resurrected by prototype/session data.
+if (!$pdo && empty($students) && function_exists('storeGet')) {
+    $students = array_values(array_filter(storeGet('students') ?? [], static function ($s) {
+        return empty($s['archivedAt'] ?? '');
+    }));
 }
 
 $statusFilters = ['not_started','submitted','under_review','for_payment','payment_recorded','ready_for_presentation','scheduled','approved','requires_revision','completed'];
@@ -142,7 +150,7 @@ require_once __DIR__ . '/../../includes/header.php';
                         <td><?= statusBadge($status) ?></td>
                         <td class="actions">
                             <a href="<?= url('coordinator/students/view.php?id=' . urlencode($s['id'])) ?>" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i> View</a>
-                            <?= function_exists('coordDeleteLink') ? coordDeleteLink(url('coordinator/students/manage.php?delete=' . urlencode($s['id'])), 'Delete this student record? This cannot be undone.') : '' ?>
+                            <button type="button" class="btn btn-sm btn-danger" data-archive-open data-student-id="<?= htmlspecialchars($s['id']) ?>" data-student-name="<?= htmlspecialchars($name) ?>"><i class="fas fa-box-archive"></i> Archive</button>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -154,5 +162,25 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 </div>
+
+<div class="modal-overlay" id="archiveStudentModal" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="archiveStudentTitle">
+        <div class="modal-header"><h3 id="archiveStudentTitle">Archive student record?</h3><button type="button" class="modal-close" data-modal-close aria-label="Close">&times;</button></div>
+        <div class="modal-body"><p>Archive <strong id="archiveStudentName"></strong>? The student will be removed from active lists, but their record and application history will be retained.</p></div>
+        <form method="post" action="<?= url('coordinator/students/manage.php') ?>" class="modal-footer">
+            <input type="hidden" name="archive_id" id="archiveStudentId">
+            <button type="button" class="btn btn-outline" data-modal-close>Cancel</button>
+            <button type="submit" class="btn btn-danger"><i class="fas fa-box-archive"></i> Archive Student</button>
+        </form>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('[data-archive-open]').forEach(button => button.addEventListener('click', () => {
+    document.getElementById('archiveStudentId').value = button.dataset.studentId;
+    document.getElementById('archiveStudentName').textContent = button.dataset.studentName;
+    document.getElementById('archiveStudentModal').classList.add('active');
+}));
+</script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

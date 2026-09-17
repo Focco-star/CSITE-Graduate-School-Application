@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'upload'
             try {
                 $saved = storeStudentUpload($file);
                 $linked = latestApplicationForEmail($mockStudent['email']);
-                addUploadRecord([
+                recordStudentDocument([
                     'applicationId' => $linked['id'] ?? null,
                     'studentEmail' => $mockStudent['email'],
                     'fileName' => $file['name'],
@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'upload'
                     'size' => $file['size'],
                     'storedFile' => $saved['storedFile'],
                     'mimeType' => $saved['mimeType'],
-                ]);
+                ], $mockStudent['email'], (int) ($sessionUser['user_id'] ?? 0));
                 $uploadSuccess = '"' . $file['name'] . '" uploaded successfully.';
             } catch (RuntimeException $e) {
                 $uploadError = $e->getMessage();
@@ -102,14 +102,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
             $studentLookup = $pdo->prepare(
                 'SELECT s.student_id
                  FROM students s
-                 INNER JOIN users u ON u.user_id = s.user_id
-                 WHERE s.user_id = :user_id OR u.email = :email
-                 ORDER BY s.student_id DESC
+                 WHERE s.user_id = :user_id AND s.archived_at IS NULL
                  LIMIT 1'
             );
             $studentLookup->execute([
                 'user_id' => $userId,
-                'email' => $mockStudent['email'],
             ]);
             $studentId = (int) ($studentLookup->fetchColumn() ?: 0);
 
@@ -136,10 +133,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                 'adviser_name' => $adviser,
                 'student_id' => $studentId,
             ]);
+
+            // Sync the full student identity (name, program, track, contact and
+            // adviser) into the Students table inside the same transaction, so the
+            // application record and the student profile can never diverge.
+            $identityStmt = $pdo->prepare(
+                'SELECT s.first_name, s.last_name, s.middle_initial, s.age, s.gender, s.program, s.track, s.student_number, u.email, u.full_name
+                 FROM students s
+                 INNER JOIN users u ON u.user_id = s.user_id
+                 WHERE s.student_id = :student_id
+                 LIMIT 1'
+            );
+            $identityStmt->execute(['student_id' => $studentId]);
+            $identity = $identityStmt->fetch() ?: [];
+            if ($identity) {
+                $programCode = programCodeForStudent(['program' => $identity['program']]);
+                $upsertStmt = $pdo->prepare(
+                    'UPDATE students
+                     SET first_name = :first_name,
+                         last_name = :last_name,
+                         middle_initial = :middle_initial,
+                         age = :age,
+                         gender = :gender,
+                         program = :program,
+                         track = :track,
+                         student_number = COALESCE(NULLIF(student_number, \'\'), :student_number),
+                         adviser_name = :adviser_name
+                     WHERE student_id = :student_id'
+                );
+                $upsertStmt->execute([
+                    'first_name' => $identity['first_name'],
+                    'last_name' => $identity['last_name'],
+                    'middle_initial' => $identity['middle_initial'],
+                    'age' => (int) $identity['age'],
+                    'gender' => $identity['gender'],
+                    'program' => $identity['program'],
+                    'track' => $identity['track'],
+                    'student_number' => generateStudentNumber($studentId),
+                    'adviser_name' => $adviser,
+                    'student_id' => $studentId,
+                ]);
+                // Keep users.full_name identical to the Students row via the trigger;
+                // the trigger covers future updates, this covers any legacy drift now.
+                $pdo->prepare('UPDATE users SET full_name = :full_name WHERE user_id = :user_id')
+                    ->execute([
+                        'full_name' => canonicalStudentName($identity['first_name'], $identity['last_name'], $identity['middle_initial']),
+                        'user_id' => $userId,
+                    ]);
+            }
             $pdo->commit();
 
+            // Refresh the session identity from MySQL so every screen shows the
+            // canonical name/details that were just persisted.
+            $identity = databaseStudentIdentity();
+            if ($identity) {
+                $sessionUser = $_SESSION['user'] ?? [];
+                $sessionUser['full_name'] = $identity['full_name'];
+                $sessionUser['email'] = $identity['email'];
+                $_SESSION['user'] = $sessionUser;
+                upsertSessionStudent($identity, ['adviser' => $adviser, 'title' => $title]);
+                $mockStudent = array_merge($mockStudent, [
+                    'name' => $identity['full_name'],
+                    'email' => $identity['email'],
+                    'program' => $identity['program'],
+                    'program_name' => $identity['program_name'],
+                    'track' => $identity['track'],
+                    'adviser' => $adviser,
+                    'title' => $title,
+                ]);
+            }
+
             // Keep the existing session-based screens in sync while the coordinator modules
-            // are gradually migrated to MySQL.
+            // are gradually migrated to MySQL. Uses the canonical identity, never mock data.
             addApplicationRecord([
                 'studentEmail' => $mockStudent['email'],
                 'student' => $mockStudent['name'],

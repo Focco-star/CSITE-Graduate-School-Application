@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../includes/config.php';
 $pageTitle   = 'Graduate School Endorsement';
 $role        = 'coordinator';
 $currentPage = 'applications';
-$userName    = $mockCoordinator['name'];
+$userName    = currentCoordinatorName();
 
 $app = findApplication((int) ($_GET['id'] ?? 0)) ?? (storeGet('applications')[0] ?? null);
 
@@ -13,6 +13,7 @@ $programName = $app ? (PROGRAMS[$app['program']] ?? $app['program']) : $mockStud
 $title = $app['title'] ?? $mockStudent['title'];
 $stage = $app['stage'] ?? 'Proposal Presentation';
 $adviser = $app['adviser'] ?? $mockStudent['adviser'];
+$coordinatorName = currentCoordinatorName();
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>
@@ -59,7 +60,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <div style="margin-top:3rem;display:grid;grid-template-columns:1fr 1fr;gap:3rem;">
             <div>
                 <p style="border-top:1px solid var(--gray-400);padding-top:0.5rem;font-size:0.85rem;">
-                    <strong><?= htmlspecialchars($mockCoordinator['name']) ?></strong><br>
+                    <strong><?= htmlspecialchars($coordinatorName) ?></strong><br>
                     Graduate Program Coordinator – CSITE<br>
                     Date: <?= date('F d, Y') ?>
                 </p>

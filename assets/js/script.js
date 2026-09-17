@@ -59,11 +59,29 @@
         });
     });
 
-    document.querySelectorAll('[data-confirm]').forEach(el => {
-        el.addEventListener('click', e => {
-            const msg = el.dataset.confirm || 'Are you sure you want to proceed?';
-            if (!confirm(msg)) e.preventDefault();
+    const confirmModal = document.getElementById('globalConfirmModal');
+    const confirmMessage = document.getElementById('globalConfirmMessage');
+    const confirmAccept = document.getElementById('globalConfirmAccept');
+    let confirmAction = null;
+    function openConfirm(message, action) {
+        confirmMessage.textContent = message || 'Are you sure you want to continue?';
+        confirmAction = action;
+        confirmModal?.classList.add('active');
+    }
+    document.querySelectorAll('[data-confirm-url]').forEach(button => {
+        button.addEventListener('click', () => openConfirm(button.dataset.confirmMessage, () => { window.location.href = button.dataset.confirmUrl; }));
+    });
+    document.querySelectorAll('[data-confirm-form] [data-confirm-trigger]').forEach(button => {
+        button.addEventListener('click', () => {
+            const form = button.closest('form');
+            openConfirm(form?.dataset.confirmMessage, () => form?.submit());
         });
+    });
+    confirmAccept?.addEventListener('click', () => {
+        const action = confirmAction;
+        confirmAction = null;
+        confirmModal?.classList.remove('active');
+        action?.();
     });
 
     document.querySelectorAll('.file-upload-area').forEach(area => {
@@ -167,11 +185,29 @@
     });
 
     document.querySelectorAll('[data-submenu-toggle]').forEach(parent => {
-        parent.addEventListener('click', () => {
+        const toggleSubmenu = () => {
             const submenu = parent.nextElementSibling;
             const chevron = parent.querySelector('.nav-chevron');
-            submenu?.classList.toggle('open');
-            chevron?.classList.toggle('open');
+            const isOpen = submenu?.classList.toggle('open');
+            chevron?.classList.toggle('open', isOpen);
+            // MyADZU theme state classes (root + nested levels)
+            parent.classList.toggle('is-open', isOpen);
+            if (parent.classList.contains('myadzu-root') || parent.classList.contains('myadzu-sub-toggle')) {
+                parent.classList.toggle('is-open', isOpen);
+            } else {
+                parent.classList.toggle('active', !!isOpen && !parent.classList.contains('myadzu-sub-toggle'));
+            }
+            if (parent.hasAttribute('aria-expanded')) {
+                parent.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            }
+        };
+        parent.addEventListener('click', toggleSubmenu);
+        // Keyboard accessibility: Enter / Space toggles div[role="button"]
+        parent.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleSubmenu();
+            }
         });
     });
 
@@ -233,27 +269,45 @@
                     if (val && (row.dataset[key] || '') !== val) ok = false;
                 });
                 row.hidden = !ok;
+                row.style.display = ok ? '' : 'none';
                 if (ok) visible += 1;
             });
+
+            // If items are nested inside cards (e.g. student template stage cards), toggle card visibility
+            root.querySelectorAll('.card').forEach(card => {
+                const cardItems = card.querySelectorAll('[data-search]');
+                if (cardItems.length > 0) {
+                    const cardHasVisible = [...cardItems].some(item => !item.hidden && item.style.display !== 'none');
+                    card.hidden = !cardHasVisible;
+                    card.style.display = cardHasVisible ? '' : 'none';
+                }
+            });
+
             if (empty) {
                 empty.hidden = visible > 0;
+                empty.style.display = visible > 0 ? 'none' : '';
                 empty.querySelector('td') && (empty.style.display = visible > 0 ? 'none' : '');
             }
             if (countEl) {
                 countEl.textContent = '(' + visible + ' result' + (visible === 1 ? '' : 's') + ')';
             }
-            if (clearBtn) clearBtn.hidden = !q;
+            if (clearBtn) {
+                const hasActiveFilter = Boolean(q || selects.some(sel => sel.value));
+                clearBtn.hidden = !hasActiveFilter;
+            }
         }
 
         search?.addEventListener('input', apply);
         search?.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
                 search.value = '';
+                selects.forEach(sel => { sel.value = ''; });
                 apply();
             }
         });
         clearBtn?.addEventListener('click', () => {
-            search.value = '';
+            if (search) search.value = '';
+            selects.forEach(sel => { sel.value = ''; });
             apply();
         });
         selects.forEach(sel => sel.addEventListener('change', apply));

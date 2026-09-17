@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
 
 $mockStudent = currentStudentProfile($mockStudent);
 
@@ -41,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $saved = storeStudentUpload($file);
                 $linked = latestApplicationForEmail($mockStudent['email']);
-                addUploadRecord([
+                recordStudentDocument([
                     'applicationId' => $linked['id'] ?? null,
                     'studentEmail' => $mockStudent['email'],
                     'fileName' => $file['name'],
@@ -51,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'notes' => $notes,
                     'storedFile' => $saved['storedFile'],
                     'mimeType' => $saved['mimeType'],
-                ]);
+                ], $mockStudent['email'], (int) ($_SESSION['user']['user_id'] ?? 0));
                 $uploadSuccess = '"' . $file['name'] . '" uploaded successfully.';
             } catch (RuntimeException $e) {
                 $uploadError = $e->getMessage();

@@ -17,7 +17,7 @@ if ($appId > 0) {
             "SELECT
                 a.application_id AS id,
                 u.email AS studentEmail,
-                COALESCE(NULLIF(TRIM(CONCAT(s.first_name, ' ', IFNULL(s.middle_initial, ''), ' ', s.last_name)), ''), u.full_name) AS student,
+                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', s.first_name, NULLIF(TRIM(REPLACE(s.middle_initial, '.', '')), ''), s.last_name)), ''), u.full_name) AS student,
                 CASE
                     WHEN s.program LIKE '%Computer Science%' THEN 'MSCS'
                     WHEN s.program LIKE '%Information Technology%' THEN 'MIT'
@@ -29,17 +29,27 @@ if ($appId > 0) {
                 a.presentation_stage AS stage,
                 a.paper_title AS title,
                 a.status,
+                a.coordinator_comment AS coordinatorComment,
+                a.grad_school_endorsed AS gradSchoolEndorsed,
+                a.payment_recorded AS paymentRecorded,
+                a.receipt_number AS receiptNumber,
+                a.payment_date AS paymentDate,
+                a.payment_amount AS paymentAmount,
+                a.ready_for_presentation AS readyForPresentation,
+                a.workflow_state AS workflowState,
+                a.result AS result,
                 a.submitted_at AS date
              FROM applications a
              INNER JOIN students s ON s.student_id = a.student_id
              INNER JOIN users u ON u.user_id = s.user_id
-             WHERE a.application_id = :id
+             WHERE a.application_id = :id AND a.archived_at IS NULL
              LIMIT 1"
         );
         $stmt->execute(['id' => $appId]);
         $app = $stmt->fetch() ?: null;
         if ($app) {
             $app['stageKey'] = stageKeyFromLabel($app['stage']);
+            $app['workflowState'] = json_decode((string) ($app['workflowState'] ?? '[]'), true) ?: [];
             $isDatabaseApplication = true;
         }
     } catch (PDOException $e) {
@@ -68,7 +78,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         foreach (($_POST['upload_status'] ?? []) as $uploadId => $uploadStatus) {
             if (!in_array($uploadStatus, ['submitted', 'verified', 'incomplete'], true)) continue;
             $upload = findUpload((string) $uploadId);
-            if (!$upload || (int) ($upload['applicationId'] ?? 0) !== (int) $app['id']) continue;
+            if (!$upload) continue;
+            // Accept documents linked to this application, or an unlinked
+            // document that belongs to this application's student.
+            $linkedAppId = (int) ($upload['applicationId'] ?? 0);
+            if ($linkedAppId !== (int) $app['id']) {
+                if ($linkedAppId !== 0 || empty($app['studentEmail'])
+                    || strcasecmp((string) ($upload['studentEmail'] ?? ''), (string) $app['studentEmail']) !== 0) {
+                    continue;
+                }
+            }
             updateUploadStatus((string) $uploadId, $uploadStatus);
             $type = strtolower((string) $upload['docType']);
             $key = (str_contains($type, 'receipt') || str_contains($type, 'payment')) ? 'receipt' : ((str_contains($type, 'endorsement') || str_contains($type, 'adviser')) ? 'adviser_endorsement' : 'paper');
@@ -93,18 +112,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             'paymentDate' => trim($_POST['paymentDate'] ?? ''),
             'paymentAmount' => trim($_POST['paymentAmount'] ?? ''),
             'readyForPresentation' => isset($_POST['readyForPresentation']),
+            'result' => trim($_POST['result'] ?? ''),
         ];
 
         try {
             if ($isDatabaseApplication) {
                 $saveStatus = DB::getConnection()->prepare(
                     'UPDATE applications
-                     SET status = :status, presentation_stage = :presentation_stage
+                     SET status = :status,
+                         presentation_stage = :presentation_stage,
+                         coordinator_comment = :coordinator_comment,
+                         grad_school_endorsed = :grad_school_endorsed,
+                         payment_recorded = :payment_recorded,
+                         receipt_number = :receipt_number,
+                         payment_date = :payment_date,
+                         payment_amount = :payment_amount,
+                         ready_for_presentation = :ready_for_presentation,
+                         workflow_state = :workflow_state,
+                         result = :result
                      WHERE application_id = :application_id'
                 );
                 $saveStatus->execute([
                     'status' => $status,
                     'presentation_stage' => $updatedFields['stage'],
+                    'coordinator_comment' => $comment,
+                    'grad_school_endorsed' => $updatedFields['gradSchoolEndorsed'] ? 1 : 0,
+                    'payment_recorded' => $updatedFields['paymentRecorded'] ? 1 : 0,
+                    'receipt_number' => $updatedFields['receiptNumber'] !== '' ? $updatedFields['receiptNumber'] : null,
+                    'payment_date' => $updatedFields['paymentDate'] !== '' ? $updatedFields['paymentDate'] : null,
+                    'payment_amount' => $updatedFields['paymentAmount'] !== '' ? (float) $updatedFields['paymentAmount'] : null,
+                    'ready_for_presentation' => $updatedFields['readyForPresentation'] ? 1 : 0,
+                    'workflow_state' => json_encode($workflowState, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: null,
+                    'result' => $updatedFields['result'] !== '' ? $updatedFields['result'] : null,
                     'application_id' => (int) $app['id'],
                 ]);
             }
@@ -208,6 +247,17 @@ require_once __DIR__ . '/../../includes/header.php';
             <div class="form-row">
                 <div class="form-field"><label>Payment Date</label><input type="date" name="paymentDate" value="<?= htmlspecialchars($app['paymentDate'] ?? '') ?>"></div>
                 <div class="form-field"><label>Amount</label><input type="text" name="paymentAmount" value="<?= htmlspecialchars($app['paymentAmount'] ?? '') ?>" placeholder="e.g. 1500.00"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Presentation Result</label>
+                    <select name="result">
+                        <option value="" <?= empty($app['result']) ? 'selected' : '' ?>>Not yet presented</option>
+                        <option value="approved" <?= ($app['result'] ?? '') === 'approved' ? 'selected' : '' ?>>Approved — advance to next stage</option>
+                        <option value="requires_revision" <?= ($app['result'] ?? '') === 'requires_revision' ? 'selected' : '' ?>>Requires Revision</option>
+                    </select>
+                    <p class="field-hint">Recorded after the presentation is conducted; this is reflected on the student Process Tracker.</p>
+                </div>
             </div>
         </div>
     </div>

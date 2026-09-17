@@ -34,6 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['full_name']  = $user['full_name'];
         $_SESSION['email']      = $user['email'];
         $_SESSION['role']       = $user['role'];
+        $_SESSION['user']       = $user;
+        setFlash('success', 'Welcome back, ' . $user['full_name'] . '.');
 
         // Redirect to student dashboard
         header('Location: ' . url('student/dashboard.php'));

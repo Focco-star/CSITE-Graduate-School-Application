@@ -56,7 +56,7 @@ require_once __DIR__ . '/../../includes/header.php';
                         <td class="actions">
                             <a href="<?= url('coordinator/schedule/edit.php?id=' . urlencode($sch['id'])) ?>" class="btn btn-sm btn-outline" title="Edit"><i class="fas fa-edit"></i></a>
                             <a href="<?= url('coordinator/schedule/panel.php?id=' . urlencode($sch['id'])) ?>" class="btn btn-sm btn-outline" title="Panel"><i class="fas fa-users"></i></a>
-                            <a href="<?= url('coordinator/schedule/notification.php?id=' . urlencode($sch['id'])) ?>" class="btn btn-sm btn-primary" title="Notify"><i class="fas fa-bell"></i></a>
+                            <a href="<?= url('coordinator/schedule/notification.php?id=' . urlencode($sch['id'])) ?>" class="btn btn-sm btn-primary" title="Notification preview"><i class="fas fa-bell"></i></a>
                             <?= coordDeleteLink(url('coordinator/schedule/manage.php?delete=' . urlencode($sch['id'])), 'Delete this schedule?') ?>
                         </td>
                     </tr>

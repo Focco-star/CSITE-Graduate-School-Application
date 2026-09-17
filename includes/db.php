@@ -48,12 +48,31 @@ class DB {
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($data);
-        
+
         $insertId = $pdo->lastInsertId();
 
-        // Return array including auto-generated primary key if applicable
-        if ($insertId && !isset($data['user_id'])) {
-            $data['user_id'] = (int) $insertId;
+        // Return array including the table's real auto-increment primary key.
+        // The previous implementation only ever returned 'user_id', which meant
+        // inserts into `students` (PK = student_id) came back without the id and
+        // every downstream reference ($student['student_id']) silently failed.
+        if ($insertId) {
+            $pkMap = [
+                'users' => 'user_id',
+                'students' => 'student_id',
+                'applications' => 'application_id',
+                'coordinators' => 'coordinator_id',
+                'advisor_pool' => 'adviser_id',
+                'application_documents' => 'document_id',
+            ];
+            $pk = $pkMap[$table] ?? 'id';
+            if (!isset($data[$pk])) {
+                $data[$pk] = (int) $insertId;
+            }
+            // Backwards compatibility: callers that inserted into `users` without
+            // passing a user_id continue to read it from $row['user_id'].
+            if ($pk !== 'user_id' && !isset($data['user_id'])) {
+                $data['user_id'] = (int) $insertId;
+            }
         }
 
         return $data;

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -36,7 +37,7 @@ if ($pdo && $appId > 0) {
             SELECT 
                 a.application_id AS id,
                 COALESCE(
-                    NULLIF(TRIM(CONCAT(s.first_name, ' ', s.last_name)), ''), 
+                    NULLIF(TRIM(CONCAT_WS(' ', s.first_name, NULLIF(TRIM(REPLACE(s.middle_initial, '.', '')), ''), s.last_name)), ''), 
                     u.full_name
                 ) AS student,
                 u.email AS studentEmail,
@@ -67,6 +68,9 @@ if (!$app && function_exists('findApplication')) {
     }
 }
 
+// Documents come from uploadsForApplication(), which merges the session store
+// with MySQL `application_documents` and also includes documents uploaded
+// before the student's application row existed (application_id IS NULL).
 $uploads = ($app && function_exists('uploadsForApplication')) ? uploadsForApplication((int) $app['id']) : [];
 $student = ($app && function_exists('findStudentByEmail') && isset($app['studentEmail'])) ? findStudentByEmail($app['studentEmail']) : null;
 

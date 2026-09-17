@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
 
 $mockStudent = currentStudentProfile($mockStudent);
 
@@ -31,14 +32,23 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="filter-bar" data-filter-table="#studentTplGrid" style="margin-bottom:1rem;">
     <div class="filter-search">
         <i class="fas fa-search"></i>
-        <input type="search" data-filter-q placeholder="Search templates and forms...">
+        <input type="search" data-filter-q placeholder="Search templates, forms, stages..." value="<?= htmlspecialchars($_GET['q'] ?? '') ?>">
     </div>
     <button type="button" class="btn btn-sm btn-outline" data-filter-clear hidden>Clear</button>
+    <select data-filter="stage">
+        <option value="">All stages</option>
+        <?php foreach ($workflow['stages'] as $s): ?>
+        <option value="<?= htmlspecialchars($s['label']) ?>" <?= (($_GET['stage'] ?? '') === $s['label']) ? 'selected' : '' ?>><?= htmlspecialchars($s['shortLabel'] ?? $s['label']) ?></option>
+        <?php endforeach; ?>
+        <?php if (!empty($workflow['refs'])): ?>
+        <option value="Reference Documents" <?= (($_GET['stage'] ?? '') === 'Reference Documents') ? 'selected' : '' ?>>Reference Documents</option>
+        <?php endif; ?>
+    </select>
     <select data-filter="type">
         <option value="">All types</option>
-        <option>Form</option>
-        <option>Template</option>
-        <option>Reference</option>
+        <option value="Form" <?= (($_GET['type'] ?? '') === 'Form') ? 'selected' : '' ?>>Form</option>
+        <option value="Template" <?= (($_GET['type'] ?? '') === 'Template') ? 'selected' : '' ?>>Template</option>
+        <option value="Reference" <?= (($_GET['type'] ?? '') === 'Reference') ? 'selected' : '' ?>>Reference</option>
     </select>
     <span class="filter-count" data-filter-count></span>
 </div>
@@ -64,8 +74,9 @@ require_once __DIR__ . '/../includes/header.php';
             <?php foreach ($stageDocs as $doc):
                 $href = asset('papers/' . rawurlencode($doc['folder']) . '/' . rawurlencode($doc['file']));
                 $isForm = ($doc['type'] ?? '') === 'form';
+                $searchKeywords = strtolower($doc['label'] . ' ' . $doc['file'] . ' ' . ($doc['description'] ?? '') . ' ' . $stage['label'] . ' ' . ($stage['shortLabel'] ?? '') . ' ' . ($isForm ? 'form' : 'template'));
             ?>
-            <div class="template-item" data-type="<?= $isForm ? 'Form' : 'Template' ?>" data-search="<?= htmlspecialchars(strtolower($doc['label'] . ' ' . $doc['file'] . ' ' . ($isForm ? 'form' : 'template'))) ?>">
+            <div class="template-item" data-stage="<?= htmlspecialchars($stage['label']) ?>" data-type="<?= $isForm ? 'Form' : 'Template' ?>" data-search="<?= htmlspecialchars($searchKeywords) ?>">
                 <div class="template-icon"><i class="fas <?= $isForm ? 'fa-file-signature' : 'fa-file-word' ?>"></i></div>
                 <h4><?= htmlspecialchars($doc['label']) ?></h4>
                 <p><?= htmlspecialchars($doc['description']) ?></p>
@@ -87,8 +98,10 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
     <div class="card-body">
         <div class="template-grid">
-            <?php foreach ($workflow['refs'] as $doc): ?>
-            <div class="template-item" data-type="Reference" data-search="<?= htmlspecialchars(strtolower($doc['label'] . ' ' . $doc['file'] . ' reference')) ?>">
+            <?php foreach ($workflow['refs'] as $doc):
+                $searchKeywords = strtolower($doc['label'] . ' ' . $doc['file'] . ' ' . ($doc['description'] ?? '') . ' reference documents');
+            ?>
+            <div class="template-item" data-stage="Reference Documents" data-type="Reference" data-search="<?= htmlspecialchars($searchKeywords) ?>">
                 <div class="template-icon"><i class="fas fa-file-word"></i></div>
                 <h4><?= htmlspecialchars($doc['label']) ?></h4>
                 <p><?= htmlspecialchars($doc['description']) ?></p>
@@ -102,6 +115,12 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 <?php endif; ?>
+
+<div class="card empty-state" data-filter-empty hidden style="text-align:center;padding:3rem 1.5rem;color:var(--gray-400);">
+    <i class="fas fa-folder-open" style="font-size:2.5rem;margin-bottom:1rem;color:var(--gray-300);"></i>
+    <h4 style="font-size:1.1rem;color:var(--gray-600);margin-bottom:0.35rem;">No templates found</h4>
+    <p style="font-size:0.875rem;">No forms or templates match your search or filter criteria.</p>
+</div>
 </div>
 
 <div class="card">

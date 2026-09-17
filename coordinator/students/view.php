@@ -1,15 +1,33 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Student Profile';
 $role        = 'coordinator';
 $currentPage = 'students';
 $userName    = $mockCoordinator['name'];
 
-$rec = findStudentById((string) ($_GET['id'] ?? '')) ?? findStudentByEmail($mockStudent['email']);
-$profile = $rec ? currentStudentProfile(array_merge($mockStudent, [
-    'email' => $rec['email'],
-])) : $mockStudent;
+$studentId = (int) ($_GET['id'] ?? 0);
+$rec = findStudentById((string) $studentId) ?? findStudentByEmail($mockStudent['email']);
+$profile = $rec ? currentStudentProfile(array_merge($mockStudent, ['email' => $rec['email']])) : $mockStudent;
+
+// The coordinator profile uses the source-of-truth users/students records when an ID came from the Students table.
+if ($studentId > 0) {
+    try {
+        $stmt = DB::getConnection()->prepare('SELECT s.*, u.full_name, u.email FROM students s INNER JOIN users u ON u.user_id = s.user_id WHERE s.student_id = :id LIMIT 1');
+        $stmt->execute(['id' => $studentId]);
+        $dbStudent = $stmt->fetch();
+        if ($dbStudent) {
+            $programCode = array_key_first(array_filter(PROGRAMS, static fn($label) => $label === $dbStudent['program'])) ?: $dbStudent['program'];
+            $programName = PROGRAMS[$programCode] ?? $dbStudent['program'];
+            $enroll = $dbStudent['enrollment_date'] ?: date('Y-m-d');
+            $rec = ['trackLabel' => getTrackLabel($dbStudent['track']), 'age' => $dbStudent['age'], 'gender' => $dbStudent['gender'], 'track' => $dbStudent['track'], 'program' => $programCode, 'currentStage' => 'not_started'];
+            $profile = array_merge($mockStudent, ['name' => studentDisplayName($dbStudent), 'email' => $dbStudent['email'], 'program' => $programCode, 'program_name' => preg_replace('/\s*\(.*\)$/', '', $programName) ?: $programName, 'track' => $dbStudent['track'], 'enroll_date' => $enroll, 'adviser' => $dbStudent['adviser_name'] ?? '', 'completion_deadline' => ((int) substr($enroll, 0, 4) + 3) . substr($enroll, 4)]);
+        }
+    } catch (Throwable $e) {
+        // Existing session records are used if MySQL is temporarily unavailable.
+    }
+}
 $latest = latestApplicationForEmail($profile['email']);
 $stages = getStagesForTrack($profile['track']);
 $studentSchedules = schedulesForEmail($profile['email']);

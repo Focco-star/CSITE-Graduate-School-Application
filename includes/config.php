@@ -1,10 +1,10 @@
 <?php
 
 
-define('SITE_NAME', 'CSITE Graduate School Application');
-define('SITE_SHORT', 'CSITE Grad App');
-define('SITE_TAGLINE', 'Capstone & Thesis Presentation Application System');
-define('BASE_URL', '/CSITE-Graduate-School-Application');
+define('SITE_NAME', 'CSITE Graduate School Application for Capstone and Thesis Presentation');
+define('SITE_SHORT', 'CSITE Graduate School Application');
+define('SITE_TAGLINE', 'Capstone and Thesis Presentation Application System');
+define('BASE_URL', '/GithubDesktop/CSITEGrad/CSITE-Graduate-School-Application');
 
 define('COLOR_PRIMARY', '#060297');
 define('COLOR_ACCENT', '#FFB82B');
@@ -89,9 +89,23 @@ function getStagesForTrack(string $track): array {
 }
 
 function getTrackForProgram(string $program): string {
+    $trimmed = trim($program);
+    if (stripos($trimmed, 'capstone') !== false) {
+        return 'capstone';
+    }
+    if (stripos($trimmed, 'seminar') !== false) {
+        return 'seminar';
+    }
+    if (stripos($trimmed, 'thesis') !== false) {
+        return 'thesis';
+    }
     $capstone = ['MIT', 'MSED_CHEM', 'MSED_GS', 'MSED_BIO', 'MSED_PHY', 'MLIS'];
-    if (in_array($program, $capstone, true)) return 'capstone';
-    if ($program === 'MATH') return 'seminar';
+    if (in_array($trimmed, $capstone, true)) {
+        return 'capstone';
+    }
+    if ($trimmed === 'MATH') {
+        return 'seminar';
+    }
     return 'thesis';
 }
 
@@ -392,9 +406,237 @@ function initPrototypeStore(): void {
 }
 
 function studentDisplayName(array $s): string {
-    $mi = trim((string) ($s['middleInitial'] ?? ''));
-    $mid = $mi !== '' ? ' ' . rtrim($mi, '.') . '.' : '';
-    return trim(($s['firstName'] ?? '') . $mid . ' ' . ($s['lastName'] ?? ''));
+    // Supports prototype/session records and MySQL query aliases alike.
+    $databaseName = trim((string) ($s['name'] ?? $s['full_name'] ?? ''));
+    if ($databaseName !== '') {
+        return $databaseName;
+    }
+    $first = trim((string) ($s['firstName'] ?? $s['first_name'] ?? ''));
+    $last = trim((string) ($s['lastName'] ?? $s['last_name'] ?? ''));
+    $mi = trim((string) ($s['middleInitial'] ?? $s['middle_initial'] ?? ''));
+    $mi = $mi !== '' ? rtrim($mi, '.') : '';
+    return canonicalStudentName($first, $last, $mi);
+}
+
+/**
+ * Build the single canonical student display name used everywhere.
+ * Format: "First M Last" (no trailing dot) — the same value the database
+ * triggers write to users.full_name, so the Users/application record and the
+ * Students table can never diverge.
+ */
+function canonicalStudentName(string $first, string $last, string $middleInitial = ''): string {
+    $first = trim($first);
+    $last = trim($last);
+    $mi = trim($middleInitial);
+    $mi = $mi !== '' ? rtrim($mi, '.') : '';
+    return trim(implode(' ', array_filter([$first, $mi, $last])));
+}
+
+/**
+ * Resolve the program code for a student row regardless of whether the stored
+ * value is the code (MSCS) or the full program label.
+ */
+function programCodeForStudent(array $student): string {
+    $program = trim((string) ($student['program'] ?? ''));
+    if ($program === '') {
+        return 'MSCS';
+    }
+    if (isset(PROGRAMS[$program])) {
+        return $program;
+    }
+    $code = array_key_first(array_filter(PROGRAMS, static fn($label) => $label === $program));
+    return $code ?: $program;
+}
+
+/**
+ * Generate the student number for a student whose account/user row already exists.
+ * Deterministic and collision-safe: CSITE-<6-digit student_id>.
+ */
+function generateStudentNumber(int $studentId): string {
+    return 'CSITE-' . str_pad((string) max(1, $studentId), 6, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Persist the full student identity into the MySQL students table.
+ * This is the single write point that keeps students in sync with the
+ * application/registration record and with users.full_name (via DB triggers).
+ */
+function upsertStudentIdentity(array $input, int $userId): array {
+    $pdo = DB::getConnection();
+
+    $first = trim((string) ($input['first_name'] ?? $input['firstName'] ?? ''));
+    $last  = trim((string) ($input['last_name'] ?? $input['lastName'] ?? ''));
+    $mi    = trim((string) ($input['middle_initial'] ?? $input['middleInitial'] ?? ''));
+    $mi    = $mi !== '' ? rtrim($mi, '.') : '';
+    $programLabel = $input['program_label'] ?? (isset(PROGRAMS[$input['program'] ?? '']) ? PROGRAMS[$input['program']] : ($input['program'] ?? 'MSCS'));
+    $track = $input['track'] ?? getTrackForProgram($input['program'] ?? 'MSCS');
+    $gender = trim((string) ($input['gender'] ?? ''));
+    $age = (int) ($input['age'] ?? 0);
+    $fullName = canonicalStudentName($first, $last, $mi);
+
+    $existing = DB::find('students', ['user_id' => (int) $userId]);
+    if ($existing) {
+        $pdo->beginTransaction();
+        try {
+            DB::update('students', [
+                'first_name' => $first,
+                'last_name' => $last,
+                'middle_initial' => $mi,
+                'age' => $age,
+                'gender' => $gender,
+                'program' => $programLabel,
+                'track' => $track,
+                'adviser_name' => trim((string) ($input['adviser_name'] ?? $existing['adviser_name'] ?? '')),
+            ], ['student_id' => (int) $existing['student_id']]);
+            DB::update('users', ['full_name' => $fullName], ['user_id' => (int) $userId]);
+            $pdo->commit();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+        $existing['first_name'] = $first;
+        $existing['last_name'] = $last;
+        $existing['middle_initial'] = $mi;
+        $existing['age'] = $age;
+        $existing['gender'] = $gender;
+        $existing['program'] = $programLabel;
+        $existing['track'] = $track;
+        $existing['adviser_name'] = trim((string) ($input['adviser_name'] ?? $existing['adviser_name'] ?? ''));
+        return $existing;
+    }
+
+    // No students row yet — create it (e.g. account exists but profile was never completed).
+    $pdo->beginTransaction();
+    try {
+        $student = DB::insert('students', [
+            'user_id' => (int) $userId,
+            'first_name' => $first,
+            'last_name' => $last,
+            'middle_initial' => $mi,
+            'age' => $age,
+            'gender' => $gender,
+            'program' => $programLabel,
+            'track' => $track,
+            'adviser_name' => trim((string) ($input['adviser_name'] ?? '')),
+            'enrollment_date' => date('Y-m-d'),
+        ]);
+        // Ensure the unique student_number is always populated.
+        if (empty($student['student_number'])) {
+            DB::update('students', ['student_number' => generateStudentNumber((int) $student['student_id'])], ['student_id' => (int) $student['student_id']]);
+        }
+        $pdo->commit();
+        return DB::find('students', ['user_id' => (int) $userId]) ?: $student;
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
+}
+
+/**
+ * Build the session-prototype student row that mirrors the MySQL students row
+ * exactly, so every hybrid screen shows the identical identity.
+ */
+function studentRowFromIdentity(array $identity, array $sessionRow = []): array {
+    $first = trim((string) ($identity['first_name'] ?? $identity['firstName'] ?? ''));
+    $last  = trim((string) ($identity['last_name'] ?? $identity['lastName'] ?? ''));
+    $mi    = trim((string) ($identity['middle_initial'] ?? $identity['middleInitial'] ?? ''));
+    $mi    = $mi !== '' ? rtrim($mi, '.') : '';
+    $programCode = programCodeForStudent($identity);
+    $track = $identity['track'] ?? getTrackForProgram($programCode);
+    $age = trim((string) ($identity['age'] ?? ''));
+    $gender = trim((string) ($identity['gender'] ?? ''));
+    $enroll = (string) ($identity['enrollment_date'] ?? $identity['enrollDate'] ?? date('Y-m-d'));
+
+    return [
+        'id' => (string) ($sessionRow['id'] ?? 's_' . uniqid()),
+        'email' => (string) ($identity['email'] ?? $sessionRow['email'] ?? ''),
+        'firstName' => $first,
+        'lastName' => $last,
+        'middleInitial' => $mi,
+        'age' => $age,
+        'gender' => $gender,
+        'program' => $programCode,
+        'track' => $track,
+        'trackLabel' => getTrackLabel($track),
+        'enrollDate' => $enroll,
+        'currentStage' => (string) ($sessionRow['currentStage'] ?? 'not_started'),
+        'status' => (string) ($sessionRow['status'] ?? 'not_started'),
+        'title' => (string) ($sessionRow['title'] ?? ''),
+        'adviser' => (string) ($sessionRow['adviser'] ?? $identity['adviser_name'] ?? ''),
+    ];
+}
+
+/**
+ * Insert or replace the session-prototype student record for an email with the
+ * canonical identity, so the prototype screens can never show a stale name.
+ */
+function upsertSessionStudent(array $identity, array $sessionRow = []): void {
+    $students = storeGet('students');
+    $email = strtolower((string) ($identity['email'] ?? $sessionRow['email'] ?? ''));
+    if ($email === '') {
+        return;
+    }
+    $row = studentRowFromIdentity($identity, $sessionRow);
+    $row['email'] = $identity['email'] ?? $sessionRow['email'] ?? $row['email'];
+    $found = false;
+    foreach ($students as &$s) {
+        if (strcasecmp((string) ($s['email'] ?? ''), $email) === 0) {
+            $s = array_merge($s, $row);
+            $found = true;
+            break;
+        }
+    }
+    unset($s);
+    if (!$found) {
+        $students[] = $row;
+    }
+    storeSet('students', $students);
+    $_SESSION['current_student_id'] = $row['id'];
+    $_SESSION['current_student_email'] = $row['email'];
+}
+
+/**
+ * Read the authenticated student's identity straight from MySQL — the single
+ * source of truth. Falls back to session data only when the DB is unavailable.
+ */
+function databaseStudentIdentity(): array {
+    $sessionUser = $_SESSION['user'] ?? [];
+    $userId = (int) ($sessionUser['user_id'] ?? $_SESSION['user_id'] ?? 0);
+    if ($userId <= 0 || !class_exists('DB')) {
+        return [];
+    }
+    try {
+        $dbStudent = DB::find('students', ['user_id' => $userId]);
+        $dbUser = $userId > 0 ? DB::find('users', ['user_id' => $userId]) : null;
+        if (!$dbStudent || !$dbUser) {
+            return [];
+        }
+        return [
+            'student_id' => (int) $dbStudent['student_id'],
+            'user_id' => $userId,
+            'email' => $dbUser['email'],
+            'full_name' => $dbUser['full_name'],
+            'first_name' => $dbStudent['first_name'],
+            'last_name' => $dbStudent['last_name'],
+            'middle_initial' => $dbStudent['middle_initial'] ?? '',
+            'age' => (int) $dbStudent['age'],
+            'gender' => $dbStudent['gender'] ?? '',
+            'program' => programCodeForStudent($dbStudent),
+            'program_label' => $dbStudent['program'],
+            'program_name' => preg_replace('/\s*\(.*\)$/', '', (string) $dbStudent['program']) ?: $dbStudent['program'],
+            'track' => $dbStudent['track'],
+            'track_label' => getTrackLabel($dbStudent['track']),
+            'student_number' => $dbStudent['student_number'] ?? '',
+            'adviser_name' => $dbStudent['adviser_name'] ?? '',
+            'enrollment_date' => $dbStudent['enrollment_date'] ?? '',
+        ];
+    } catch (Throwable $e) {
+        return [];
+    }
 }
 
 function findStudentByEmail(string $email): ?array {
@@ -427,6 +669,25 @@ function currentStudentEmail(array $fallback): string {
 }
 
 function currentStudentProfile(array $fallback): array {
+    // Prefer the authenticated account so every student page shows the same user.
+    $sessionUser = $_SESSION['user'] ?? [];
+    if (($sessionUser['role'] ?? '') === 'student' && !empty($sessionUser['user_id']) && class_exists('DB')) {
+        try {
+            $dbStudent = DB::find('students', ['user_id' => (int) $sessionUser['user_id']]);
+            if ($dbStudent) {
+                $programCode = programCodeForStudent($dbStudent);
+                $programName = PROGRAMS[$programCode] ?? $dbStudent['program'];
+                $enroll = $dbStudent['enrollment_date'] ?: date('Y-m-d');
+                $fullName = trim((string) ($sessionUser['full_name'] ?? ''));
+                if ($fullName === '') {
+                    $fullName = canonicalStudentName($dbStudent['first_name'], $dbStudent['last_name'], $dbStudent['middle_initial'] ?? '');
+                }
+                return array_merge($fallback, ['id' => (string) $dbStudent['student_id'], 'name' => $fullName, 'email' => $sessionUser['email'] ?? $dbStudent['email'] ?? '', 'program' => $programCode, 'program_name' => preg_replace('/\s*\(.*\)$/', '', $programName) ?: $programName, 'track' => $dbStudent['track'], 'trackLabel' => getTrackLabel($dbStudent['track']), 'enroll_date' => $enroll, 'current_stage' => 'not_started', 'status' => 'not_started', 'title' => '', 'adviser' => $dbStudent['adviser_name'] ?? '', 'completion_deadline' => ((int) substr($enroll, 0, 4) + 3) . substr($enroll, 4)]);
+            }
+        } catch (Throwable $e) {
+            // Session values below remain a safe fallback when the database is unavailable.
+        }
+    }
     $id = (string) ($_SESSION['current_student_id'] ?? '');
     $s = $id !== '' ? findStudentById($id) : null;
     $email = currentStudentEmail($fallback);
@@ -434,6 +695,10 @@ function currentStudentProfile(array $fallback): array {
         $s = findStudentByEmail($email);
     }
     if (!$s) {
+        if (($sessionUser['role'] ?? '') === 'student') {
+            $fallback['name'] = $sessionUser['full_name'] ?? $fallback['name'];
+            $fallback['email'] = $sessionUser['email'] ?? $fallback['email'];
+        }
         return $fallback;
     }
     $program = $s['program'];
@@ -473,9 +738,9 @@ function addRegisteredStudent(array $input): array {
     $rec = [
         'id' => 's_' . uniqid(),
         'email' => $input['email'],
-        'firstName' => $input['firstName'],
-        'lastName' => $input['lastName'],
-        'middleInitial' => $input['middleInitial'] ?? '',
+        'firstName' => trim($input['firstName']),
+        'lastName' => trim($input['lastName']),
+        'middleInitial' => rtrim(trim($input['middleInitial'] ?? ''), '.'),
         'age' => $input['age'] ?? '',
         'gender' => $input['gender'] ?? '',
         'program' => $input['program'],
@@ -701,19 +966,28 @@ function updateApplicationRecord(int $id, array $patch): ?array {
 function addUploadRecord(array $u): array {
     $list = storeGet('uploads');
     $rec = [
-        'id' => 'up_' . uniqid(),
+        'id' => (string) ($u['id'] ?? '') !== '' ? (string) $u['id'] : 'up_' . uniqid(),
         'applicationId' => $u['applicationId'] ?? null,
         'studentEmail' => $u['studentEmail'],
         'fileName' => $u['fileName'],
         'docType' => $u['docType'],
         'stage' => $u['stage'],
         'size' => (int) ($u['size'] ?? 0),
-        'date' => date('Y-m-d'),
-        'status' => 'submitted',
+        'date' => $u['date'] ?? date('Y-m-d'),
+        'status' => $u['status'] ?? 'submitted',
         'notes' => $u['notes'] ?? '',
         'storedFile' => $u['storedFile'] ?? '',
         'mimeType' => $u['mimeType'] ?? '',
     ];
+    // Replace an existing entry with the same id instead of duplicating it, so a
+    // re-recorded upload keeps one row per document.
+    foreach ($list as $i => $existing) {
+        if ((string) ($existing['id'] ?? '') === $rec['id']) {
+            $list[$i] = array_merge($existing, $rec);
+            storeSet('uploads', $list);
+            return $list[$i];
+        }
+    }
     $list[] = $rec;
     storeSet('uploads', $list);
     return $rec;
@@ -739,9 +1013,257 @@ function storeStudentUpload(array $file): array {
     return ['storedFile' => $stored, 'mimeType' => (string) ($file['type'] ?? ''), 'originalName' => $original];
 }
 
+/**
+ * Normalize a MySQL `application_documents` row into the exact shape the
+ * session-backed store uses, so every view/consumer works with either source
+ * without knowing where the record came from.
+ */
+function normalizeDatabaseDocument(array $row, string $email = ''): array {
+    return [
+        'id' => (string) ($row['document_id'] ?? $row['id'] ?? ''),
+        'applicationId' => isset($row['application_id']) && $row['application_id'] !== null ? (int) $row['application_id'] : null,
+        'studentEmail' => strtolower($email !== '' ? $email : (string) ($row['studentEmail'] ?? $row['email'] ?? '')),
+        'fileName' => (string) ($row['original_name'] ?? $row['fileName'] ?? ''),
+        'docType' => (string) ($row['document_type'] ?? $row['docType'] ?? ''),
+        'stage' => (string) ($row['stage'] ?? ''),
+        'size' => (int) ($row['file_size'] ?? $row['size'] ?? 0),
+        'date' => (string) ($row['uploaded_at'] ?? $row['date'] ?? ''),
+        'status' => (string) ($row['status'] ?? 'submitted'),
+        'notes' => (string) ($row['notes'] ?? ''),
+        'storedFile' => (string) ($row['stored_name'] ?? $row['storedFile'] ?? ''),
+        'mimeType' => (string) ($row['mime_type'] ?? $row['mimeType'] ?? ''),
+        'source' => 'db',
+    ];
+}
+
+/**
+ * Resolve the MySQL students.student_id for an email address.
+ */
+function databaseStudentIdForEmail(string $email): int {
+    if (!class_exists('DB') || $email === '') {
+        return 0;
+    }
+    try {
+        $stmt = DB::getConnection()->prepare(
+            'SELECT s.student_id
+             FROM students s
+             INNER JOIN users u ON u.user_id = s.user_id
+             WHERE u.email = :email
+             LIMIT 1'
+        );
+        $stmt->execute(['email' => $email]);
+        return (int) ($stmt->fetchColumn() ?: 0);
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+/**
+ * Latest (or stage-matching) application id for a student. Used to link a
+ * freshly uploaded document to the student's active application so the
+ * coordinator panel can surface it immediately.
+ */
+function databaseApplicationIdForStudent(int $studentId, string $stageLabel = ''): ?int {
+    if (!class_exists('DB') || $studentId <= 0) {
+        return null;
+    }
+    try {
+        $pdo = DB::getConnection();
+        if ($stageLabel !== '') {
+            $stmt = $pdo->prepare(
+                'SELECT application_id FROM applications
+                 WHERE student_id = :student_id AND archived_at IS NULL AND presentation_stage = :stage
+                 ORDER BY submitted_at DESC LIMIT 1'
+            );
+            $stmt->execute(['student_id' => $studentId, 'stage' => $stageLabel]);
+            $found = $stmt->fetchColumn();
+            if ($found) {
+                return (int) $found;
+            }
+        }
+        $stmt = $pdo->prepare(
+            'SELECT application_id FROM applications
+             WHERE student_id = :student_id AND archived_at IS NULL
+             ORDER BY submitted_at DESC LIMIT 1'
+        );
+        $stmt->execute(['student_id' => $studentId]);
+        return ($id = $stmt->fetchColumn()) ? (int) $id : null;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/**
+ * Read student documents straight from MySQL, optionally scoped.
+ * This is what makes an upload visible to the coordinator: the student and the
+ * coordinator are different PHP sessions, so a session-only store can never be
+ * seen across accounts.
+ *
+ * $applicationId NULL + $studentId set  -> every document for that student
+ * $applicationId set + $studentId set   -> documents linked to the application
+ *                                          OR still unlinked (application_id IS NULL)
+ */
+function databaseDocuments(?int $applicationId = null, int $studentId = 0, bool $includeUnlinked = true): array {
+    if (!class_exists('DB')) {
+        return [];
+    }
+    try {
+        $pdo = DB::getConnection();
+        $where = [];
+        $params = [];
+        if ($applicationId !== null && $applicationId > 0) {
+            if ($studentId > 0 && $includeUnlinked) {
+                $where[] = '(d.application_id = :application_id OR (d.application_id IS NULL AND d.student_id = :student_id))';
+                $params['application_id'] = $applicationId;
+                $params['student_id'] = $studentId;
+            } else {
+                $where[] = 'd.application_id = :application_id';
+                $params['application_id'] = $applicationId;
+            }
+        } elseif ($studentId > 0) {
+            $where[] = 'd.student_id = :student_id';
+            $params['student_id'] = $studentId;
+        } else {
+            return [];
+        }
+        $sql = 'SELECT d.document_id, d.application_id, d.student_id, d.stage, d.document_type,
+                       d.original_name, d.stored_name, d.mime_type, d.file_size, d.status, d.uploaded_at,
+                       u.email AS studentEmail
+                FROM application_documents d
+                INNER JOIN students s ON s.student_id = d.student_id
+                INNER JOIN users u ON u.user_id = s.user_id
+                WHERE ' . implode(' AND ', $where) . '
+                ORDER BY d.uploaded_at DESC, d.document_id DESC';
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        return array_map(
+            static fn($row) => normalizeDatabaseDocument($row, (string) ($row['studentEmail'] ?? '')),
+            $stmt->fetchAll()
+        );
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
+ * Fetch a single document by its MySQL primary key.
+ */
+function databaseDocumentById(int $documentId): ?array {
+    if (!class_exists('DB') || $documentId <= 0) {
+        return null;
+    }
+    try {
+        $stmt = DB::getConnection()->prepare(
+            'SELECT d.document_id, d.application_id, d.student_id, d.stage, d.document_type,
+                    d.original_name, d.stored_name, d.mime_type, d.file_size, d.status, d.uploaded_at,
+                    u.email AS studentEmail
+             FROM application_documents d
+             INNER JOIN students s ON s.student_id = d.student_id
+             INNER JOIN users u ON u.user_id = s.user_id
+             WHERE d.document_id = :document_id
+             LIMIT 1'
+        );
+        $stmt->execute(['document_id' => $documentId]);
+        $row = $stmt->fetch();
+        return $row ? normalizeDatabaseDocument($row, (string) ($row['studentEmail'] ?? '')) : null;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/**
+ * The single write point for a student document.
+ *
+ * Records the upload in BOTH stores: the session prototype (kept for the
+ * legacy prototype screens) and MySQL `application_documents` (the shared
+ * source of truth the coordinator panel reads). Writing only to the session
+ * was the reason a coordinator could never see a student's upload.
+ */
+function recordStudentDocument(array $meta, ?string $email = null, ?int $userId = null): ?int {
+    $email = strtolower((string) ($email ?? ($meta['studentEmail'] ?? '')));
+    if ($email === '') {
+        return null;
+    }
+
+    // 1) Shared store first: this is the record the coordinator reads.
+    $documentId = null;
+    if (class_exists('DB')) {
+        try {
+            $studentId = databaseStudentIdForEmail($email);
+            if ($studentId > 0) {
+                $stageLabel = (string) ($meta['stage'] ?? '');
+                // Resolve the REAL MySQL application id for this student instead of
+                // trusting the caller's applicationId. The student pages pass the
+                // session-store id (a time() value), which never matches an
+                // applications.application_id and makes this INSERT fail the FK
+                // constraint - which is exactly how uploads vanished from the
+                // coordinator panel (and from the student's own list after a
+                // re-login, because only the session copy existed).
+                $applicationId = databaseApplicationIdForStudent($studentId, $stageLabel);
+                if ($applicationId === null && !empty($meta['applicationId'])) {
+                    // Fall back to the caller's id ONLY if it is a real application row.
+                    $candidate = (int) $meta['applicationId'];
+                    if ($candidate > 0) {
+                        $existsStmt = DB::getConnection()->prepare(
+                            'SELECT 1 FROM applications WHERE application_id = :id LIMIT 1'
+                        );
+                        $existsStmt->execute(['id' => $candidate]);
+                        if ($existsStmt->fetchColumn()) {
+                            $applicationId = $candidate;
+                        }
+                    }
+                }
+                $status = (string) ($meta['status'] ?? 'submitted');
+                if (!in_array($status, ['submitted', 'verified', 'incomplete'], true)) {
+                    $status = 'submitted';
+                }
+                $stmt = DB::getConnection()->prepare(
+                    'INSERT INTO application_documents
+                        (application_id, student_id, stage, document_type, original_name, stored_name, mime_type, file_size, status)
+                     VALUES
+                        (:application_id, :student_id, :stage, :document_type, :original_name, :stored_name, :mime_type, :file_size, :status)'
+                );
+                $stmt->execute([
+                    'application_id' => $applicationId,
+                    'student_id' => $studentId,
+                    'stage' => $stageLabel,
+                    'document_type' => (string) ($meta['docType'] ?? 'Document'),
+                    'original_name' => (string) ($meta['fileName'] ?? ''),
+                    'stored_name' => (string) ($meta['storedFile'] ?? ''),
+                    'mime_type' => (string) ($meta['mimeType'] ?? ''),
+                    'file_size' => (int) ($meta['size'] ?? 0),
+                    'status' => $status,
+                ]);
+                $documentId = (int) DB::getConnection()->lastInsertId();
+            }
+        } catch (Throwable $e) {
+            // Keep the student's own screens working, but never fail silently:
+            // an invisible failure here is what makes an upload disappear from
+            // the coordinator panel.
+            error_log('CSITE: failed to record application document for ' . $email . ' — ' . $e->getMessage());
+            $documentId = null;
+        }
+    }
+
+    // 2) Session prototype record, now carrying the real document id so
+    //    download links resolve against either store.
+    addUploadRecord(array_merge($meta, [
+        'studentEmail' => $email,
+        'applicationId' => $meta['applicationId'] ?? null,
+        'id' => $documentId ? (string) $documentId : null,
+    ]));
+
+    return $documentId;
+}
+
 function findUpload(string $id): ?array {
     foreach (storeGet('uploads') as $upload) {
         if ((string) ($upload['id'] ?? '') === $id) return $upload;
+    }
+    // Fall back to MySQL so documents uploaded in another session (i.e. by the
+    // student while the coordinator is signed in) are still resolvable.
+    if (ctype_digit($id)) {
+        return databaseDocumentById((int) $id);
     }
     return null;
 }
@@ -754,6 +1276,18 @@ function uploadStoragePath(array $upload): ?string {
 }
 
 function updateUploadStatus(string $id, string $status): void {
+    // Shared store first, so a coordinator's review is visible to the student
+    // in a different session.
+    if (ctype_digit($id) && class_exists('DB')) {
+        try {
+            $stmt = DB::getConnection()->prepare(
+                'UPDATE application_documents SET status = :status WHERE document_id = :document_id'
+            );
+            $stmt->execute(['status' => $status, 'document_id' => (int) $id]);
+        } catch (Throwable $e) {
+            // The session record below still reflects the change on this screen.
+        }
+    }
     $list = storeGet('uploads');
     foreach ($list as &$u) {
         if ((string) $u['id'] !== $id) {
@@ -788,15 +1322,61 @@ function syncUploadStatusesFromWorkflow(int $appId, array $workflowState): void 
 }
 
 function uploadsForEmail(string $email): array {
-    return array_values(array_filter(storeGet('uploads'), static function ($u) use ($email) {
+    $sessionUploads = array_values(array_filter(storeGet('uploads'), static function ($u) use ($email) {
         return strcasecmp((string) $u['studentEmail'], $email) === 0;
     }));
+    $dbUploads = databaseDocuments(null, databaseStudentIdForEmail($email));
+    $merged = [];
+    $seen = [];
+    foreach ($sessionUploads as $u) {
+        $seen[(string) ($u['id'] ?? '') . '|' . (string) ($u['storedFile'] ?? '')] = true;
+        $merged[] = $u;
+    }
+    foreach ($dbUploads as $u) {
+        $key = (string) ($u['id'] ?? '') . '|' . (string) ($u['storedFile'] ?? '');
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        $merged[] = $u;
+    }
+    return $merged;
 }
 
 function uploadsForApplication(int $id): array {
-    return array_values(array_filter(storeGet('uploads'), static function ($u) use ($id) {
+    // Documents are linked to an application, but a document uploaded before
+    // the student's application record existed may still be unlinked. Resolve
+    // the application's student and include those, otherwise the coordinator
+    // sees "No documents uploaded" for a student who has uploaded files.
+    $studentId = 0;
+    if (class_exists('DB') && $id > 0) {
+        try {
+            $stmt = DB::getConnection()->prepare('SELECT student_id FROM applications WHERE application_id = :id LIMIT 1');
+            $stmt->execute(['id' => $id]);
+            $studentId = (int) ($stmt->fetchColumn() ?: 0);
+        } catch (Throwable $e) {
+            $studentId = 0;
+        }
+    }
+    $sessionUploads = array_values(array_filter(storeGet('uploads'), static function ($u) use ($id) {
         return (int) ($u['applicationId'] ?? 0) === $id;
     }));
+    $dbUploads = databaseDocuments($id, $studentId, $studentId > 0);
+    $merged = [];
+    $seen = [];
+    // Session entries first, then DB rows that are not already represented.
+    foreach ($sessionUploads as $u) {
+        $seen[(string) ($u['storedFile'] ?? '')] = true;
+        $merged[] = $u;
+    }
+    foreach ($dbUploads as $u) {
+        $key = (string) ($u['storedFile'] ?? '');
+        if ($key !== '' && isset($seen[$key])) {
+            continue;
+        }
+        $merged[] = $u;
+    }
+    return $merged;
 }
 
 function formatFileSize(int $bytes): string {
@@ -809,6 +1389,24 @@ function formatFileSize(int $bytes): string {
 function redirectTo(string $path): void {
     header('Location: ' . url($path));
     exit;
+}
+
+function setFlash(string $type, string $message): void {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $_SESSION['flash'] = ['type' => $type, 'message' => $message];
+}
+
+function pullFlash(): ?array {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $flash = $_SESSION['flash'] ?? null;
+    unset($_SESSION['flash']);
+    return is_array($flash) ? $flash : null;
+}
+
+function currentCoordinatorName(): string {
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $name = trim((string) ($_SESSION['user']['full_name'] ?? ''));
+    return $name !== '' ? $name : ($GLOBALS['mockCoordinator']['name'] ?? 'Graduate Program Coordinator');
 }
 
 function appWorkflowDefaults(): array {
@@ -877,9 +1475,9 @@ function displayStageLabel(array $student): string {
 }
 
 function coordDeleteForm(string $actionUrl, string $id, string $message, string $title = 'Delete'): string {
-    return '<form method="post" action="' . htmlspecialchars($actionUrl) . '" style="display:inline;" onsubmit="return confirm(' . htmlspecialchars(json_encode($message), ENT_QUOTES) . ');">'
+    return '<form method="post" action="' . htmlspecialchars($actionUrl) . '" style="display:inline;" data-confirm-form data-confirm-message="' . htmlspecialchars($message) . '">'
         . '<input type="hidden" name="delete_id" value="' . htmlspecialchars($id) . '">'
-        . '<button type="submit" class="btn btn-sm btn-danger" title="' . htmlspecialchars($title) . '"><i class="fas fa-trash"></i> Delete</button>'
+        . '<button type="button" class="btn btn-sm btn-danger" data-confirm-trigger title="' . htmlspecialchars($title) . '"><i class="fas fa-trash"></i> Delete</button>'
         . '</form>';
 }
 
@@ -891,13 +1489,31 @@ function postedDeleteId(): string {
 }
 
 function coordDeleteLink(string $href, string $message): string {
-    return '<a href="' . htmlspecialchars($href) . '" class="btn btn-sm btn-danger" title="Delete" onclick="return confirm(' . htmlspecialchars(json_encode($message), ENT_QUOTES) . ');"><i class="fas fa-trash"></i> Delete</a>';
+    return '<button type="button" class="btn btn-sm btn-danger" title="Delete" data-confirm-url="' . htmlspecialchars($href) . '" data-confirm-message="' . htmlspecialchars($message) . '"><i class="fas fa-trash"></i> Delete</button>';
 }
 
-function deleteStudentRecord(string $id): void {
-    storeSet('students', array_values(array_filter(storeGet('students'), static function ($s) use ($id) {
-        return (string) $s['id'] !== $id;
-    })));
+function archiveStudentRecord(string $id): void {
+    $students = storeGet('students');
+    foreach ($students as &$student) {
+        if ((string) ($student['id'] ?? '') === $id) {
+            $student['archivedAt'] = date('c');
+            break;
+        }
+    }
+    unset($student);
+    storeSet('students', $students);
+}
+
+function archiveApplicationRecord(int $id): void {
+    $apps = storeGet('applications');
+    foreach ($apps as &$app) {
+        if ((int) ($app['id'] ?? 0) === $id) {
+            $app['archivedAt'] = date('c');
+            break;
+        }
+    }
+    unset($app);
+    storeSet('applications', $apps);
 }
 
 function deleteApplicationRecord(int $id): void {
@@ -1021,6 +1637,38 @@ function panelSelectOptions(): array {
     ];
 }
 
+/**
+ * Determine the index of the student's current workflow stage.
+ *
+ * The coordinator's "advance to next stage" renames the single application row's
+ * presentation_stage (rather than keeping a row per completed stage), so earlier
+ * stages legitimately have no row and read as 'not_started'. Scanning back-to-front
+ * and taking the furthest stage that actually carries a status makes the stepper
+ * land on the stage the student is really at, not on an earlier blank stage.
+ */
+function workflowCurrentIndex(array $progress, array $stages): int {
+    $started = -1;
+    foreach ($progress as $i => $p) {
+        $st = $p['stageStatus'] ?? 'not_started';
+        if (!in_array($st, ['not_started', 'pending', 'draft'], true)) {
+            $started = $i;
+        }
+    }
+    return $started >= 0 ? $started : 0;
+}
+
+/**
+ * Stage visual state for the stepper: 'done' when completed/approved or already
+ * passed by the current stage, 'active' for the current stage, otherwise 'pending'.
+ */
+function workflowStageState(array $p, int $idx, int $currentIdx): string {
+    $st = $p['stageStatus'] ?? 'not_started';
+    if (in_array($st, ['completed', 'approved'], true) || $idx < $currentIdx) {
+        return 'done';
+    }
+    return $idx === $currentIdx ? 'active' : 'pending';
+}
+
 function blankStageProgress(array $stage): array {
     $pending = ['status' => 'pending'];
     return [
@@ -1045,6 +1693,24 @@ function getStudentProgress(string $email, string $track): array {
     }));
     $uploads = uploadsForEmail($email);
     $schedules = schedulesForEmail($email);
+
+    // Use saved MySQL records for live student progress; keep the local store only as a fallback.
+    if (class_exists('DB')) {
+        try {
+            $stmt = DB::getConnection()->prepare('SELECT a.application_id AS id, a.presentation_stage AS stage, a.paper_title AS title, a.status, a.coordinator_comment AS coordinatorComment, a.grad_school_endorsed AS gradSchoolEndorsed, a.payment_recorded AS paymentRecorded, a.receipt_number AS receiptNumber, a.payment_date AS paymentDate, a.payment_amount AS paymentAmount, a.ready_for_presentation AS readyForPresentation, a.workflow_state AS workflowState, a.result AS result, a.submitted_at AS date FROM applications a INNER JOIN students s ON s.student_id = a.student_id INNER JOIN users u ON u.user_id = s.user_id WHERE u.email = :email AND a.archived_at IS NULL ORDER BY a.submitted_at ASC');
+            $stmt->execute(['email' => $email]);
+            $dbApps = $stmt->fetchAll();
+            if ($dbApps) {
+                $apps = array_map(static function ($app) use ($email, $track) { $app['studentEmail'] = $email; $app['track'] = $track; $app['stageKey'] = stageKeyFromLabel($app['stage']); $app['workflowState'] = json_decode((string) ($app['workflowState'] ?? '[]'), true) ?: []; return $app; }, $dbApps);
+                $docStmt = DB::getConnection()->prepare('SELECT d.application_id AS applicationId, d.original_name AS fileName, d.document_type AS docType, d.stage, d.file_size AS size, d.uploaded_at AS date, d.status, d.stored_name AS storedFile, d.mime_type AS mimeType FROM application_documents d INNER JOIN students s ON s.student_id = d.student_id INNER JOIN users u ON u.user_id = s.user_id WHERE u.email = :email ORDER BY d.uploaded_at ASC');
+                $docStmt->execute(['email' => $email]);
+                $dbUploads = $docStmt->fetchAll();
+                if ($dbUploads) $uploads = $dbUploads;
+            }
+        } catch (Throwable $e) {
+            // The session-backed prototype remains available during initial setup.
+        }
+    }
 
     $rows = [];
     foreach ($stages as $stage) {

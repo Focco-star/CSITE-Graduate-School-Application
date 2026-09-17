@@ -36,15 +36,15 @@ $pendingApps = [];
 if ($pdo) {
     try {
         // Pending applications count (submitted, under_review)
-        $stmt = $pdo->query("SELECT COUNT(*) FROM applications WHERE status IN ('submitted', 'under_review')");
+        $stmt = $pdo->query("SELECT COUNT(*) FROM applications WHERE archived_at IS NULL AND status IN ('submitted', 'under_review')");
         $pendingAppsCount = (int) $stmt->fetchColumn();
 
         // Total applications count
-        $stmt = $pdo->query("SELECT COUNT(*) FROM applications");
+        $stmt = $pdo->query("SELECT COUNT(*) FROM applications WHERE archived_at IS NULL");
         $totalAppsCount = (int) $stmt->fetchColumn();
 
         // Active students count
-        $stmt = $pdo->query("SELECT COUNT(*) FROM students");
+        $stmt = $pdo->query("SELECT COUNT(*) FROM students WHERE archived_at IS NULL");
         $activeStudentsCount = (int) $stmt->fetchColumn();
 
         // Applications requiring attention from DB
@@ -52,7 +52,7 @@ if ($pdo) {
             SELECT 
                 a.application_id AS id,
                 COALESCE(
-                    NULLIF(TRIM(CONCAT(s.first_name, ' ', s.last_name)), ''), 
+                    NULLIF(TRIM(CONCAT_WS(' ', s.first_name, NULLIF(TRIM(REPLACE(s.middle_initial, '.', '')), ''), s.last_name)), ''), 
                     u.full_name
                 ) AS student,
                 COALESCE(s.program, 'Graduate Program') AS program,
@@ -62,7 +62,8 @@ if ($pdo) {
             FROM applications a
             JOIN students s ON a.student_id = s.student_id
             LEFT JOIN users u ON s.user_id = u.user_id
-            WHERE a.status IN ('submitted', 'under_review')
+            WHERE a.archived_at IS NULL
+              AND a.status IN ('submitted', 'under_review')
             ORDER BY a.submitted_at DESC
         ");
         $stmt->execute();
@@ -72,10 +73,12 @@ if ($pdo) {
     }
 }
 
-// Fallback logic if DB returns empty or unavailable
-if (empty($pendingApps) && function_exists('storeGet')) {
+// Fallback ONLY when the database is genuinely unavailable (PDO failed to
+// connect). When the DB is reachable, the MySQL result is authoritative: rows
+// deleted directly in phpMyAdmin must disappear immediately.
+if (!$pdo && empty($pendingApps) && function_exists('storeGet')) {
     $pendingApps = array_values(array_filter(storeGet('applications') ?? [], static function ($a) {
-        return in_array($a['status'] ?? '', ['submitted', 'under_review'], true);
+        return empty($a['archivedAt'] ?? '') && in_array($a['status'] ?? '', ['submitted', 'under_review'], true);
     }));
 }
 

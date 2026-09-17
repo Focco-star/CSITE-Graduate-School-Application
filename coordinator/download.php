@@ -1,5 +1,16 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/db.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Only an authenticated coordinator may download student documents.
+if (empty($_SESSION['user']) || ($_SESSION['user']['role'] ?? '') !== 'coordinator') {
+    http_response_code(403);
+    exit('Access denied. Please sign in as the Graduate Program Coordinator.');
+}
 
 $upload = findUpload((string) ($_GET['id'] ?? ''));
 $path = $upload ? uploadStoragePath($upload) : null;

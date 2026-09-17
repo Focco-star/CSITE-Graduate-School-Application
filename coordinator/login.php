@@ -47,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'email'     => $user['email'],
                     'role'      => $user['role'],
                 ];
+                setFlash('success', 'Welcome back, ' . $user['full_name'] . '.');
                 header('Location: ' . url('coordinator/dashboard.php'));
                 exit;
             } else {

@@ -8,17 +8,27 @@ CREATE TABLE `applications` (
   `presentation_stage` varchar(100) NOT NULL,
   `paper_title` text NOT NULL,
   `status` enum('submitted','under_review','for_payment','payment_recorded','ready_for_presentation','scheduled','approved','requires_revision','completed') DEFAULT 'submitted',
+  `coordinator_comment` text DEFAULT NULL,
+  `grad_school_endorsed` tinyint(1) NOT NULL DEFAULT 0,
+  `payment_recorded` tinyint(1) NOT NULL DEFAULT 0,
+  `receipt_number` varchar(100) DEFAULT NULL,
+  `payment_date` date DEFAULT NULL,
+  `payment_amount` decimal(10,2) DEFAULT NULL,
+  `ready_for_presentation` tinyint(1) NOT NULL DEFAULT 0,
+  `workflow_state` text DEFAULT NULL,
+  `result` varchar(50) DEFAULT NULL,
   `submitted_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `archived_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
-INSERT INTO `applications` (`application_id`, `student_id`, `presentation_stage`, `paper_title`, `status`, `submitted_at`, `updated_at`) VALUES
-(17, 4, 'Thesis Proposal', 'Machine Learning Approaches for Predictive Analytics in Graduate Education', 'under_review', '2026-09-10 01:30:00', '2026-09-13 06:58:19'),
-(18, 5, 'Final Capstone', 'Development of an Automated Graduate Application Tracking System', 'submitted', '2026-09-11 06:15:00', '2026-09-13 06:58:19'),
-(19, 6, 'Concept Paper', 'Cloud Security Protocols for Institutional Repositories', 'submitted', '2026-09-12 02:00:00', '2026-09-13 06:58:19'),
-(20, 7, 'Capstone Proposal', 'Mobile-Based Student Records and Notification Management', 'approved', '2026-09-08 03:20:00', '2026-09-13 06:58:19'),
-(21, 4, 'Final Thesis Defense', 'Optimizing Database Queries in Large-Scale Web Applications', 'requires_revision', '2026-09-05 08:45:00', '2026-09-13 06:58:19');
+INSERT INTO `applications` (`application_id`, `student_id`, `presentation_stage`, `paper_title`, `status`, `coordinator_comment`, `grad_school_endorsed`, `payment_recorded`, `receipt_number`, `payment_date`, `payment_amount`, `ready_for_presentation`, `workflow_state`, `result`, `submitted_at`, `updated_at`) VALUES
+(17, 4, 'Thesis Proposal', 'Machine Learning Approaches for Predictive Analytics in Graduate Education', 'under_review', '', 0, 0, NULL, NULL, NULL, 0, NULL, NULL, '2026-09-10 01:30:00', '2026-09-13 06:58:19'),
+(18, 5, 'Final Capstone', 'Development of an Automated Graduate Application Tracking System', 'submitted', '', 0, 0, NULL, NULL, NULL, 0, NULL, NULL, '2026-09-11 06:15:00', '2026-09-13 06:58:19'),
+(19, 6, 'Concept Paper', 'Cloud Security Protocols for Institutional Repositories', 'submitted', '', 0, 0, NULL, NULL, NULL, 0, NULL, NULL, '2026-09-12 02:00:00', '2026-09-13 06:58:19'),
+(20, 7, 'Capstone Proposal', 'Mobile-Based Student Records and Notification Management', 'approved', '', 1, 1, NULL, NULL, NULL, 1, '{"paper":"verified","adviser_endorsement":"verified"}', 'approved', '2026-09-08 03:20:00', '2026-09-13 06:58:19'),
+(21, 4, 'Final Thesis Defense', 'Optimizing Database Queries in Large-Scale Web Applications', 'requires_revision', 'Please strengthen the experimental validation chapter and resubmit.', 0, 0, NULL, NULL, NULL, 0, NULL, 'requires_revision', '2026-09-05 08:45:00', '2026-09-13 06:58:19');
 
 
 CREATE TABLE `coordinators` (
@@ -47,7 +57,8 @@ CREATE TABLE `students` (
   `track` enum('thesis','capstone','seminar') NOT NULL,
   `student_number` varchar(20) DEFAULT NULL,
   `adviser_name` varchar(150) DEFAULT NULL,
-  `enrollment_date` date DEFAULT NULL
+  `enrollment_date` date DEFAULT NULL,
+  `archived_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -66,6 +77,30 @@ CREATE TABLE `users` (
   `password` varchar(255) NOT NULL,
   `role` enum('student','coordinator','panel','adviser') NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `advisor_pool` (
+  `adviser_id` int(11) NOT NULL,
+  `name` varchar(150) NOT NULL,
+  `qualification` varchar(150) NOT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `availability` enum('available','unavailable') NOT NULL DEFAULT 'available',
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `application_documents` (
+  `document_id` int(11) NOT NULL,
+  `application_id` int(11) DEFAULT NULL,
+  `student_id` int(11) NOT NULL,
+  `stage` varchar(100) NOT NULL,
+  `document_type` varchar(150) NOT NULL,
+  `original_name` varchar(255) NOT NULL,
+  `stored_name` varchar(255) NOT NULL,
+  `mime_type` varchar(100) DEFAULT NULL,
+  `file_size` int(11) NOT NULL DEFAULT 0,
+  `status` enum('submitted','verified','incomplete') NOT NULL DEFAULT 'submitted',
+  `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
@@ -109,6 +144,14 @@ ALTER TABLE `users`
   ADD PRIMARY KEY (`user_id`),
   ADD UNIQUE KEY `email` (`email`);
 
+ALTER TABLE `advisor_pool`
+  ADD PRIMARY KEY (`adviser_id`);
+
+ALTER TABLE `application_documents`
+  ADD PRIMARY KEY (`document_id`),
+  ADD KEY `application_documents_application_id` (`application_id`),
+  ADD KEY `application_documents_student_id` (`student_id`);
+
 --
 -- AUTO_INCREMENT for dumped tables
 --
@@ -137,6 +180,12 @@ ALTER TABLE `students`
 ALTER TABLE `users`
   MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
+ALTER TABLE `advisor_pool`
+  MODIFY `adviser_id` int(11) NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE `application_documents`
+  MODIFY `document_id` int(11) NOT NULL AUTO_INCREMENT;
+
 --
 -- Constraints for dumped tables
 --
@@ -158,8 +207,29 @@ ALTER TABLE `coordinators`
 --
 ALTER TABLE `students`
   ADD CONSTRAINT `students_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
-COMMIT;
 
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+ALTER TABLE `application_documents`
+  ADD CONSTRAINT `application_documents_student_fk` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `application_documents_application_fk` FOREIGN KEY (`application_id`) REFERENCES `applications` (`application_id`) ON DELETE SET NULL;
+
+DROP TRIGGER IF EXISTS `students_after_insert_sync_user`;
+CREATE TRIGGER `students_after_insert_sync_user`
+AFTER INSERT ON `students`
+FOR EACH ROW
+UPDATE `users`
+SET `full_name` = TRIM(CONCAT_WS(' ', NEW.`first_name`, NULLIF(TRIM(REPLACE(NEW.`middle_initial`, '.', '')), ''), NEW.`last_name`))
+WHERE `user_id` = NEW.`user_id`;
+
+DROP TRIGGER IF EXISTS `students_after_update_sync_user`;
+CREATE TRIGGER `students_after_update_sync_user`
+AFTER UPDATE ON `students`
+FOR EACH ROW
+UPDATE `users`
+SET `full_name` = TRIM(CONCAT_WS(' ', NEW.`first_name`, NULLIF(TRIM(REPLACE(NEW.`middle_initial`, '.', '')), ''), NEW.`last_name`))
+WHERE `user_id` = NEW.`user_id`;
+
+UPDATE `users` u
+INNER JOIN `students` s ON s.`user_id` = u.`user_id`
+SET u.`full_name` = TRIM(CONCAT_WS(' ', s.`first_name`, NULLIF(TRIM(REPLACE(s.`middle_initial`, '.', '')), ''), s.`last_name`))
+WHERE u.`role` = 'student';
+COMMIT;
