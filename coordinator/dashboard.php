@@ -11,7 +11,7 @@ $pageTitle   = 'Welcome, ' . $userName;
 $role        = 'coordinator';
 $currentPage = 'dashboard';
 
-// Ensure PDO connection fallback
+
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     try {
         $dbHost = defined('DB_HOST') ? DB_HOST : 'localhost';
@@ -27,7 +27,7 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
     }
 }
 
-// Database stats and dynamic applications list
+
 $pendingAppsCount = 0;
 $totalAppsCount   = 0;
 $activeStudentsCount = 0;
@@ -35,19 +35,19 @@ $pendingApps = [];
 
 if ($pdo) {
     try {
-        // Pending applications count (submitted, under_review)
+
         $stmt = $pdo->query("SELECT COUNT(*) FROM applications WHERE archived_at IS NULL AND status IN ('submitted', 'under_review')");
         $pendingAppsCount = (int) $stmt->fetchColumn();
 
-        // Total applications count
+
         $stmt = $pdo->query("SELECT COUNT(*) FROM applications WHERE archived_at IS NULL");
         $totalAppsCount = (int) $stmt->fetchColumn();
 
-        // Active students count
+
         $stmt = $pdo->query("SELECT COUNT(*) FROM students WHERE archived_at IS NULL");
         $activeStudentsCount = (int) $stmt->fetchColumn();
 
-        // Applications requiring attention from DB
+
         $stmt = $pdo->prepare("
             SELECT 
                 a.application_id AS id,
@@ -69,13 +69,13 @@ if ($pdo) {
         $stmt->execute();
         $pendingApps = $stmt->fetchAll();
     } catch (PDOException $e) {
-        // Fallback to storeGet if query fails
+
     }
 }
 
-// Fallback ONLY when the database is genuinely unavailable (PDO failed to
-// connect). When the DB is reachable, the MySQL result is authoritative: rows
-// deleted directly in phpMyAdmin must disappear immediately.
+
+
+
 if (!$pdo && empty($pendingApps) && function_exists('storeGet')) {
     $pendingApps = array_values(array_filter(storeGet('applications') ?? [], static function ($a) {
         return empty($a['archivedAt'] ?? '') && in_array($a['status'] ?? '', ['submitted', 'under_review'], true);

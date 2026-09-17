@@ -13,17 +13,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($email) || empty($password)) {
         $loginError = 'Please enter both your email and password.';
     } else {
-        // Query database for user by email
+
         $user = DB::find('users', ['email' => $email]);
 
         if ($user && password_verify($password, $user['password'])) {
             if ($user['role'] !== 'student') {
                 $loginError = 'Access denied. Account is not registered as a student.';
             } else {
-                // Fetch student profile details
+
                 $student = DB::find('students', ['user_id' => $user['user_id']]);
 
-                // Store active session variables
                 $_SESSION['user_id']    = $user['user_id'];
                 $_SESSION['student_id'] = $student['student_id'] ?? null;
                 $_SESSION['full_name']  = $user['full_name'];
@@ -32,7 +31,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['user']       = $user;
                 setFlash('success', 'Welcome back, ' . $user['full_name'] . '.');
 
-                // Redirect to dashboard
                 header('Location: ' . url('student/dashboard.php'));
                 exit;
             }

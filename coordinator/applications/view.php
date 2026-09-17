@@ -12,7 +12,7 @@ $pageTitle   = 'Application Details';
 $role        = 'coordinator';
 $currentPage = 'applications';
 
-// Ensure PDO database connection
+
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     try {
         $dbHost = defined('DB_HOST') ? DB_HOST : 'localhost';
@@ -60,7 +60,7 @@ if ($pdo && $appId > 0) {
     }
 }
 
-// Fallback logic if database query returns empty or PDO isn't available
+
 if (!$app && function_exists('findApplication')) {
     $app = findApplication($appId) ?? latestApplicationForEmail($mockStudent['email']);
     if (!$app && function_exists('storeGet')) {
@@ -68,9 +68,9 @@ if (!$app && function_exists('findApplication')) {
     }
 }
 
-// Documents come from uploadsForApplication(), which merges the session store
-// with MySQL `application_documents` and also includes documents uploaded
-// before the student's application row existed (application_id IS NULL).
+
+
+
 $uploads = ($app && function_exists('uploadsForApplication')) ? uploadsForApplication((int) $app['id']) : [];
 $student = ($app && function_exists('findStudentByEmail') && isset($app['studentEmail'])) ? findStudentByEmail($app['studentEmail']) : null;
 

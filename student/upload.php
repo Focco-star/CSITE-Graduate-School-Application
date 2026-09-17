@@ -28,6 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $uploadError = 'Please select a document type.';
     } elseif ($stageKey === '' || !isset($stages[$stageKey])) {
         $uploadError = 'Please select a stage.';
+    } elseif (($seqError = validateUploadSequence($mockStudent['email'], $track, $stageKey, $docType)) !== null) {
+        $uploadError = $seqError;
     } elseif (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
         $uploadError = 'Please select a file to upload.';
     } elseif (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {

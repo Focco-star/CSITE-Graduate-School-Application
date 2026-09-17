@@ -11,7 +11,7 @@ $studentId = (int) ($_GET['id'] ?? 0);
 $rec = findStudentById((string) $studentId) ?? findStudentByEmail($mockStudent['email']);
 $profile = $rec ? currentStudentProfile(array_merge($mockStudent, ['email' => $rec['email']])) : $mockStudent;
 
-// The coordinator profile uses the source-of-truth users/students records when an ID came from the Students table.
+
 if ($studentId > 0) {
     try {
         $stmt = DB::getConnection()->prepare('SELECT s.*, u.full_name, u.email FROM students s INNER JOIN users u ON u.user_id = s.user_id WHERE s.student_id = :id LIMIT 1');
@@ -25,7 +25,7 @@ if ($studentId > 0) {
             $profile = array_merge($mockStudent, ['name' => studentDisplayName($dbStudent), 'email' => $dbStudent['email'], 'program' => $programCode, 'program_name' => preg_replace('/\s*\(.*\)$/', '', $programName) ?: $programName, 'track' => $dbStudent['track'], 'enroll_date' => $enroll, 'adviser' => $dbStudent['adviser_name'] ?? '', 'completion_deadline' => ((int) substr($enroll, 0, 4) + 3) . substr($enroll, 4)]);
         }
     } catch (Throwable $e) {
-        // Existing session records are used if MySQL is temporarily unavailable.
+
     }
 }
 $latest = latestApplicationForEmail($profile['email']);

@@ -57,6 +57,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'upload'
         $uploadError = 'Please select a document type.';
     } elseif ($stageKey === '' || !isset($stages[$stageKey])) {
         $uploadError = 'Please select a stage.';
+    } elseif (($seqError = validateUploadSequence($mockStudent['email'], $track, $stageKey, $docType)) !== null) {
+        $uploadError = $seqError;
     } elseif (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
         $uploadError = 'Please select a file to upload.';
     } elseif (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
@@ -134,9 +136,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                 'student_id' => $studentId,
             ]);
 
-            // Sync the full student identity (name, program, track, contact and
-            // adviser) into the Students table inside the same transaction, so the
-            // application record and the student profile can never diverge.
             $identityStmt = $pdo->prepare(
                 'SELECT s.first_name, s.last_name, s.middle_initial, s.age, s.gender, s.program, s.track, s.student_number, u.email, u.full_name
                  FROM students s
@@ -173,8 +172,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                     'adviser_name' => $adviser,
                     'student_id' => $studentId,
                 ]);
-                // Keep users.full_name identical to the Students row via the trigger;
-                // the trigger covers future updates, this covers any legacy drift now.
                 $pdo->prepare('UPDATE users SET full_name = :full_name WHERE user_id = :user_id')
                     ->execute([
                         'full_name' => canonicalStudentName($identity['first_name'], $identity['last_name'], $identity['middle_initial']),
@@ -183,8 +180,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
             }
             $pdo->commit();
 
-            // Refresh the session identity from MySQL so every screen shows the
-            // canonical name/details that were just persisted.
             $identity = databaseStudentIdentity();
             if ($identity) {
                 $sessionUser = $_SESSION['user'] ?? [];
@@ -203,8 +198,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                 ]);
             }
 
-            // Keep the existing session-based screens in sync while the coordinator modules
-            // are gradually migrated to MySQL. Uses the canonical identity, never mock data.
             addApplicationRecord([
                 'studentEmail' => $mockStudent['email'],
                 'student' => $mockStudent['name'],

@@ -2,14 +2,12 @@
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db.php';
 
-// Ensure user is authenticated as a student
 if (empty($_SESSION['user']) || ($_SESSION['user']['role'] ?? '') !== 'student') {
     redirectTo('student/login.php');
 }
 
 $user = $_SESSION['user'];
 
-// Fetch the student's complete profile record from MySQL
 $student = DB::find('students', ['user_id' => $user['user_id']]);
 
 if (!$student) {
@@ -25,7 +23,6 @@ $trackLabel  = getTrackLabel($track);
 $workflow    = getWorkflow($track);
 $stages      = $workflow['stages'] ?? [];
 
-// Fetch stage progress dynamically using student's email
 $progress   = getStudentProgress($user['email'], $track);
 $currentIdx = workflowCurrentIndex($progress, $stages);
 
@@ -104,12 +101,14 @@ require_once __DIR__ . '/../includes/header.php';
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.5rem;">
                 <?php
                 $checks = [
-                    ['Paper Submitted', $activeStage['paper']['status'] ?? 'pending', $activeStage['paper']['submitted'] ?? ''],
-                    ['Adviser Endorsement', $activeStage['adviserEndorsement']['status'] ?? 'pending', $activeStage['adviserEndorsement']['submitted'] ?? ''],
-                    ['Coordinator Review', $activeStage['coordReview']['status'] ?? 'pending', ''],
-                    ['Grad School Endorsement', $activeStage['gradSchoolEndorsement']['status'] ?? 'pending', ''],
-                    ['Payment Recorded', $activeStage['payment']['status'] ?? 'pending', $activeStage['payment']['submitted'] ?? ''],
-                    ['Presentation', $activeStage['presentation']['status'] ?? 'pending', $activeStage['presentation']['date'] ?? ''],
+                    ['Paper Prepared & Submitted', $activeStage['paper']['status'] ?? 'pending', $activeStage['paper']['submitted'] ?? ''],
+                    ['Adviser Endorsement Submitted', $activeStage['adviserEndorsement']['status'] ?? 'pending', $activeStage['adviserEndorsement']['submitted'] ?? ''],
+                    ['Coordinator Document Review', $activeStage['coordReview']['status'] ?? 'pending', ''],
+                    ['Graduate School Endorsement', $activeStage['gradSchoolEndorsement']['status'] ?? 'pending', ''],
+                    ['Official Receipt / Payment Uploaded', $activeStage['payment']['status'] ?? 'pending', $activeStage['payment']['submitted'] ?? ''],
+                    ['Status Set to Ready for Presentation', $activeStage['readyForPresentation']['status'] ?? 'pending', ''],
+                    ['Presentation Scheduled', $activeStage['presentation']['status'] ?? 'pending', $activeStage['presentation']['date'] ?? ''],
+                    ['Presentation Conducted & Result Recorded', $activeStage['result']['status'] ?? 'pending', $activeStage['result']['value'] ?? ''],
                 ];
                 foreach ($checks as [$label, $state, $extra]):
                 ?>

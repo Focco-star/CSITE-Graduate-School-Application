@@ -10,7 +10,7 @@ $role        = 'coordinator';
 $currentPage = 'students';
 $userName    = !empty($_SESSION['user']['full_name']) ? $_SESSION['user']['full_name'] : ($mockCoordinator['name'] ?? 'Coordinator');
 
-// Ensure PDO database connection
+
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     try {
         $dbHost = defined('DB_HOST') ? DB_HOST : 'localhost';
@@ -26,7 +26,7 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
     }
 }
 
-// Archive student records instead of permanently deleting them.
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_id'])) {
     $archiveId = (int) $_POST['archive_id'];
     if ($pdo && $archiveId > 0) {
@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_id'])) {
     redirectTo('coordinator/students/manage.php');
 }
 
-// Fetch real student records from database
+
 $students = [];
 
 if ($pdo) {
@@ -81,10 +81,10 @@ if ($pdo) {
     }
 }
 
-// Fallback ONLY when the database is genuinely unavailable (PDO failed to
-// connect). When the DB is reachable, the MySQL result is authoritative: rows
-// deleted directly in phpMyAdmin must disappear from this view immediately,
-// never be resurrected by prototype/session data.
+
+
+
+
 if (!$pdo && empty($students) && function_exists('storeGet')) {
     $students = array_values(array_filter(storeGet('students') ?? [], static function ($s) {
         return empty($s['archivedAt'] ?? '');

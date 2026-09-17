@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
-require_once __DIR__ . '/../includes/db.php'; // Ensure DB class is loaded
+require_once __DIR__ . '/../includes/db.php';
 
 $registerError = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -28,19 +28,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $pdo = DB::getConnection();
 
-            // 1. Check if email already exists
             $existingUser = DB::find('users', ['email' => $email]);
             if ($existingUser) {
                 throw new LogicException('An account with this email address already exists.');
             }
 
-            // Determine track from helper function
             $track = getTrackForProgram($program);
             $fullName = implode(' ', array_filter([$first, $middleInitial, $last]));
 
             $pdo->beginTransaction();
 
-            // 2. Insert into users table
             $user = DB::insert('users', [
                 'full_name' => canonicalStudentName($first, $last, $middleInitial),
                 'email'     => $email,
@@ -48,7 +45,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'role'      => 'student'
             ]);
 
-            // 3. Insert into students table — the single source-of-truth identity.
             $student = DB::insert('students', [
                 'user_id'        => $user['user_id'],
                 'first_name'     => $first,
@@ -60,14 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'track'          => $track,
                 'enrollment_date'=> date('Y-m-d')
             ]);
-            // The Students table expects a unique student number; generate one
-            // deterministically from the auto-increment student_id.
             DB::update('students', ['student_number' => generateStudentNumber((int) $student['student_id'])], ['student_id' => (int) $student['student_id']]);
 
             $pdo->commit();
 
-            // Mirror the exact same identity into the shared session store so every
-            // student screen and coordinator fallback shows identical data.
             upsertSessionStudent([
                 'email' => $email,
                 'first_name' => $first,
@@ -79,7 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'enrollment_date' => date('Y-m-d'),
             ]);
 
-            // Set session variables and redirect
             $_SESSION['user'] = $user;
             $_SESSION['user_id'] = (int) $user['user_id'];
             $_SESSION['email'] = $email;

@@ -14,7 +14,7 @@ try {
     $rows = DB::query("SELECT name FROM advisor_pool WHERE availability = 'available' ORDER BY name")->fetchAll();
     if ($rows) $adviserOpts = array_column($rows, 'name');
 } catch (Throwable $e) {
-    // The schedule remains usable before the adviser-pool migration is imported.
+
 }
 $preselected = '';
 if (!empty($_GET['app'])) {
@@ -52,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $panel = implode(', ', array_filter([$_POST['panel1'] ?? '', $_POST['panel2'] ?? '', $_POST['panel3'] ?? '']));
+        $venue = trim($_POST['venue'] ?? '');
         $app = latestApplicationForEmail($email);
         addScheduleRecord([
             'studentEmail' => $email,
@@ -60,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'stage' => $stage,
             'date' => $displayDate,
             'time' => $displayTime,
-            'venue' => trim($_POST['venue'] ?? ''),
+            'venue' => $venue,
             'panel' => $panel ?: 'TBD',
             'adviser' => trim($_POST['adviser'] ?? ''),
             'documentor' => trim($_POST['documentor'] ?? ''),
@@ -68,6 +69,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         if ($app) {
             updateApplicationRecord((int) $app['id'], ['status' => 'scheduled']);
+        }
+        if (class_exists('DB')) {
+            try {
+                $studentId = databaseStudentIdForEmail($email);
+                if ($studentId > 0) {
+                    $dbAppId = databaseApplicationIdForStudent($studentId, $stage);
+                    if ($dbAppId) {
+                        $pdo = DB::getConnection();
+                        $cur = $pdo->prepare('SELECT workflow_state FROM applications WHERE application_id = :id LIMIT 1');
+                        $cur->execute(['id' => $dbAppId]);
+                        $wf = json_decode((string) ($cur->fetchColumn() ?: '[]'), true) ?: [];
+                        $wf['presentation_date'] = $displayDate;
+                        $wf['presentation_time'] = $displayTime;
+                        $wf['presentation_venue'] = $venue;
+                        $wf['presentation_panel'] = $panel ?: 'TBD';
+                        $upd = $pdo->prepare('UPDATE applications SET status = :status, workflow_state = :wf WHERE application_id = :id');
+                        $upd->execute([
+                            'status' => 'scheduled',
+                            'wf' => json_encode($wf, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                            'id' => $dbAppId,
+                        ]);
+                    }
+                }
+            } catch (Throwable $e) {
+            }
         }
         redirectTo('coordinator/schedule/manage.php');
     }

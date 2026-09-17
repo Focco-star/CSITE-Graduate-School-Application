@@ -1,9 +1,9 @@
 <?php
 
 
-define('SITE_NAME', 'CSITE Graduate School Application for Capstone and Thesis Presentation');
+define('SITE_NAME', 'CSITE Graduate School Application');
 define('SITE_SHORT', 'CSITE Graduate School Application');
-define('SITE_TAGLINE', 'Capstone and Thesis Presentation Application System');
+define('SITE_TAGLINE', 'Capstone, Seminar Paper and Thesis Presentation Application System');
 define('BASE_URL', '/GithubDesktop/CSITEGrad/CSITE-Graduate-School-Application');
 
 define('COLOR_PRIMARY', '#060297');
@@ -406,7 +406,6 @@ function initPrototypeStore(): void {
 }
 
 function studentDisplayName(array $s): string {
-    // Supports prototype/session records and MySQL query aliases alike.
     $databaseName = trim((string) ($s['name'] ?? $s['full_name'] ?? ''));
     if ($databaseName !== '') {
         return $databaseName;
@@ -507,7 +506,6 @@ function upsertStudentIdentity(array $input, int $userId): array {
         return $existing;
     }
 
-    // No students row yet — create it (e.g. account exists but profile was never completed).
     $pdo->beginTransaction();
     try {
         $student = DB::insert('students', [
@@ -522,7 +520,6 @@ function upsertStudentIdentity(array $input, int $userId): array {
             'adviser_name' => trim((string) ($input['adviser_name'] ?? '')),
             'enrollment_date' => date('Y-m-d'),
         ]);
-        // Ensure the unique student_number is always populated.
         if (empty($student['student_number'])) {
             DB::update('students', ['student_number' => generateStudentNumber((int) $student['student_id'])], ['student_id' => (int) $student['student_id']]);
         }
@@ -669,7 +666,6 @@ function currentStudentEmail(array $fallback): string {
 }
 
 function currentStudentProfile(array $fallback): array {
-    // Prefer the authenticated account so every student page shows the same user.
     $sessionUser = $_SESSION['user'] ?? [];
     if (($sessionUser['role'] ?? '') === 'student' && !empty($sessionUser['user_id']) && class_exists('DB')) {
         try {
@@ -685,7 +681,6 @@ function currentStudentProfile(array $fallback): array {
                 return array_merge($fallback, ['id' => (string) $dbStudent['student_id'], 'name' => $fullName, 'email' => $sessionUser['email'] ?? $dbStudent['email'] ?? '', 'program' => $programCode, 'program_name' => preg_replace('/\s*\(.*\)$/', '', $programName) ?: $programName, 'track' => $dbStudent['track'], 'trackLabel' => getTrackLabel($dbStudent['track']), 'enroll_date' => $enroll, 'current_stage' => 'not_started', 'status' => 'not_started', 'title' => '', 'adviser' => $dbStudent['adviser_name'] ?? '', 'completion_deadline' => ((int) substr($enroll, 0, 4) + 3) . substr($enroll, 4)]);
             }
         } catch (Throwable $e) {
-            // Session values below remain a safe fallback when the database is unavailable.
         }
     }
     $id = (string) ($_SESSION['current_student_id'] ?? '');
@@ -973,14 +968,12 @@ function addUploadRecord(array $u): array {
         'docType' => $u['docType'],
         'stage' => $u['stage'],
         'size' => (int) ($u['size'] ?? 0),
-        'date' => $u['date'] ?? date('Y-m-d'),
+        'date' => $u['date'] ?? date('Y-m-d H:i:s'),
         'status' => $u['status'] ?? 'submitted',
         'notes' => $u['notes'] ?? '',
         'storedFile' => $u['storedFile'] ?? '',
         'mimeType' => $u['mimeType'] ?? '',
     ];
-    // Replace an existing entry with the same id instead of duplicating it, so a
-    // re-recorded upload keeps one row per document.
     foreach ($list as $i => $existing) {
         if ((string) ($existing['id'] ?? '') === $rec['id']) {
             $list[$i] = array_merge($existing, $rec);
@@ -1171,6 +1164,137 @@ function databaseDocumentById(int $documentId): ?array {
     }
 }
 
+function classifyUploadDocType(string $docType): string {
+    $doc = strtolower($docType);
+    if (str_contains($doc, 'receipt') || str_contains($doc, 'payment')) {
+        return 'receipt';
+    }
+    if (str_contains($doc, 'endorsement') || str_contains($doc, 'adviser')) {
+        return 'adviser_endorsement';
+    }
+    return 'paper';
+}
+
+function validateUploadSequence(string $email, string $track, string $stageKey, string $docType): ?string {
+    $kind = classifyUploadDocType($docType);
+    if ($kind === 'paper') {
+        return null;
+    }
+    $stages = getWorkflow($track)['stages'] ?? [];
+    $stageLabel = $stageKey;
+    foreach ($stages as $s) {
+        if (($s['key'] ?? '') === $stageKey) {
+            $stageLabel = $s['label'] ?? $stageKey;
+            break;
+        }
+    }
+    $row = null;
+    foreach (getStudentProgress($email, $track) as $p) {
+        if (($p['stageKey'] ?? '') === $stageKey) {
+            $row = $p;
+            break;
+        }
+    }
+    if ($kind === 'adviser_endorsement') {
+        if (($row['paper']['status'] ?? 'pending') !== 'done') {
+            return 'Upload the ' . $stageLabel . ' paper first before the adviser endorsement form.';
+        }
+        return null;
+    }
+    if (($row['gradSchoolEndorsement']['status'] ?? 'pending') !== 'done') {
+        return 'Your coordinator must issue the Graduate School endorsement for ' . $stageLabel . ' before you upload the official receipt.';
+    }
+    return null;
+}
+
+function findStageApplicationForEmail(string $email, string $stageKey): ?array {
+    foreach (storeGet('applications') as $a) {
+        if (strcasecmp((string) ($a['studentEmail'] ?? ''), $email) !== 0) {
+            continue;
+        }
+        if (($a['stageKey'] ?? stageKeyFromLabel($a['stage'] ?? '')) === $stageKey) {
+            return $a;
+        }
+    }
+    return null;
+}
+
+function ensureStageApplication(string $email, string $stageKey, string $stageLabel): ?array {
+    $email = strtolower(trim($email));
+    if ($email === '') {
+        return null;
+    }
+    $existing = findStageApplicationForEmail($email, $stageKey);
+    $track = $existing['track'] ?? null;
+    if ($track === null) {
+        $student = findStudentByEmail($email);
+        $track = $student['track'] ?? getTrackForProgram($student['program'] ?? 'MSCS');
+    }
+    if ($track === null || $track === '') {
+        $track = 'thesis';
+    }
+    $stages = getWorkflowStageLabels($track);
+    $canonLabel = $stages[$stageKey] ?? $stageLabel;
+
+    if ($existing) {
+        if (in_array($existing['status'] ?? '', ['not_started', 'pending', 'draft', ''], true)) {
+            updateApplicationRecord((int) $existing['id'], ['status' => 'submitted']);
+            $existing['status'] = 'submitted';
+        }
+    } else {
+        $student = findStudentByEmail($email);
+        $existing = addApplicationRecord([
+            'studentEmail' => $email,
+            'student' => $student ? studentDisplayName($student) : $email,
+            'program' => $student['program'] ?? 'MSCS',
+            'stage' => $canonLabel,
+            'stageKey' => $stageKey,
+            'title' => '',
+            'adviser' => $student['adviser'] ?? '',
+        ]);
+    }
+
+    if (class_exists('DB')) {
+        try {
+            $studentId = databaseStudentIdForEmail($email);
+            if ($studentId > 0) {
+                $pdo = DB::getConnection();
+                $stmt = $pdo->prepare(
+                    'SELECT application_id, status, paper_title FROM applications
+                     WHERE student_id = :student_id AND archived_at IS NULL AND presentation_stage = :stage
+                     ORDER BY submitted_at DESC LIMIT 1'
+                );
+                $stmt->execute(['student_id' => $studentId, 'stage' => $canonLabel]);
+                $row = $stmt->fetch();
+                if ($row) {
+                    if (in_array($row['status'] ?? '', ['not_started', 'pending', 'draft', ''], true)) {
+                        $upd = $pdo->prepare('UPDATE applications SET status = :status WHERE application_id = :id');
+                        $upd->execute(['status' => 'submitted', 'id' => (int) $row['application_id']]);
+                    }
+                } else {
+                    $title = '';
+                    $latest = latestApplicationForEmail($email);
+                    if (!empty($latest['title'])) {
+                        $title = (string) $latest['title'];
+                    }
+                    $ins = $pdo->prepare(
+                        'INSERT INTO applications (student_id, presentation_stage, paper_title, status)
+                         VALUES (:student_id, :presentation_stage, :paper_title, :status)'
+                    );
+                    $ins->execute([
+                        'student_id' => $studentId,
+                        'presentation_stage' => $canonLabel,
+                        'paper_title' => $title !== '' ? $title : 'Untitled paper',
+                        'status' => 'submitted',
+                    ]);
+                }
+            }
+        } catch (Throwable $e) {
+        }
+    }
+    return findStageApplicationForEmail($email, $stageKey) ?? $existing;
+}
+
 /**
  * The single write point for a student document.
  *
@@ -1185,23 +1309,20 @@ function recordStudentDocument(array $meta, ?string $email = null, ?int $userId 
         return null;
     }
 
-    // 1) Shared store first: this is the record the coordinator reads.
+    $stageLabel = (string) ($meta['stage'] ?? '');
+    $stageKey = stageKeyFromLabel($stageLabel);
+    $stageApp = ensureStageApplication($email, $stageKey, $stageLabel);
+    if ($stageApp) {
+        $meta['applicationId'] = $stageApp['id'];
+    }
+
     $documentId = null;
     if (class_exists('DB')) {
         try {
             $studentId = databaseStudentIdForEmail($email);
             if ($studentId > 0) {
-                $stageLabel = (string) ($meta['stage'] ?? '');
-                // Resolve the REAL MySQL application id for this student instead of
-                // trusting the caller's applicationId. The student pages pass the
-                // session-store id (a time() value), which never matches an
-                // applications.application_id and makes this INSERT fail the FK
-                // constraint - which is exactly how uploads vanished from the
-                // coordinator panel (and from the student's own list after a
-                // re-login, because only the session copy existed).
                 $applicationId = databaseApplicationIdForStudent($studentId, $stageLabel);
                 if ($applicationId === null && !empty($meta['applicationId'])) {
-                    // Fall back to the caller's id ONLY if it is a real application row.
                     $candidate = (int) $meta['applicationId'];
                     if ($candidate > 0) {
                         $existsStmt = DB::getConnection()->prepare(
@@ -1237,16 +1358,11 @@ function recordStudentDocument(array $meta, ?string $email = null, ?int $userId 
                 $documentId = (int) DB::getConnection()->lastInsertId();
             }
         } catch (Throwable $e) {
-            // Keep the student's own screens working, but never fail silently:
-            // an invisible failure here is what makes an upload disappear from
-            // the coordinator panel.
             error_log('CSITE: failed to record application document for ' . $email . ' — ' . $e->getMessage());
             $documentId = null;
         }
     }
 
-    // 2) Session prototype record, now carrying the real document id so
-    //    download links resolve against either store.
     addUploadRecord(array_merge($meta, [
         'studentEmail' => $email,
         'applicationId' => $meta['applicationId'] ?? null,
@@ -1260,8 +1376,6 @@ function findUpload(string $id): ?array {
     foreach (storeGet('uploads') as $upload) {
         if ((string) ($upload['id'] ?? '') === $id) return $upload;
     }
-    // Fall back to MySQL so documents uploaded in another session (i.e. by the
-    // student while the coordinator is signed in) are still resolvable.
     if (ctype_digit($id)) {
         return databaseDocumentById((int) $id);
     }
@@ -1276,8 +1390,6 @@ function uploadStoragePath(array $upload): ?string {
 }
 
 function updateUploadStatus(string $id, string $status): void {
-    // Shared store first, so a coordinator's review is visible to the student
-    // in a different session.
     if (ctype_digit($id) && class_exists('DB')) {
         try {
             $stmt = DB::getConnection()->prepare(
@@ -1285,7 +1397,6 @@ function updateUploadStatus(string $id, string $status): void {
             );
             $stmt->execute(['status' => $status, 'document_id' => (int) $id]);
         } catch (Throwable $e) {
-            // The session record below still reflects the change on this screen.
         }
     }
     $list = storeGet('uploads');
@@ -1306,13 +1417,7 @@ function syncUploadStatusesFromWorkflow(int $appId, array $workflowState): void 
         if ((int) ($u['applicationId'] ?? 0) !== $appId) {
             continue;
         }
-        $doc = strtolower((string) $u['docType']);
-        $key = 'paper';
-        if (str_contains($doc, 'receipt') || str_contains($doc, 'payment')) {
-            $key = 'receipt';
-        } elseif (str_contains($doc, 'endorsement') || str_contains($doc, 'adviser')) {
-            $key = 'adviser_endorsement';
-        }
+        $key = classifyUploadDocType((string) $u['docType']);
         if (!empty($workflowState[$key]) && in_array($workflowState[$key], ['verified', 'incomplete', 'submitted'], true)) {
             $u['status'] = $workflowState[$key];
         }
@@ -1344,10 +1449,6 @@ function uploadsForEmail(string $email): array {
 }
 
 function uploadsForApplication(int $id): array {
-    // Documents are linked to an application, but a document uploaded before
-    // the student's application record existed may still be unlinked. Resolve
-    // the application's student and include those, otherwise the coordinator
-    // sees "No documents uploaded" for a student who has uploaded files.
     $studentId = 0;
     if (class_exists('DB') && $id > 0) {
         try {
@@ -1364,7 +1465,6 @@ function uploadsForApplication(int $id): array {
     $dbUploads = databaseDocuments($id, $studentId, $studentId > 0);
     $merged = [];
     $seen = [];
-    // Session entries first, then DB rows that are not already represented.
     foreach ($sessionUploads as $u) {
         $seen[(string) ($u['storedFile'] ?? '')] = true;
         $merged[] = $u;
@@ -1647,14 +1747,17 @@ function panelSelectOptions(): array {
  * land on the stage the student is really at, not on an earlier blank stage.
  */
 function workflowCurrentIndex(array $progress, array $stages): int {
-    $started = -1;
+    $count = count($stages);
+    if ($count === 0) {
+        return 0;
+    }
     foreach ($progress as $i => $p) {
         $st = $p['stageStatus'] ?? 'not_started';
-        if (!in_array($st, ['not_started', 'pending', 'draft'], true)) {
-            $started = $i;
+        if (!in_array($st, ['completed', 'approved'], true)) {
+            return max(0, min($i, $count - 1));
         }
     }
-    return $started >= 0 ? $started : 0;
+    return $count - 1;
 }
 
 /**
@@ -1694,7 +1797,6 @@ function getStudentProgress(string $email, string $track): array {
     $uploads = uploadsForEmail($email);
     $schedules = schedulesForEmail($email);
 
-    // Use saved MySQL records for live student progress; keep the local store only as a fallback.
     if (class_exists('DB')) {
         try {
             $stmt = DB::getConnection()->prepare('SELECT a.application_id AS id, a.presentation_stage AS stage, a.paper_title AS title, a.status, a.coordinator_comment AS coordinatorComment, a.grad_school_endorsed AS gradSchoolEndorsed, a.payment_recorded AS paymentRecorded, a.receipt_number AS receiptNumber, a.payment_date AS paymentDate, a.payment_amount AS paymentAmount, a.ready_for_presentation AS readyForPresentation, a.workflow_state AS workflowState, a.result AS result, a.submitted_at AS date FROM applications a INNER JOIN students s ON s.student_id = a.student_id INNER JOIN users u ON u.user_id = s.user_id WHERE u.email = :email AND a.archived_at IS NULL ORDER BY a.submitted_at ASC');
@@ -1708,7 +1810,6 @@ function getStudentProgress(string $email, string $track): array {
                 if ($dbUploads) $uploads = $dbUploads;
             }
         } catch (Throwable $e) {
-            // The session-backed prototype remains available during initial setup.
         }
     }
 
@@ -1740,18 +1841,18 @@ function getStudentProgress(string $email, string $track): array {
         $adviserUpload = null;
         $paymentUpload = null;
         foreach ($uploads as $u) {
-            $doc = strtolower((string) $u['docType']);
             $sameStage = stripos((string) $u['stage'], $stage['shortLabel'] ?? $stage['label']) !== false
                 || stripos((string) $u['stage'], $stage['label']) !== false
                 || stageKeyFromLabel((string) $u['stage']) === $stage['key'];
             if (!$sameStage) {
                 continue;
             }
-            if (str_contains($doc, 'receipt') || str_contains($doc, 'payment')) {
+            $kind = classifyUploadDocType((string) $u['docType']);
+            if ($kind === 'receipt') {
                 $paymentUpload = $u;
-            } elseif (str_contains($doc, 'endorsement') || str_contains($doc, 'adviser')) {
+            } elseif ($kind === 'adviser_endorsement') {
                 $adviserUpload = $u;
-            } elseif (str_contains($doc, 'paper') || str_contains($doc, 'proposal') || str_contains($doc, 'thesis') || str_contains($doc, 'capstone') || str_contains($doc, 'seminar')) {
+            } else {
                 $paperUpload = $u;
             }
         }
@@ -1763,10 +1864,20 @@ function getStudentProgress(string $email, string $track): array {
         $coordStatus = ($paperWf === 'incomplete' || $advWf === 'incomplete') ? 'flagged' : (($paperWf === 'verified' && $advWf === 'verified') ? 'done' : 'pending');
 
         $schedule = null;
-        foreach ($schedules as $s) {
-            if ((int) ($s['applicationId'] ?? 0) === (int) $app['id'] || stripos((string) $s['stage'], $stage['shortLabel'] ?? '') !== false) {
-                $schedule = $s;
-                break;
+        if (!empty($wf['presentation_date'])) {
+            $schedule = [
+                'date' => (string) ($wf['presentation_date'] ?? ''),
+                'time' => (string) ($wf['presentation_time'] ?? ''),
+                'venue' => (string) ($wf['presentation_venue'] ?? ''),
+                'panel' => (string) ($wf['presentation_panel'] ?? ''),
+                'applicationId' => $app['id'] ?? null,
+            ];
+        } else {
+            foreach ($schedules as $s) {
+                if ((int) ($s['applicationId'] ?? 0) === (int) $app['id'] || stripos((string) $s['stage'], $stage['shortLabel'] ?? '') !== false) {
+                    $schedule = $s;
+                    break;
+                }
             }
         }
 
@@ -1778,7 +1889,7 @@ function getStudentProgress(string $email, string $track): array {
             'adviserEndorsement' => ['status' => $adviserStatus, 'submitted' => $adviserUpload['date'] ?? ''],
             'coordReview' => ['status' => $coordStatus, 'comment' => $coordStatus === 'flagged' ? ($app['coordinatorComment'] ?? '') : ''],
             'gradSchoolEndorsement' => ['status' => !empty($app['gradSchoolEndorsed']) ? 'done' : 'pending'],
-            'payment' => ['status' => !empty($app['paymentRecorded']) ? 'done' : 'pending', 'submitted' => $app['paymentDate'] ?? ($paymentUpload['date'] ?? '')],
+            'payment' => ['status' => !empty($app['paymentRecorded']) ? 'done' : 'pending', 'submitted' => !empty($app['paymentDate']) ? $app['paymentDate'] : ($paymentUpload['date'] ?? '')],
             'readyForPresentation' => ['status' => !empty($app['readyForPresentation']) ? 'done' : 'pending'],
             'presentation' => [
                 'status' => $schedule && !empty($schedule['date']) ? 'done' : 'pending',
@@ -1795,18 +1906,6 @@ function getStudentProgress(string $email, string $track): array {
         ];
     }
 
-    $hasAny = false;
-    foreach ($rows as $r) {
-        if ($r['stageStatus'] !== 'not_started') {
-            $hasAny = true;
-            break;
-        }
-    }
-    $demoEmails = ['1@adzu.edu.ph', 'rtorres@adzu.edu.ph', '2@adzu.edu.ph', 'jgler@adzu.edu.ph', '3@adzu.edu.ph'];
-    $isDemo = in_array(strtolower($email), $demoEmails, true);
-    if (!$hasAny && $isDemo) {
-        return demoProgressForTrack($track);
-    }
     return $rows;
 }
 

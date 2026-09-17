@@ -1,5 +1,5 @@
 <?php
-// includes/db.php
+
 require_once __DIR__ . '/config.php';
 
 class DB {
@@ -12,9 +12,9 @@ class DB {
         if (self::$pdo === null) {
             $host = 'localhost';
             $db   = 'csite_grad_school';
-            $user = 'root'; // Default XAMPP MySQL user
-            $pass = '';     // Default XAMPP MySQL password is empty
-            $port = '3306'; // Default MySQL port
+            $user = 'root';
+            $pass = '';
+            $port = '3306';
 
             $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4";
             
@@ -51,10 +51,6 @@ class DB {
 
         $insertId = $pdo->lastInsertId();
 
-        // Return array including the table's real auto-increment primary key.
-        // The previous implementation only ever returned 'user_id', which meant
-        // inserts into `students` (PK = student_id) came back without the id and
-        // every downstream reference ($student['student_id']) silently failed.
         if ($insertId) {
             $pkMap = [
                 'users' => 'user_id',
@@ -68,8 +64,6 @@ class DB {
             if (!isset($data[$pk])) {
                 $data[$pk] = (int) $insertId;
             }
-            // Backwards compatibility: callers that inserted into `users` without
-            // passing a user_id continue to read it from $row['user_id'].
             if ($pk !== 'user_id' && !isset($data['user_id'])) {
                 $data['user_id'] = (int) $insertId;
             }

@@ -54,7 +54,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <div class="stat-card">
                 <div class="stat-icon purple"><i class="fas fa-presentation"></i></div>
                 <div class="stat-value">24</div>
-                <div class="stat-label">Presentations (AY 2024–25)</div>
+                <div class="stat-label">Presentation (SY 2026-2027)</div>
             </div>
         </div>
     </div>

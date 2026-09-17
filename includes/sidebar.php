@@ -23,10 +23,6 @@ $currentPage = $currentPage ?? '';
 $userName    = $userName ?? ($_SESSION['user']['full_name'] ?? '');
 $isCoordinator = ($role === 'coordinator');
 
-// ------------------------------------------------------------------
-// 1. NAVIGATION DEFINITIONS (loop-driven, easy to extend)
-// ------------------------------------------------------------------
-
 $studentLinks = [
     ['key' => 'dashboard',   'label' => 'Dashboard',   'icon' => 'fa-gauge-high', 'href' => url('student/dashboard.php')],
     ['key' => 'application', 'label' => 'Application', 'icon' => 'fa-file-lines', 'href' => url('student/application.php')],
@@ -76,10 +72,6 @@ $socialLinks = [
     ['label' => 'YouTube',    'icon' => 'fa-youtube',    'href' => 'https://www.youtube.com/@ateneodezamboangauniversity'],
 ];
 
-// ------------------------------------------------------------------
-// 2. ACTIVE / OPEN STATE HELPERS
-// ------------------------------------------------------------------
-
 /** Collect every key inside a link tree (parent + children). */
 $collectKeys = static function (array $links) use (&$collectKeys): array {
     $keys = [];
@@ -116,9 +108,6 @@ $isSubmenuChildActive = static function (array $submenu, string $current): bool 
     return false;
 };
 
-// Which section should render? Keep both definitions above for modularity,
-// but only output the section matching the active role (chronological order
-// required by spec: MAIN NAVIGATION first, then COORDINATOR).
 $showStudentSection    = !$isCoordinator;
 $showCoordinatorSection = $isCoordinator;
 ?>
@@ -156,23 +145,14 @@ $showCoordinatorSection = $isCoordinator;
     position: relative;
     overflow: hidden;
     display: flex; align-items: center; justify-content: center;
-    /* soft multi-colored seal backdrop */
-    background:
-      radial-gradient(circle at 30% 30%, rgba(255,255,255,.85) 0 18%, transparent 19%),
-      conic-gradient(from 200deg, #7fb3d5, #a9cce3, #f9e79f, #a9dfbf, #aed6f1, #7fb3d5);
+    background: #ffffff;
   }
   #sidebar.myadzu-sidebar .myadzu-avatar img.myadzu-seal {
     position: absolute; inset: 0;
     width: 100%; height: 100%;
     object-fit: cover;
-    opacity: .55;
+    opacity: 1;
     pointer-events: none;
-  }
-  #sidebar.myadzu-sidebar .myadzu-avatar i {
-    position: relative; z-index: 1;
-    font-size: 3rem;
-    color: #8fa0b5;
-    text-shadow: 0 1px 0 rgba(255,255,255,.6);
   }
   #sidebar.myadzu-sidebar .myadzu-username {
     font-size: .8rem; color: #cbd5e1;
@@ -222,11 +202,12 @@ $showCoordinatorSection = $isCoordinator;
   #sidebar.myadzu-sidebar .myadzu-root.is-open { background: #1c242e; border-left-color: #FFB82B; }
   #sidebar.myadzu-sidebar .myadzu-root-left { display: flex; align-items: center; gap: .7rem; }
   #sidebar.myadzu-sidebar .myadzu-root-left > i { color: #FFB82B; width: 20px; text-align: center; }
-  #sidebar.myadzu-sidebar .myadzu-root .nav-chevron { color: #8a94a6; font-size: .75rem; transition: transform .25s ease; }
+  #sidebar.myadzu-sidebar .myadzu-root .nav-chevron { color: #8a94a6; font-size: .75rem; transition: transform .15s ease; }
   #sidebar.myadzu-sidebar .myadzu-root .nav-chevron.open { transform: rotate(180deg); }
-  /* Child links */
-  #sidebar.myadzu-sidebar .myadzu-children { overflow: hidden; max-height: 0; opacity: 0; transition: max-height .3s ease, opacity .25s ease; }
-  #sidebar.myadzu-sidebar .myadzu-children.open { max-height: 800px; opacity: 1; }
+  /* Child links — instant show/hide (height animations stutter on low-end machines) */
+  #sidebar.myadzu-sidebar .myadzu-children { display: none; contain: layout style; }
+  #sidebar.myadzu-sidebar .myadzu-children.open { display: block; }
+  #sidebar.myadzu-sidebar .myadzu-children > ul { min-height: 0; }
   #sidebar.myadzu-sidebar .myadzu-link,
   #sidebar.myadzu-sidebar .myadzu-sub-toggle {
     display: flex; align-items: center; gap: .65rem;
@@ -245,8 +226,9 @@ $showCoordinatorSection = $isCoordinator;
   #sidebar.myadzu-sidebar .myadzu-link.active i { color: #FFB82B; }
   #sidebar.myadzu-sidebar .myadzu-sub-toggle.is-open { color: #ffffff; background: #1c242e; }
   #sidebar.myadzu-sidebar .myadzu-sub-toggle .nav-chevron { margin-left: auto; font-size: .65rem; color: #8a94a6; }
-  #sidebar.myadzu-sidebar .myadzu-nested { overflow: hidden; max-height: 0; opacity: 0; transition: max-height .3s ease, opacity .25s ease; }
-  #sidebar.myadzu-sidebar .myadzu-nested.open { max-height: 400px; opacity: 1; }
+  #sidebar.myadzu-sidebar .myadzu-nested { display: none; contain: layout style; }
+  #sidebar.myadzu-sidebar .myadzu-nested.open { display: block; }
+  #sidebar.myadzu-sidebar .myadzu-nested > ul { min-height: 0; }
   #sidebar.myadzu-sidebar .myadzu-nested .myadzu-link { padding-left: 3.8rem; font-size: .82rem; }
   /* Socials */
   #sidebar.myadzu-sidebar .myadzu-socials { padding-bottom: 1rem; border-top: 1px solid rgba(255,255,255,.07); }
@@ -262,6 +244,8 @@ $showCoordinatorSection = $isCoordinator;
   #sidebar.myadzu-sidebar::-webkit-scrollbar,
   #sidebar.myadzu-sidebar .myadzu-nav::-webkit-scrollbar { width: 8px; }
   #sidebar.myadzu-sidebar .myadzu-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 4px; }
+  /* Perf: zero animation inside sidebar so toggles apply instantly (no tween jank) */
+  #sidebar.myadzu-sidebar, #sidebar.myadzu-sidebar * { transition: none !important; animation: none !important; }
 </style>
 
 <aside class="sidebar myadzu-sidebar" id="sidebar" aria-label="MyADZU sidebar navigation">
@@ -270,9 +254,8 @@ $showCoordinatorSection = $isCoordinator;
   <div class="myadzu-brandbar">MyADZU</div>
 
   <div class="myadzu-profile">
-    <div class="myadzu-avatar" role="img" aria-label="User profile picture">
-      <img class="myadzu-seal" src="<?= asset('img/adzu-seal.png') ?>" alt="" onerror="this.style.display='none'">
-      <i class="fas fa-user" aria-hidden="true"></i>
+    <div class="myadzu-avatar" role="img" aria-label="ADZU seal">
+      <img class="myadzu-seal" src="<?= asset('img/adzu-seal.png') ?>" alt="ADZU seal" onerror="this.style.display='none'">
     </div>
     <?php if (!empty($userName)): ?>
       <div class="myadzu-username"><?= htmlspecialchars($userName) ?></div>
@@ -424,6 +407,11 @@ $showCoordinatorSection = $isCoordinator;
   var input = document.querySelector('[data-menu-filter]');
   if (!input) return;
   var sidebar = document.getElementById('sidebar');
+  var debounceTimer = null;
+  function scheduleFilter() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(applyFilter, 120);
+  }
   function applyFilter() {
     var q = (input.value || '').trim().toLowerCase();
     var items = sidebar ? sidebar.querySelectorAll('[data-menu-item]') : [];
@@ -465,7 +453,7 @@ $showCoordinatorSection = $isCoordinator;
       empty.style.display = anyVisible ? 'none' : '';
     }
   }
-  input.addEventListener('input', applyFilter);
+  input.addEventListener('input', scheduleFilter);
   input.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { input.value = ''; applyFilter(); }
   });

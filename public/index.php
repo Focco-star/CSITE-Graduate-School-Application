@@ -27,13 +27,13 @@ require_once __DIR__ . '/../includes/header.php';
         <h2 class="section-title">About the System</h2>
         <p class="section-subtitle">
             A centralized online platform for CSITE graduate students to apply, submit requirements,
-            and track their capstone or thesis presentation progress.
+            and track their capstone, seminar paper or thesis presentation progress.
         </p>
         <div class="info-grid info-grid--static">
             <div class="info-card">
                 <div class="icon"><i class="fas fa-file-upload"></i></div>
                 <h3>Online Application</h3>
-                <p>Apply for capstone or thesis presentations online. No need to visit the office to submit forms and documents.</p>
+                <p>Apply for capstone, seminar paper or thesis presentations online. No need to visit the office to submit forms and documents.</p>
             </div>
             <div class="info-card">
                 <div class="icon"><i class="fas fa-download"></i></div>
@@ -52,7 +52,7 @@ require_once __DIR__ . '/../includes/header.php';
 <section class="info-section">
     <div class="container">
         <h2 class="section-title">Application Process</h2>
-        <p class="section-subtitle">Follow these steps to apply for your capstone or thesis presentation.</p>
+        <p class="section-subtitle">Follow these steps to apply for your capstone, seminar paper or thesis presentation.</p>
         <div class="process-steps">
             <div class="process-step">
                 <div class="step-number">1</div>
@@ -108,7 +108,7 @@ require_once __DIR__ . '/../includes/header.php';
             <div class="track-card">
                 <div class="track-card-header"><i class="fas fa-book"></i> Thesis Track</div>
                 <div class="track-card-body">
-                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.75rem;">For MSCS students</p>
+                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.75rem;">For MSCS &amp; MSMEd students</p>
                     <ul class="track-stages">
                         <li><span class="stage-num">1</span> Concept Paper Presentation</li>
                         <li><span class="stage-num">2</span> Thesis Proposal Presentation</li>

@@ -10,7 +10,7 @@ $role        = 'coordinator';
 $currentPage = 'applications';
 $userName    = !empty($_SESSION['user']['full_name']) ? $_SESSION['user']['full_name'] : ($mockCoordinator['name'] ?? 'Coordinator');
 
-// Ensure PDO database connection
+
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     try {
         $dbHost = defined('DB_HOST') ? DB_HOST : 'localhost';
@@ -26,7 +26,7 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
     }
 }
 
-// Handle application archiving (soft-delete only — records are flagged, never removed).
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_id'])) {
     $archiveId = (int) $_POST['archive_id'];
     if ($pdo && $archiveId > 0) {
@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_id'])) {
     redirectTo('coordinator/applications/manage.php');
 }
 
-// Restore an archived application back to the active list.
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_id'])) {
     $restoreId = (int) $_POST['restore_id'];
     if ($pdo && $restoreId > 0) {
@@ -63,16 +63,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_id'])) {
     redirectTo('coordinator/applications/manage.php');
 }
 
-// Legacy GET-based delete links are removed from the UI. If one is still hit
-// (e.g. a stale bookmark), refuse it — coordinators must archive through the UI.
+
+
 if (($_GET['delete'] ?? '') !== '') {
     setFlash('error', 'Applications can no longer be deleted from the website. Use Archive instead.');
     redirectTo('coordinator/applications/manage.php');
 }
 
-// Fetch applications directly from database (active records only).
-// This is DB-authoritative: a row deleted straight from MySQL/phpMyAdmin simply
-// stops appearing here, with no session/store fallback to resurrect it.
+
+
+
 $applications = [];
 
 if ($pdo) {

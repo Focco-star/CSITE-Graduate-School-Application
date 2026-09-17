@@ -187,15 +187,14 @@
     document.querySelectorAll('[data-submenu-toggle]').forEach(parent => {
         const toggleSubmenu = () => {
             const submenu = parent.nextElementSibling;
-            const chevron = parent.querySelector('.nav-chevron');
-            const isOpen = submenu?.classList.toggle('open');
-            chevron?.classList.toggle('open', isOpen);
+            if (!submenu) return;
+            const isOpen = submenu.classList.toggle('open');
+            parent.querySelector('.nav-chevron')?.classList.toggle('open', isOpen);
             // MyADZU theme state classes (root + nested levels)
-            parent.classList.toggle('is-open', isOpen);
             if (parent.classList.contains('myadzu-root') || parent.classList.contains('myadzu-sub-toggle')) {
                 parent.classList.toggle('is-open', isOpen);
             } else {
-                parent.classList.toggle('active', !!isOpen && !parent.classList.contains('myadzu-sub-toggle'));
+                parent.classList.toggle('active', isOpen);
             }
             if (parent.hasAttribute('aria-expanded')) {
                 parent.setAttribute('aria-expanded', isOpen ? 'true' : 'false');

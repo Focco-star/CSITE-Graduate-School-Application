@@ -18,15 +18,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         DB::getConnection()->beginTransaction();
         try {
             DB::update('students', ['first_name' => $first, 'last_name' => $last, 'middle_initial' => rtrim($middle, '.'), 'age' => $age, 'gender' => $gender, 'program' => PROGRAMS[$programCode], 'track' => getTrackForProgram($programCode)], ['student_id' => $student['student_id']]);
-            // Keep the unique student number populated for every profile.
             if (empty($student['student_number'])) {
                 DB::update('students', ['student_number' => generateStudentNumber((int) $student['student_id'])], ['student_id' => (int) $student['student_id']]);
             }
             DB::update('users', ['full_name' => $fullName], ['user_id' => $user['user_id']]);
             DB::getConnection()->commit();
             $_SESSION['user']['full_name'] = $fullName;
-            // Mirror the canonical identity into the shared store so coordinator
-            // screens that read the prototype layer show the identical profile.
             $identity = databaseStudentIdentity();
             if ($identity) {
                 upsertSessionStudent($identity);

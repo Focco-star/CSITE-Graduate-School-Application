@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Only an authenticated coordinator may download student documents.
+
 if (empty($_SESSION['user']) || ($_SESSION['user']['role'] ?? '') !== 'coordinator') {
     http_response_code(403);
     exit('Access denied. Please sign in as the Graduate Program Coordinator.');

@@ -1261,8 +1261,8 @@ img { max-width: 100%; height: auto; }
 .nav-parent-content i { width: 20px; text-align: center; font-size: 0.95rem; color: #8fa0b5; }
 .nav-chevron { font-size: 0.7rem; transition: transform 0.28s ease; color: #8a94a6; }
 .nav-chevron.open { transform: rotate(180deg); }
-.nav-submenu { overflow: hidden; max-height: 0; opacity: 0; transition: max-height 0.3s ease, opacity 0.25s ease; background: #1c242e; }
-.nav-submenu.open { max-height: 480px; opacity: 1; }
+.nav-submenu { display: none; contain: layout style; background: #1c242e; }
+.nav-submenu.open { display: block; }
 .nav-submenu a { padding-left: 3rem !important; font-size: 0.825rem !important; }
 
 .program-picker {

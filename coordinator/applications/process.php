@@ -79,8 +79,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             if (!in_array($uploadStatus, ['submitted', 'verified', 'incomplete'], true)) continue;
             $upload = findUpload((string) $uploadId);
             if (!$upload) continue;
-            // Accept documents linked to this application, or an unlinked
-            // document that belongs to this application's student.
+
+
             $linkedAppId = (int) ($upload['applicationId'] ?? 0);
             if ($linkedAppId !== (int) $app['id']) {
                 if ($linkedAppId !== 0 || empty($app['studentEmail'])
@@ -89,8 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
                 }
             }
             updateUploadStatus((string) $uploadId, $uploadStatus);
-            $type = strtolower((string) $upload['docType']);
-            $key = (str_contains($type, 'receipt') || str_contains($type, 'payment')) ? 'receipt' : ((str_contains($type, 'endorsement') || str_contains($type, 'adviser')) ? 'adviser_endorsement' : 'paper');
+            $key = classifyUploadDocType((string) $upload['docType']);
             $workflowState[$key] = $uploadStatus;
         }
         if ($advance && $status === 'approved') {
@@ -148,7 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
                 ]);
             }
 
-            // Keep existing prototype-session screens synchronized when the same record exists there.
+
             if (findApplication((int) $app['id'])) {
                 updateApplicationRecord((int) $app['id'], $updatedFields);
             }

@@ -5,7 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Redirect if already logged in as coordinator
+
 if (!empty($_SESSION['user']) && ($_SESSION['user']['role'] ?? '') === 'coordinator') {
     header('Location: ' . url('coordinator/dashboard.php'));
     exit;
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please enter both email and password.';
     } else {
         try {
-            // Establish PDO connection directly if $pdo is not set in config.php
+
             if (!isset($pdo) || !($pdo instanceof PDO)) {
                 $dbHost = defined('DB_HOST') ? DB_HOST : 'localhost';
                 $dbName = defined('DB_NAME') ? DB_NAME : 'csite_grad_school';
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
             }
 
-            // Fetch user from DB
+
             $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :email AND role = 'coordinator' LIMIT 1");
             $stmt->execute(['email' => $email]);
             $user = $stmt->fetch();

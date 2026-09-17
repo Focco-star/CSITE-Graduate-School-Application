@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
 
-// Start session if not already active
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -11,11 +10,6 @@ $role        = $role ?? ($_SESSION['user']['role'] ?? 'public');
 $currentPage = $currentPage ?? '';
 $bodyClass   = $bodyClass ?? '';
 
-// Centralized access control: every page sets $role before including this
-// header. If the page declares a portal role (student/coordinator) but the
-// active session does not match it, bounce to the appropriate login page
-// instead of rendering the portal shell. This also prevents a coordinator
-// session from rendering student pages and vice versa.
 if ($role === 'coordinator' && (empty($_SESSION['user']) || ($_SESSION['user']['role'] ?? '') !== 'coordinator')) {
     redirectTo('coordinator/login.php');
 }
@@ -23,7 +17,6 @@ if ($role === 'student' && (empty($_SESSION['user']) || ($_SESSION['user']['role
     redirectTo('student/login.php');
 }
 
-// Fallback to fetch full_name or user_id name from active session if $userName is empty
 if (empty($userName) && !empty($_SESSION['user'])) {
     $userName = $_SESSION['user']['full_name'] ?? $_SESSION['user']['name'] ?? '';
 }
