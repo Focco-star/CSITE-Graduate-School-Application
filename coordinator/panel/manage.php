@@ -21,13 +21,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_avail'])) {
     redirectTo('coordinator/panel/manage.php');
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['sessions_id'])) {
-    updatePanelMemberRecord((string) $_POST['sessions_id'], [
-        'panelSessions' => (int) ($_POST['panelSessions'] ?? 0),
-    ]);
-    redirectTo('coordinator/panel/manage.php');
-}
-
 $panelMembers = storeGet('panels');
 
 require_once __DIR__ . '/../../includes/header.php';
@@ -48,7 +41,7 @@ require_once __DIR__ . '/../../includes/header.php';
         <div class="table-responsive">
             <table class="data-table">
                 <thead>
-                    <tr><th>Name</th><th>Qualification</th><th>Panel Sessions</th><th>Availability</th><th>Actions</th></tr>
+                    <tr><th>Name</th><th>Qualification</th><th style="text-align:center;">Panel Sessions</th><th>Availability</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                     <?php if (!$panelMembers): ?>
@@ -63,12 +56,8 @@ require_once __DIR__ . '/../../includes/header.php';
                             <?php endif; ?>
                         </td>
                         <td style="font-size:0.83rem;"><?= htmlspecialchars($pm['qualification']) ?></td>
-                        <td>
-                            <form method="post" style="display:flex;align-items:center;gap:0.5rem;">
-                                <input type="hidden" name="sessions_id" value="<?= htmlspecialchars($pm['id']) ?>">
-                                <input type="number" min="0" name="panelSessions" value="<?= (int) $pm['panelSessions'] ?>" style="width:72px;padding:0.25rem 0.4rem;">
-                                <button class="btn btn-sm btn-outline" type="submit" title="Save sessions"><i class="fas fa-save"></i></button>
-                            </form>
+                        <td style="text-align:center;font-weight:600;color:var(--adzu-navy);">
+                            <?= (int) ($pm['panelSessions'] ?? 0) ?>
                         </td>
                         <td>
                             <form method="post">
