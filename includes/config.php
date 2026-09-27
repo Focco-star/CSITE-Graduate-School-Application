@@ -83,13 +83,63 @@ function statusBadge(string $status): string {
 }
 
 function getStagesForTrack(string $track): array {
-    if ($track === 'capstone') return STAGES_CAPSTONE;
-    if ($track === 'seminar') return STAGES_SEMINAR;
-    return STAGES_THESIS;
+    $fallback = STAGES_THESIS;
+    if ($track === 'capstone') {
+        $fallback = STAGES_CAPSTONE;
+    } elseif ($track === 'seminar') {
+        $fallback = STAGES_SEMINAR;
+    }
+
+    if (!class_exists('DB')) {
+        return $fallback;
+    }
+
+    try {
+        $stmt = DB::getConnection()->prepare(
+            'SELECT workflow_stages.stage_key, workflow_stages.stage_label
+             FROM workflow_stages
+             INNER JOIN tracks ON tracks.track_id = workflow_stages.track_id
+             WHERE tracks.track_code = :track
+             ORDER BY workflow_stages.stage_order, workflow_stages.stage_id'
+        );
+        $stmt->execute(['track' => $track]);
+        $stages = [];
+        foreach ($stmt->fetchAll() as $stage) {
+            $stages[$stage['stage_key']] = $stage['stage_label'];
+        }
+        return $stages ?: $fallback;
+    } catch (Throwable $e) {
+        return $fallback;
+    }
 }
 
 function getTrackForProgram(string $program): string {
     $trimmed = trim($program);
+
+    if ($trimmed !== '' && class_exists('DB')) {
+        try {
+            $stmt = DB::getConnection()->prepare(
+                'SELECT tracks.track_code
+                 FROM programs
+                 INNER JOIN tracks ON tracks.track_id = programs.track_id
+                 WHERE programs.program_code = :program
+                    OR programs.program_name = :program
+                    OR programs.program_name LIKE :program_like
+                 LIMIT 1'
+            );
+            $stmt->execute([
+                'program' => $trimmed,
+                'program_like' => '%' . $trimmed . '%',
+            ]);
+            $databaseTrack = $stmt->fetchColumn();
+            if (is_string($databaseTrack) && $databaseTrack !== '') {
+                return $databaseTrack;
+            }
+        } catch (Throwable $e) {
+            // Keep the existing program mapping when the new tables are unavailable.
+        }
+    }
+
     if (stripos($trimmed, 'capstone') !== false) {
         return 'capstone';
     }
@@ -245,12 +295,58 @@ function getWorkflow(string $track): array {
     ];
 
     if ($track === 'capstone') {
-        return $capstone;
+        return getDatabaseWorkflow($track, $capstone);
     }
     if ($track === 'seminar') {
-        return $seminar;
+        return getDatabaseWorkflow($track, $seminar);
     }
-    return $thesis;
+    return getDatabaseWorkflow($track, $thesis);
+}
+
+function getDatabaseWorkflow(string $track, array $workflow): array {
+    if (!class_exists('DB')) {
+        return $workflow;
+    }
+
+    try {
+        $stmt = DB::getConnection()->prepare(
+            'SELECT workflow_stages.stage_key, workflow_stages.stage_label
+             FROM workflow_stages
+             INNER JOIN tracks ON tracks.track_id = workflow_stages.track_id
+             WHERE tracks.track_code = :track
+             ORDER BY workflow_stages.stage_order, workflow_stages.stage_id'
+        );
+        $stmt->execute(['track' => $track]);
+        $databaseStages = $stmt->fetchAll();
+        if (!$databaseStages) {
+            return $workflow;
+        }
+
+        $configuredStages = [];
+        foreach ($workflow['stages'] as $configuredStage) {
+            $configuredStages[$configuredStage['key']] = $configuredStage;
+        }
+
+        $stages = [];
+        foreach ($databaseStages as $databaseStage) {
+            $stageKey = $databaseStage['stage_key'];
+            $stage = $configuredStages[$stageKey] ?? [
+                'key' => $stageKey,
+                'label' => $databaseStage['stage_label'],
+                'shortLabel' => $databaseStage['stage_label'],
+                'documents' => [],
+                'adviserEndorsementForm' => ['file' => ''],
+                'gradSchoolEndorsementForm' => ['file' => ''],
+            ];
+            $stage['label'] = $databaseStage['stage_label'];
+            $stages[] = $stage;
+        }
+        $workflow['stages'] = $stages;
+    } catch (Throwable $e) {
+        return $workflow;
+    }
+
+    return $workflow;
 }
 
 function getPaperLibraryRows(): array {
@@ -1064,14 +1160,27 @@ function databaseApplicationIdForStudent(int $studentId, string $stageLabel = ''
         $pdo = DB::getConnection();
         if ($stageLabel !== '') {
             $stmt = $pdo->prepare(
-                'SELECT application_id FROM applications
+                'SELECT application_id, presentation_stage FROM applications
                  WHERE student_id = :student_id AND archived_at IS NULL AND presentation_stage = :stage
                  ORDER BY submitted_at DESC LIMIT 1'
             );
             $stmt->execute(['student_id' => $studentId, 'stage' => $stageLabel]);
-            $found = $stmt->fetchColumn();
-            if ($found) {
-                return (int) $found;
+            $exact = $stmt->fetchColumn();
+            if ($exact) {
+                return (int) $exact;
+            }
+
+            $stageStmt = $pdo->prepare(
+                'SELECT application_id, presentation_stage FROM applications
+                 WHERE student_id = :student_id AND archived_at IS NULL
+                 ORDER BY submitted_at DESC'
+            );
+            $stageStmt->execute(['student_id' => $studentId]);
+            $requestedStageKey = stageKeyFromLabel($stageLabel);
+            foreach ($stageStmt->fetchAll() as $application) {
+                if (stageKeyFromLabel((string) $application['presentation_stage']) === $requestedStageKey) {
+                    return (int) $application['application_id'];
+                }
             }
         }
         $stmt = $pdo->prepare(
@@ -1373,11 +1482,14 @@ function recordStudentDocument(array $meta, ?string $email = null, ?int $userId 
 }
 
 function findUpload(string $id): ?array {
+    if (ctype_digit($id)) {
+        $databaseUpload = databaseDocumentById((int) $id);
+        if ($databaseUpload) {
+            return $databaseUpload;
+        }
+    }
     foreach (storeGet('uploads') as $upload) {
         if ((string) ($upload['id'] ?? '') === $id) return $upload;
-    }
-    if (ctype_digit($id)) {
-        return databaseDocumentById((int) $id);
     }
     return null;
 }
@@ -1540,13 +1652,7 @@ function getWorkflowStageLabels(string $track): array {
 }
 
 function presentationStageOptions(string $track): array {
-    if ($track === 'capstone') {
-        return array_values(STAGES_CAPSTONE);
-    }
-    if ($track === 'seminar') {
-        return array_values(STAGES_SEMINAR);
-    }
-    return array_values(STAGES_THESIS);
+    return array_values(getStagesForTrack($track));
 }
 
 function stageKeyFromLabel(string $label): string {
@@ -1751,13 +1857,17 @@ function workflowCurrentIndex(array $progress, array $stages): int {
     if ($count === 0) {
         return 0;
     }
-    foreach ($progress as $i => $p) {
+    for ($i = $count - 1; $i >= 0; $i--) {
+        $p = $progress[$i] ?? [];
         $st = $p['stageStatus'] ?? 'not_started';
-        if (!in_array($st, ['completed', 'approved'], true)) {
-            return max(0, min($i, $count - 1));
+        if (!in_array($st, ['not_started', 'pending', 'draft', ''], true)) {
+            if (!in_array($st, ['completed', 'approved'], true)) {
+                return $i;
+            }
+            return min($i + 1, $count - 1);
         }
     }
-    return $count - 1;
+    return 0;
 }
 
 /**
@@ -1814,7 +1924,18 @@ function getStudentProgress(string $email, string $track): array {
     }
 
     $rows = [];
-    foreach ($stages as $stage) {
+    $activeStageIndex = -1;
+    foreach ($apps as $app) {
+        $appStageKey = $app['stageKey'] ?? stageKeyFromLabel($app['stage'] ?? '');
+        foreach ($stages as $stageIndex => $stage) {
+            if ($appStageKey === $stage['key']) {
+                $activeStageIndex = max($activeStageIndex, $stageIndex);
+                break;
+            }
+        }
+    }
+
+    foreach ($stages as $stageIndex => $stage) {
         $app = null;
         foreach ($apps as $a) {
             $key = $a['stageKey'] ?? stageKeyFromLabel($a['stage'] ?? '');
@@ -1832,7 +1953,19 @@ function getStudentProgress(string $email, string $track): array {
             }
         }
         if (!$app) {
-            $rows[] = blankStageProgress($stage);
+            $blank = blankStageProgress($stage);
+            if ($activeStageIndex > $stageIndex) {
+                $blank['stageStatus'] = 'completed';
+                $blank['paper'] = ['status' => 'done'];
+                $blank['adviserEndorsement'] = ['status' => 'done'];
+                $blank['coordReview'] = ['status' => 'done', 'comment' => ''];
+                $blank['gradSchoolEndorsement'] = ['status' => 'done'];
+                $blank['payment'] = ['status' => 'done'];
+                $blank['readyForPresentation'] = ['status' => 'done'];
+                $blank['presentation'] = ['status' => 'done'];
+                $blank['result'] = ['status' => 'done', 'value' => 'approved'];
+            }
+            $rows[] = $blank;
             continue;
         }
 
@@ -1859,6 +1992,16 @@ function getStudentProgress(string $email, string $track): array {
 
         $paperWf = $wf['paper'] ?? '';
         $advWf = $wf['adviser_endorsement'] ?? '';
+        if ($paperUpload && in_array($paperUpload['status'] ?? '', ['verified', 'approved'], true)) {
+            $paperWf = 'verified';
+        } elseif ($paperUpload && ($paperUpload['status'] ?? '') === 'incomplete') {
+            $paperWf = 'incomplete';
+        }
+        if ($adviserUpload && in_array($adviserUpload['status'] ?? '', ['verified', 'approved'], true)) {
+            $advWf = 'verified';
+        } elseif ($adviserUpload && ($adviserUpload['status'] ?? '') === 'incomplete') {
+            $advWf = 'incomplete';
+        }
         $paperStatus = $paperWf === 'verified' ? 'done' : ($paperWf === 'incomplete' ? 'flagged' : ($paperUpload ? 'done' : 'pending'));
         $adviserStatus = $advWf === 'verified' ? 'done' : ($advWf === 'incomplete' ? 'flagged' : ($adviserUpload ? 'done' : 'pending'));
         $coordStatus = ($paperWf === 'incomplete' || $advWf === 'incomplete') ? 'flagged' : (($paperWf === 'verified' && $advWf === 'verified') ? 'done' : 'pending');

@@ -13,6 +13,9 @@ $workflow    = getWorkflow($track);
 $stages      = $workflow['stages'];
 $progress    = getStudentProgress($mockStudent['email'], $track);
 $uploads     = uploadsForEmail($mockStudent['email']);
+$currentIndex = workflowCurrentIndex($progress, $stages);
+$currentProgress = $progress[$currentIndex] ?? ['stageStatus' => 'pending'];
+$currentStage = $stages[$currentIndex] ?? null;
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -25,12 +28,12 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="stats-grid">
     <div class="stat-card">
         <div class="stat-icon blue"><i class="fas fa-flag"></i></div>
-        <div class="stat-value" style="font-size:1rem;"><?= htmlspecialchars(displayStageLabel(['track' => $track, 'program' => $mockStudent['program'], 'currentStage' => $mockStudent['current_stage']])) ?></div>
+        <div class="stat-value" style="font-size:1rem;"><?= htmlspecialchars($currentStage['label'] ?? 'Not Started') ?></div>
         <div class="stat-label">Current Stage</div>
     </div>
     <div class="stat-card">
         <div class="stat-icon purple"><i class="fas fa-tasks"></i></div>
-        <div class="stat-value"><?= statusBadge($mockStudent['status']) ?></div>
+        <div class="stat-value"><?= statusBadge($currentProgress['stageStatus'] ?? 'pending') ?></div>
         <div class="stat-label">Overall Status</div>
     </div>
     <div class="stat-card">

@@ -8,6 +8,25 @@ $currentPage = 'schedule';
 $userName    = $mockCoordinator['name'];
 
 $students = storeGet('students');
+try {
+    $databaseStudents = DB::query(
+        "SELECT s.student_id, s.first_name, s.last_name, s.middle_initial,
+                s.program, s.track, s.adviser_name AS adviser, u.email
+         FROM students s
+         INNER JOIN users u ON u.user_id = s.user_id
+         WHERE s.archived_at IS NULL AND u.role = 'student'
+         ORDER BY s.last_name, s.first_name"
+    )->fetchAll();
+    if ($databaseStudents) {
+        $students = array_map(static function (array $student): array {
+            $student['program'] = programCodeForStudent($student);
+            $student['track'] = $student['track'] ?: getTrackForProgram($student['program']);
+            return $student;
+        }, $databaseStudents);
+    }
+} catch (Throwable $e) {
+    // Keep the prototype student list available when the database is unavailable.
+}
 $panelOpts = panelSelectOptions();
 $adviserOpts = ['Dr. Maria Santos', 'Dr. Juan Dela Cruz', 'Dr. Ana Reyes'];
 try {
@@ -35,6 +54,26 @@ foreach ($students as $s) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = $_POST['studentEmail'] ?? '';
     $st = findStudentByEmail($email);
+    if (!$st) {
+        try {
+            $studentStmt = DB::getConnection()->prepare(
+                'SELECT s.student_id, s.first_name, s.last_name, s.middle_initial,
+                        s.program, s.track, s.adviser_name AS adviser, u.email
+                 FROM students s
+                 INNER JOIN users u ON u.user_id = s.user_id
+                 WHERE u.email = :email AND s.archived_at IS NULL
+                 LIMIT 1'
+            );
+            $studentStmt->execute(['email' => $email]);
+            $st = $studentStmt->fetch() ?: null;
+            if ($st) {
+                $st['program'] = programCodeForStudent($st);
+                $st['track'] = $st['track'] ?: getTrackForProgram($st['program']);
+            }
+        } catch (Throwable $e) {
+            $st = null;
+        }
+    }
     $stage = trim($_POST['stage'] ?? '');
     if ($st && $stage !== '') {
         $displayDate = trim($_POST['date'] ?? '');
