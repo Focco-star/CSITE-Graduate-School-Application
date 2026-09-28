@@ -4,7 +4,7 @@
 define('SITE_NAME', 'CSITE Graduate School Application');
 define('SITE_SHORT', 'CSITE Graduate School Application');
 define('SITE_TAGLINE', 'Capstone, Seminar Paper and Thesis Presentation Application System');
-define('BASE_URL', '/CSITE/CSITE-Graduate-School-Application');
+define('BASE_URL', '/CSITE-Graduate-School-Application');
 
 define('COLOR_PRIMARY', '#060297');
 define('COLOR_ACCENT', '#FFB82B');
