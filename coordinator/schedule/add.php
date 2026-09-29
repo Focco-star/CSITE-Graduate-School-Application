@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Schedule Presentation';
 $role        = 'coordinator';
@@ -7,7 +8,33 @@ $currentPage = 'schedule';
 $userName    = $mockCoordinator['name'];
 
 $students = storeGet('students');
+try {
+    $databaseStudents = DB::query(
+        "SELECT s.student_id, s.first_name, s.last_name, s.middle_initial,
+                s.program, s.track, s.adviser_name AS adviser, u.email
+         FROM students s
+         INNER JOIN users u ON u.user_id = s.user_id
+         WHERE s.archived_at IS NULL AND u.role = 'student'
+         ORDER BY s.last_name, s.first_name"
+    )->fetchAll();
+    if ($databaseStudents) {
+        $students = array_map(static function (array $student): array {
+            $student['program'] = programCodeForStudent($student);
+            $student['track'] = $student['track'] ?: getTrackForProgram($student['program']);
+            return $student;
+        }, $databaseStudents);
+    }
+} catch (Throwable $e) {
+    // Keep the prototype student list available when the database is unavailable.
+}
 $panelOpts = panelSelectOptions();
+$adviserOpts = ['Dr. Maria Santos', 'Dr. Juan Dela Cruz', 'Dr. Ana Reyes'];
+try {
+    $rows = DB::query("SELECT name FROM advisor_pool WHERE availability = 'available' ORDER BY name")->fetchAll();
+    if ($rows) $adviserOpts = array_column($rows, 'name');
+} catch (Throwable $e) {
+
+}
 $preselected = '';
 if (!empty($_GET['app'])) {
     $preApp = findApplication((int) $_GET['app']);
@@ -27,6 +54,26 @@ foreach ($students as $s) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = $_POST['studentEmail'] ?? '';
     $st = findStudentByEmail($email);
+    if (!$st) {
+        try {
+            $studentStmt = DB::getConnection()->prepare(
+                'SELECT s.student_id, s.first_name, s.last_name, s.middle_initial,
+                        s.program, s.track, s.adviser_name AS adviser, u.email
+                 FROM students s
+                 INNER JOIN users u ON u.user_id = s.user_id
+                 WHERE u.email = :email AND s.archived_at IS NULL
+                 LIMIT 1'
+            );
+            $studentStmt->execute(['email' => $email]);
+            $st = $studentStmt->fetch() ?: null;
+            if ($st) {
+                $st['program'] = programCodeForStudent($st);
+                $st['track'] = $st['track'] ?: getTrackForProgram($st['program']);
+            }
+        } catch (Throwable $e) {
+            $st = null;
+        }
+    }
     $stage = trim($_POST['stage'] ?? '');
     if ($st && $stage !== '') {
         $displayDate = trim($_POST['date'] ?? '');
@@ -44,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $panel = implode(', ', array_filter([$_POST['panel1'] ?? '', $_POST['panel2'] ?? '', $_POST['panel3'] ?? '']));
+        $venue = trim($_POST['venue'] ?? '');
         $app = latestApplicationForEmail($email);
         addScheduleRecord([
             'studentEmail' => $email,
@@ -52,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'stage' => $stage,
             'date' => $displayDate,
             'time' => $displayTime,
-            'venue' => trim($_POST['venue'] ?? ''),
+            'venue' => $venue,
             'panel' => $panel ?: 'TBD',
             'adviser' => trim($_POST['adviser'] ?? ''),
             'documentor' => trim($_POST['documentor'] ?? ''),
@@ -60,6 +108,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
         if ($app) {
             updateApplicationRecord((int) $app['id'], ['status' => 'scheduled']);
+        }
+        if (class_exists('DB')) {
+            try {
+                $studentId = databaseStudentIdForEmail($email);
+                if ($studentId > 0) {
+                    $dbAppId = databaseApplicationIdForStudent($studentId, $stage);
+                    if ($dbAppId) {
+                        $pdo = DB::getConnection();
+                        $cur = $pdo->prepare('SELECT workflow_state FROM applications WHERE application_id = :id LIMIT 1');
+                        $cur->execute(['id' => $dbAppId]);
+                        $wf = json_decode((string) ($cur->fetchColumn() ?: '[]'), true) ?: [];
+                        $wf['presentation_date'] = $displayDate;
+                        $wf['presentation_time'] = $displayTime;
+                        $wf['presentation_venue'] = $venue;
+                        $wf['presentation_panel'] = $panel ?: 'TBD';
+                        $upd = $pdo->prepare('UPDATE applications SET status = :status, workflow_state = :wf WHERE application_id = :id');
+                        $upd->execute([
+                            'status' => 'scheduled',
+                            'wf' => json_encode($wf, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                            'id' => $dbAppId,
+                        ]);
+                    }
+                }
+            } catch (Throwable $e) {
+            }
         }
         redirectTo('coordinator/schedule/manage.php');
     }
@@ -147,12 +220,7 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 
     <div class="card">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h3>Panel Assignment</h3>
-            <a href="<?= url('coordinator/panel/add.php') ?>" class="btn btn-outline" style="font-size: 0.82rem; padding: 0.35rem 0.75rem;">
-                <i class="fas fa-plus"></i> Add Panel Member
-            </a>
-        </div>
+        <div class="card-header"><h3>Panel Assignment</h3></div>
         <div class="card-body">
             <div class="form-row">
                 <div class="form-field">
@@ -182,9 +250,7 @@ require_once __DIR__ . '/../../includes/header.php';
                     <label>Adviser <span class="required">*</span></label>
                     <select name="adviser" required>
                         <option value="">Select adviser</option>
-                        <option>Dr. Maria Santos</option>
-                        <option>Dr. Juan Dela Cruz</option>
-                        <option>Dr. Ana Reyes</option>
+                        <?php foreach ($adviserOpts as $adviser): ?><option><?= htmlspecialchars($adviser) ?></option><?php endforeach; ?>
                     </select>
                 </div>
             </div>
