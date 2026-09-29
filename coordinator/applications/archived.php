@@ -104,9 +104,10 @@ require_once __DIR__ . '/../../includes/header.php';
 .confirm-notice{margin-top:1rem;padding:.7rem .9rem;background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;color:#374151;font-size:.85rem;line-height:1.5;}
 .confirm-footer{display:flex;justify-content:space-between;align-items:center;padding:.9rem 1.5rem;border-top:1px solid #e5e7eb;background:#fff;}
 
-/* Same neutral confirm button for both Restore and Delete */
-.confirm-submit{background:#1f2937;border:1px solid #1f2937;color:#fff;}
-.confirm-submit:hover{background:#111827;border-color:#111827;}
+.confirm-submit.is-restore{background:#f5b800;border:1px solid #f5b800;color:#1f2937;font-weight:600;}
+.confirm-submit.is-restore:hover{background:#d9a300;border-color:#d9a300;}
+.confirm-submit.is-delete{background:#b91c1c;border:1px solid #b91c1c;color:#fff;font-weight:600;}
+.confirm-submit.is-delete:hover{background:#991b1b;border-color:#991b1b;}
 </style>
 
 <div class="page-header"><h2>Archived Applications</h2><p>View retained application records, restore an application when it becomes active again, or permanently delete it.</p></div>
@@ -176,6 +177,7 @@ require_once __DIR__ . '/../../includes/header.php';
     var config = {
         restore: {
             field: 'restore_id',
+            btnClass: 'is-restore',
             icon: 'fa-undo',
             title: 'Restore Application',
             intro: 'You are about to restore the following application to the active application list. Please review the details below before proceeding.',
@@ -184,6 +186,7 @@ require_once __DIR__ . '/../../includes/header.php';
         },
         delete: {
             field: 'delete_id',
+            btnClass: 'is-delete',
             icon: 'fa-trash',
             title: 'Delete Application',
             intro: 'You are about to permanently delete the following application. Please review the details below before proceeding.',
@@ -206,7 +209,9 @@ require_once __DIR__ . '/../../includes/header.php';
         document.getElementById('confirmTitle').textContent = c.title;
         document.getElementById('confirmIntro').textContent = c.intro;
         document.getElementById('confirmNotice').textContent = c.notice;
-        document.getElementById('confirmSubmit').textContent = c.submit;
+        var submitBtn = document.getElementById('confirmSubmit');
+        submitBtn.textContent = c.submit;
+        submitBtn.className = 'btn confirm-submit ' + c.btnClass;
         Object.keys(fields).forEach(function (k) {
             document.getElementById(fields[k]).textContent = btn.dataset[k] || '';
         });
