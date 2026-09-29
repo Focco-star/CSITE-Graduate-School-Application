@@ -56,7 +56,6 @@ class DB {
                 'users' => 'user_id',
                 'students' => 'student_id',
                 'applications' => 'application_id',
-                'coordinators' => 'coordinator_id',
                 'advisor_pool' => 'adviser_id',
                 'application_documents' => 'document_id',
             ];

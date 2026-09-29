@@ -118,32 +118,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
 
             $pdo->beginTransaction();
             $insertApplication = $pdo->prepare(
-                'INSERT INTO applications (student_id, presentation_stage, paper_title, status)
-                 VALUES (:student_id, :presentation_stage, :paper_title, :status)'
+                'INSERT INTO applications (user_id, presentation_stage, paper_title, status)
+                 VALUES (:user_id, :presentation_stage, :paper_title, :status)'
             );
             $insertApplication->execute([
-                'student_id' => $studentId,
+                'user_id' => $userId,
                 'presentation_stage' => $stages[$stageKey]['label'],
                 'paper_title' => $title,
                 'status' => 'submitted',
             ]);
 
             $updateAdviser = $pdo->prepare(
-                'UPDATE students SET adviser_name = :adviser_name WHERE student_id = :student_id'
+                'UPDATE students SET adviser_name = :adviser_name WHERE user_id = :user_id'
             );
             $updateAdviser->execute([
                 'adviser_name' => $adviser,
-                'student_id' => $studentId,
+                'user_id' => $userId,
             ]);
 
             $identityStmt = $pdo->prepare(
-                'SELECT s.first_name, s.last_name, s.middle_initial, s.age, s.gender, s.program, s.track, s.student_number, u.email, u.full_name
+                'SELECT s.student_id, s.first_name, s.last_name, s.middle_initial, s.age, s.gender, s.program, s.track, u.email, u.full_name
                  FROM students s
                  INNER JOIN users u ON u.user_id = s.user_id
-                 WHERE s.student_id = :student_id
+                 WHERE s.user_id = :user_id
                  LIMIT 1'
             );
-            $identityStmt->execute(['student_id' => $studentId]);
+            $identityStmt->execute(['user_id' => $userId]);
             $identity = $identityStmt->fetch() ?: [];
             if ($identity) {
                 $programCode = programCodeForStudent(['program' => $identity['program']]);
@@ -156,9 +156,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                          gender = :gender,
                          program = :program,
                          track = :track,
-                         student_number = COALESCE(NULLIF(student_number, \'\'), :student_number),
                          adviser_name = :adviser_name
-                     WHERE student_id = :student_id'
+                     WHERE user_id = :user_id'
                 );
                 $upsertStmt->execute([
                     'first_name' => $identity['first_name'],
@@ -168,9 +167,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                     'gender' => $identity['gender'],
                     'program' => $identity['program'],
                     'track' => $identity['track'],
-                    'student_number' => generateStudentNumber($studentId),
                     'adviser_name' => $adviser,
-                    'student_id' => $studentId,
+                    'user_id' => $userId,
                 ]);
                 $pdo->prepare('UPDATE users SET full_name = :full_name WHERE user_id = :user_id')
                     ->execute([

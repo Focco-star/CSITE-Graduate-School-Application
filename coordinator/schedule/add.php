@@ -111,9 +111,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (class_exists('DB')) {
             try {
-                $studentId = databaseStudentIdForEmail($email);
-                if ($studentId > 0) {
-                    $dbAppId = databaseApplicationIdForStudent($studentId, $stage);
+                $userId = databaseUserIdForEmail($email);
+                if ($userId > 0) {
+                    $dbAppId = databaseApplicationIdForStudent($userId, $stage);
                     if ($dbAppId) {
                         $pdo = DB::getConnection();
                         $cur = $pdo->prepare('SELECT workflow_state FROM applications WHERE application_id = :id LIMIT 1');

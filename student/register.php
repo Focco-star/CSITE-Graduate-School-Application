@@ -34,18 +34,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $track = getTrackForProgram($program);
-            $fullName = implode(' ', array_filter([$first, $middleInitial, $last]));
+            $fullName = canonicalStudentName($first, $last, $middleInitial);
+            // Official student ID = numeric part of the ADZU email
+            // (e.g. co259344@adzu.edu.ph -> student_id 259344).
+            $officialStudentId = extractStudentIdFromEmail($email);
+            $explicitStudentId = ($officialStudentId !== '' && ctype_digit($officialStudentId)) ? (int) $officialStudentId : 0;
 
             $pdo->beginTransaction();
 
             $user = DB::insert('users', [
-                'full_name' => canonicalStudentName($first, $last, $middleInitial),
+                'full_name' => $fullName,
                 'email'     => $email,
                 'password'  => password_hash($password, PASSWORD_DEFAULT),
                 'role'      => 'student'
             ]);
 
-            $student = DB::insert('students', [
+            $newStudent = [
                 'user_id'        => $user['user_id'],
                 'first_name'     => $first,
                 'last_name'      => $last,
@@ -55,9 +59,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'program'        => PROGRAMS[$program] ?? $program,
                 'track'          => $track,
                 'enrollment_date'=> date('Y-m-d')
-            ]);
-            DB::update('students', ['student_number' => generateStudentNumber((int) $student['student_id'])], ['student_id' => (int) $student['student_id']]);
-
+            ];
+            if ($explicitStudentId > 0) {
+                $newStudent['student_id'] = $explicitStudentId;
+            }
+            try {
+                $student = DB::insert('students', $newStudent);
+            } catch (PDOException $e) {
+                // Rare digit collision (different email, same digits): fall back to auto-assign.
+                if ($explicitStudentId > 0 && (string) ($e->getCode() ?? '') === '23000') {
+                    unset($newStudent['student_id']);
+                    $student = DB::insert('students', $newStudent);
+                } else {
+                    throw $e;
+                }
+            }
             $pdo->commit();
 
             upsertSessionStudent([

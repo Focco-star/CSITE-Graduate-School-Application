@@ -37,8 +37,8 @@ try {
 
             if ($row) {
                 // Collect uploaded file names before the rows disappear.
-                $stmt = $pdo->prepare('SELECT stored_name FROM application_documents WHERE student_id = :id');
-                $stmt->execute(['id' => $studentId]);
+                $stmt = $pdo->prepare('SELECT stored_name FROM application_documents WHERE user_id = :uid');
+                $stmt->execute(['uid' => (int) $row['user_id']]);
                 $storedFiles = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
                 // Deleting the user account cascades to students -> applications -> documents.
@@ -74,7 +74,7 @@ try {
         }
     }
 
-    $stmt = $pdo->query("SELECT s.student_id, CONCAT_WS(' ', s.first_name, NULLIF(TRIM(REPLACE(s.middle_initial, '.', '')), ''), s.last_name) AS name, s.program, s.track, s.enrollment_date, s.archived_at FROM students s WHERE s.archived_at IS NOT NULL ORDER BY s.archived_at DESC");
+    $stmt = $pdo->query("SELECT s.student_id, TRIM(CONCAT(s.last_name, ', ', s.first_name, IF(s.middle_initial IS NULL OR TRIM(REPLACE(s.middle_initial, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(s.middle_initial, '.', '')))))) AS name, s.program, s.track, s.enrollment_date, s.archived_at FROM students s WHERE s.archived_at IS NOT NULL ORDER BY s.last_name ASC, s.first_name ASC");
     $students = $stmt->fetchAll();
 } catch (Throwable $e) {
     $error = 'Archived student records are unavailable. Confirm that the archive database migration has been applied.';

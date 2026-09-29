@@ -53,7 +53,7 @@ if ($pdo) {
             SELECT 
                 s.student_id AS id,
                 COALESCE(
-                    NULLIF(TRIM(CONCAT_WS(' ', s.first_name, NULLIF(TRIM(REPLACE(s.middle_initial, '.', '')), ''), s.last_name)), ''), 
+                    NULLIF(TRIM(CONCAT(s.last_name, ', ', s.first_name, IF(s.middle_initial IS NULL OR TRIM(REPLACE(s.middle_initial, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(s.middle_initial, '.', '')))))), ''), 
                     u.full_name
                 ) AS name,
                 COALESCE(s.program, 'MSCS') AS program,
@@ -67,13 +67,13 @@ if ($pdo) {
                 SELECT a1.*
                 FROM applications a1
                 INNER JOIN (
-                    SELECT student_id, MAX(submitted_at) AS max_submitted
+                    SELECT user_id, MAX(submitted_at) AS max_submitted
                     FROM applications
-                    GROUP BY student_id
-                ) a2 ON a1.student_id = a2.student_id AND a1.submitted_at = a2.max_submitted
-            ) latest_app ON s.student_id = latest_app.student_id
+                    GROUP BY user_id
+                ) a2 ON a1.user_id = a2.user_id AND a1.submitted_at = a2.max_submitted
+            ) latest_app ON latest_app.user_id = s.user_id
             WHERE s.archived_at IS NULL
-            ORDER BY s.student_id ASC
+            ORDER BY s.last_name ASC, s.first_name ASC
         ");
         $students = $stmt->fetchAll();
     } catch (PDOException $e) {

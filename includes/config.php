@@ -57,7 +57,7 @@ define('PROGRAMS', [
 
 $mockStudent = [
     'id'           => '2024-001',
-    'name'         => 'Robbie Ryan A. Torres',
+    'name'         => 'Torres, Robbie Ryan A',
     'email'        => 'rtorres@adzu.edu.ph',
     'program'      => 'MSCS',
     'program_name' => 'Master of Science in Computer Science',
@@ -72,7 +72,7 @@ $mockStudent = [
 
 $mockCoordinator = [
     'id'   => 'GPC-001',
-    'name' => 'Ma\'am Precious Opinion',
+    'name' => 'Opinion, Precious',
     'role' => 'Graduate Program Coordinator – CSITE',
     'email'=> 'gpc-csite@adzu.edu.ph',
 ];
@@ -491,6 +491,7 @@ function initPrototypeStore(): void {
     ];
 
     storeSet('students', $students);
+    sortSessionStudentsAlphabetically();
     storeSet('applications', $applications);
     storeSet('uploads', $uploads);
     storeSet('panels', $panels);
@@ -515,16 +516,43 @@ function studentDisplayName(array $s): string {
 
 /**
  * Build the single canonical student display name used everywhere.
- * Format: "First M Last" (no trailing dot) — the same value the database
+ * Format: "Last, First MI" (no trailing dot) — the same value the database
  * triggers write to users.full_name, so the Users/application record and the
- * Students table can never diverge.
+ * Students table can never diverge. Because the last name leads, a plain
+ * alphabetical ORDER BY on this value (or on last_name, first_name) is correct.
  */
 function canonicalStudentName(string $first, string $last, string $middleInitial = ''): string {
     $first = trim($first);
     $last = trim($last);
     $mi = trim($middleInitial);
     $mi = $mi !== '' ? rtrim($mi, '.') : '';
-    return trim(implode(' ', array_filter([$first, $mi, $last])));
+    if ($last === '' && $first === '') {
+        return '';
+    }
+    if ($last === '') {
+        return trim($first . ($mi !== '' ? ' ' . $mi : ''));
+    }
+    if ($first === '') {
+        return trim($last . ($mi !== '' ? ', ' . $mi : ''));
+    }
+    return trim($last . ', ' . $first . ($mi !== '' ? ' ' . $mi : ''));
+}
+
+/**
+ * Extract the official student ID from an ADZU email address.
+ * Keeps only the numeric characters of the local part:
+ * e.g. co240255@adzu.edu.ph -> 240255.
+ */
+function extractStudentIdFromEmail(string $email): string {
+    $email = trim($email);
+    if ($email === '' || !str_contains($email, '@')) {
+        return '';
+    }
+    $local = strtolower(explode('@', $email, 2)[0]);
+    if (preg_match_all('/\d+/', $local, $m)) {
+        return implode('', $m[0]);
+    }
+    return '';
 }
 
 /**
@@ -541,14 +569,6 @@ function programCodeForStudent(array $student): string {
     }
     $code = array_key_first(array_filter(PROGRAMS, static fn($label) => $label === $program));
     return $code ?: $program;
-}
-
-/**
- * Generate the student number for a student whose account/user row already exists.
- * Deterministic and collision-safe: CSITE-<6-digit student_id>.
- */
-function generateStudentNumber(int $studentId): string {
-    return 'CSITE-' . str_pad((string) max(1, $studentId), 6, '0', STR_PAD_LEFT);
 }
 
 /**
@@ -570,10 +590,20 @@ function upsertStudentIdentity(array $input, int $userId): array {
     $fullName = canonicalStudentName($first, $last, $mi);
 
     $existing = DB::find('students', ['user_id' => (int) $userId]);
+    $emailForId = trim((string) ($input['email'] ?? ''));
+    if ($emailForId === '') {
+        try {
+            $owner = DB::find('users', ['user_id' => (int) $userId]);
+            $emailForId = trim((string) ($owner['email'] ?? ''));
+        } catch (Throwable $e) {
+            $emailForId = '';
+        }
+    }
+    $emailDigits = $emailForId !== '' ? extractStudentIdFromEmail($emailForId) : '';
     if ($existing) {
         $pdo->beginTransaction();
         try {
-            DB::update('students', [
+            $patch = [
                 'first_name' => $first,
                 'last_name' => $last,
                 'middle_initial' => $mi,
@@ -582,7 +612,8 @@ function upsertStudentIdentity(array $input, int $userId): array {
                 'program' => $programLabel,
                 'track' => $track,
                 'adviser_name' => trim((string) ($input['adviser_name'] ?? $existing['adviser_name'] ?? '')),
-            ], ['student_id' => (int) $existing['student_id']]);
+            ];
+            DB::update('students', $patch, ['student_id' => (int) $existing['student_id']]);
             DB::update('users', ['full_name' => $fullName], ['user_id' => (int) $userId]);
             $pdo->commit();
         } catch (Throwable $e) {
@@ -604,7 +635,7 @@ function upsertStudentIdentity(array $input, int $userId): array {
 
     $pdo->beginTransaction();
     try {
-        $student = DB::insert('students', [
+        $newRow = [
             'user_id' => (int) $userId,
             'first_name' => $first,
             'last_name' => $last,
@@ -615,9 +646,23 @@ function upsertStudentIdentity(array $input, int $userId): array {
             'track' => $track,
             'adviser_name' => trim((string) ($input['adviser_name'] ?? '')),
             'enrollment_date' => date('Y-m-d'),
-        ]);
-        if (empty($student['student_number'])) {
-            DB::update('students', ['student_number' => generateStudentNumber((int) $student['student_id'])], ['student_id' => (int) $student['student_id']]);
+        ];
+        // Official student ID = numeric part of the ADZU email
+        // (e.g. co259344@adzu.edu.ph -> student_id 259344).
+        $explicitStudentId = ($emailDigits !== '' && ctype_digit($emailDigits)) ? (int) $emailDigits : 0;
+        if ($explicitStudentId > 0) {
+            $newRow['student_id'] = $explicitStudentId;
+        }
+        try {
+            $student = DB::insert('students', $newRow);
+        } catch (PDOException $e) {
+            // Rare digit collision (different email, same digits): fall back to auto-assign.
+            if ($explicitStudentId > 0 && (string) ($e->getCode() ?? '') === '23000') {
+                unset($newRow['student_id']);
+                $student = DB::insert('students', $newRow);
+            } else {
+                throw $e;
+            }
         }
         $pdo->commit();
         return DB::find('students', ['user_id' => (int) $userId]) ?: $student;
@@ -688,6 +733,7 @@ function upsertSessionStudent(array $identity, array $sessionRow = []): void {
         $students[] = $row;
     }
     storeSet('students', $students);
+    sortSessionStudentsAlphabetically();
     $_SESSION['current_student_id'] = $row['id'];
     $_SESSION['current_student_email'] = $row['email'];
 }
@@ -723,7 +769,6 @@ function databaseStudentIdentity(): array {
             'program_name' => preg_replace('/\s*\(.*\)$/', '', (string) $dbStudent['program']) ?: $dbStudent['program'],
             'track' => $dbStudent['track'],
             'track_label' => getTrackLabel($dbStudent['track']),
-            'student_number' => $dbStudent['student_number'] ?? '',
             'adviser_name' => $dbStudent['adviser_name'] ?? '',
             'enrollment_date' => $dbStudent['enrollment_date'] ?? '',
         ];
@@ -818,6 +863,29 @@ function currentStudentProfile(array $fallback): array {
     ]);
 }
 
+/**
+ * Keep the session student list in the same alphabetical order as the
+ * database (last name, then first name) so a newly created account lands in
+ * its correct sorted position instead of appended at the end.
+ */
+function sortSessionStudentsAlphabetically(): void {
+    $students = storeGet('students');
+    usort($students, static function ($a, $b) {
+        $c = strcasecmp(
+            trim((string) ($a['lastName'] ?? $a['last_name'] ?? '')),
+            trim((string) ($b['lastName'] ?? $b['last_name'] ?? ''))
+        );
+        if ($c !== 0) {
+            return $c;
+        }
+        return strcasecmp(
+            trim((string) ($a['firstName'] ?? $a['first_name'] ?? '')),
+            trim((string) ($b['firstName'] ?? $b['first_name'] ?? ''))
+        );
+    });
+    storeSet('students', $students);
+}
+
 function addRegisteredStudent(array $input): array {
     $list = storeGet('students');
     foreach ($list as $s) {
@@ -845,6 +913,7 @@ function addRegisteredStudent(array $input): array {
     ];
     $list[] = $rec;
     storeSet('students', $list);
+    sortSessionStudentsAlphabetically();
     $_SESSION['current_student_id'] = $rec['id'];
     $_SESSION['current_student_email'] = $rec['email'];
     return $rec;
@@ -946,6 +1015,7 @@ function updateLoggedInStudentProfile(array $input): void {
     }
     unset($s);
     storeSet('students', $students);
+    sortSessionStudentsAlphabetically();
 }
 
 function addApplicationRecord(array $a): array {
@@ -1126,19 +1196,16 @@ function normalizeDatabaseDocument(array $row, string $email = ''): array {
 }
 
 /**
- * Resolve the MySQL students.student_id for an email address.
+ * Resolve the primary users.user_id for an email address.
+ * This is the unified key used by applications + application_documents.
  */
-function databaseStudentIdForEmail(string $email): int {
+function databaseUserIdForEmail(string $email): int {
     if (!class_exists('DB') || $email === '') {
         return 0;
     }
     try {
         $stmt = DB::getConnection()->prepare(
-            'SELECT s.student_id
-             FROM students s
-             INNER JOIN users u ON u.user_id = s.user_id
-             WHERE u.email = :email
-             LIMIT 1'
+            'SELECT user_id FROM users WHERE email = :email LIMIT 1'
         );
         $stmt->execute(['email' => $email]);
         return (int) ($stmt->fetchColumn() ?: 0);
@@ -1148,12 +1215,34 @@ function databaseStudentIdForEmail(string $email): int {
 }
 
 /**
- * Latest (or stage-matching) application id for a student. Used to link a
+ * Resolve the MySQL students.student_id for an email address.
+ * Kept for screens that still need the students PK (profile edits); new
+ * application/document relations use databaseUserIdForEmail() instead.
+ */
+function databaseStudentIdForEmail(string $email): int {
+    $userId = databaseUserIdForEmail($email);
+    if ($userId <= 0) {
+        return 0;
+    }
+    try {
+        $stmt = DB::getConnection()->prepare(
+            'SELECT student_id FROM students WHERE user_id = :user_id LIMIT 1'
+        );
+        $stmt->execute(['user_id' => $userId]);
+        return (int) ($stmt->fetchColumn() ?: 0);
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+/**
+ * Latest (or stage-matching) application id for a user. Used to link a
  * freshly uploaded document to the student's active application so the
  * coordinator panel can surface it immediately.
+ * NOTE: unified key is users.user_id (not students.student_id).
  */
-function databaseApplicationIdForStudent(int $studentId, string $stageLabel = ''): ?int {
-    if (!class_exists('DB') || $studentId <= 0) {
+function databaseApplicationIdForStudent(int $userId, string $stageLabel = ''): ?int {
+    if (!class_exists('DB') || $userId <= 0) {
         return null;
     }
     try {
@@ -1161,10 +1250,10 @@ function databaseApplicationIdForStudent(int $studentId, string $stageLabel = ''
         if ($stageLabel !== '') {
             $stmt = $pdo->prepare(
                 'SELECT application_id, presentation_stage FROM applications
-                 WHERE student_id = :student_id AND archived_at IS NULL AND presentation_stage = :stage
+                 WHERE user_id = :user_id AND archived_at IS NULL AND presentation_stage = :stage
                  ORDER BY submitted_at DESC LIMIT 1'
             );
-            $stmt->execute(['student_id' => $studentId, 'stage' => $stageLabel]);
+            $stmt->execute(['user_id' => $userId, 'stage' => $stageLabel]);
             $exact = $stmt->fetchColumn();
             if ($exact) {
                 return (int) $exact;
@@ -1172,10 +1261,10 @@ function databaseApplicationIdForStudent(int $studentId, string $stageLabel = ''
 
             $stageStmt = $pdo->prepare(
                 'SELECT application_id, presentation_stage FROM applications
-                 WHERE student_id = :student_id AND archived_at IS NULL
+                 WHERE user_id = :user_id AND archived_at IS NULL
                  ORDER BY submitted_at DESC'
             );
-            $stageStmt->execute(['student_id' => $studentId]);
+            $stageStmt->execute(['user_id' => $userId]);
             $requestedStageKey = stageKeyFromLabel($stageLabel);
             foreach ($stageStmt->fetchAll() as $application) {
                 if (stageKeyFromLabel((string) $application['presentation_stage']) === $requestedStageKey) {
@@ -1185,10 +1274,10 @@ function databaseApplicationIdForStudent(int $studentId, string $stageLabel = ''
         }
         $stmt = $pdo->prepare(
             'SELECT application_id FROM applications
-             WHERE student_id = :student_id AND archived_at IS NULL
+             WHERE user_id = :user_id AND archived_at IS NULL
              ORDER BY submitted_at DESC LIMIT 1'
         );
-        $stmt->execute(['student_id' => $studentId]);
+        $stmt->execute(['user_id' => $userId]);
         return ($id = $stmt->fetchColumn()) ? (int) $id : null;
     } catch (Throwable $e) {
         return null;
@@ -1201,11 +1290,13 @@ function databaseApplicationIdForStudent(int $studentId, string $stageLabel = ''
  * coordinator are different PHP sessions, so a session-only store can never be
  * seen across accounts.
  *
- * $applicationId NULL + $studentId set  -> every document for that student
- * $applicationId set + $studentId set   -> documents linked to the application
+ * Unified key: application_documents.user_id -> users.user_id.
+ *
+ * $applicationId NULL + $userId set  -> every document for that user
+ * $applicationId set + $userId set   -> documents linked to the application
  *                                          OR still unlinked (application_id IS NULL)
  */
-function databaseDocuments(?int $applicationId = null, int $studentId = 0, bool $includeUnlinked = true): array {
+function databaseDocuments(?int $applicationId = null, int $userId = 0, bool $includeUnlinked = true): array {
     if (!class_exists('DB')) {
         return [];
     }
@@ -1214,26 +1305,25 @@ function databaseDocuments(?int $applicationId = null, int $studentId = 0, bool 
         $where = [];
         $params = [];
         if ($applicationId !== null && $applicationId > 0) {
-            if ($studentId > 0 && $includeUnlinked) {
-                $where[] = '(d.application_id = :application_id OR (d.application_id IS NULL AND d.student_id = :student_id))';
+            if ($userId > 0 && $includeUnlinked) {
+                $where[] = '(d.application_id = :application_id OR (d.application_id IS NULL AND d.user_id = :user_id))';
                 $params['application_id'] = $applicationId;
-                $params['student_id'] = $studentId;
+                $params['user_id'] = $userId;
             } else {
                 $where[] = 'd.application_id = :application_id';
                 $params['application_id'] = $applicationId;
             }
-        } elseif ($studentId > 0) {
-            $where[] = 'd.student_id = :student_id';
-            $params['student_id'] = $studentId;
+        } elseif ($userId > 0) {
+            $where[] = 'd.user_id = :user_id';
+            $params['user_id'] = $userId;
         } else {
             return [];
         }
-        $sql = 'SELECT d.document_id, d.application_id, d.student_id, d.stage, d.document_type,
+        $sql = 'SELECT d.document_id, d.application_id, d.user_id, d.stage, d.document_type,
                        d.original_name, d.stored_name, d.mime_type, d.file_size, d.status, d.uploaded_at,
                        u.email AS studentEmail
                 FROM application_documents d
-                INNER JOIN students s ON s.student_id = d.student_id
-                INNER JOIN users u ON u.user_id = s.user_id
+                INNER JOIN users u ON u.user_id = d.user_id
                 WHERE ' . implode(' AND ', $where) . '
                 ORDER BY d.uploaded_at DESC, d.document_id DESC';
         $stmt = $pdo->prepare($sql);
@@ -1256,12 +1346,11 @@ function databaseDocumentById(int $documentId): ?array {
     }
     try {
         $stmt = DB::getConnection()->prepare(
-            'SELECT d.document_id, d.application_id, d.student_id, d.stage, d.document_type,
+            'SELECT d.document_id, d.application_id, d.user_id, d.stage, d.document_type,
                     d.original_name, d.stored_name, d.mime_type, d.file_size, d.status, d.uploaded_at,
                     u.email AS studentEmail
              FROM application_documents d
-             INNER JOIN students s ON s.student_id = d.student_id
-             INNER JOIN users u ON u.user_id = s.user_id
+             INNER JOIN users u ON u.user_id = d.user_id
              WHERE d.document_id = :document_id
              LIMIT 1'
         );
@@ -1365,15 +1454,15 @@ function ensureStageApplication(string $email, string $stageKey, string $stageLa
 
     if (class_exists('DB')) {
         try {
-            $studentId = databaseStudentIdForEmail($email);
-            if ($studentId > 0) {
+            $userId = databaseUserIdForEmail($email);
+            if ($userId > 0) {
                 $pdo = DB::getConnection();
                 $stmt = $pdo->prepare(
                     'SELECT application_id, status, paper_title FROM applications
-                     WHERE student_id = :student_id AND archived_at IS NULL AND presentation_stage = :stage
+                     WHERE user_id = :user_id AND archived_at IS NULL AND presentation_stage = :stage
                      ORDER BY submitted_at DESC LIMIT 1'
                 );
-                $stmt->execute(['student_id' => $studentId, 'stage' => $canonLabel]);
+                $stmt->execute(['user_id' => $userId, 'stage' => $canonLabel]);
                 $row = $stmt->fetch();
                 if ($row) {
                     if (in_array($row['status'] ?? '', ['not_started', 'pending', 'draft', ''], true)) {
@@ -1387,11 +1476,11 @@ function ensureStageApplication(string $email, string $stageKey, string $stageLa
                         $title = (string) $latest['title'];
                     }
                     $ins = $pdo->prepare(
-                        'INSERT INTO applications (student_id, presentation_stage, paper_title, status)
-                         VALUES (:student_id, :presentation_stage, :paper_title, :status)'
+                        'INSERT INTO applications (user_id, presentation_stage, paper_title, status)
+                         VALUES (:user_id, :presentation_stage, :paper_title, :status)'
                     );
                     $ins->execute([
-                        'student_id' => $studentId,
+                        'user_id' => $userId,
                         'presentation_stage' => $canonLabel,
                         'paper_title' => $title !== '' ? $title : 'Untitled paper',
                         'status' => 'submitted',
@@ -1428,9 +1517,9 @@ function recordStudentDocument(array $meta, ?string $email = null, ?int $userId 
     $documentId = null;
     if (class_exists('DB')) {
         try {
-            $studentId = databaseStudentIdForEmail($email);
-            if ($studentId > 0) {
-                $applicationId = databaseApplicationIdForStudent($studentId, $stageLabel);
+            $resolvedUserId = $userId !== null && $userId > 0 ? (int) $userId : databaseUserIdForEmail($email);
+            if ($resolvedUserId > 0) {
+                $applicationId = databaseApplicationIdForStudent($resolvedUserId, $stageLabel);
                 if ($applicationId === null && !empty($meta['applicationId'])) {
                     $candidate = (int) $meta['applicationId'];
                     if ($candidate > 0) {
@@ -1449,13 +1538,13 @@ function recordStudentDocument(array $meta, ?string $email = null, ?int $userId 
                 }
                 $stmt = DB::getConnection()->prepare(
                     'INSERT INTO application_documents
-                        (application_id, student_id, stage, document_type, original_name, stored_name, mime_type, file_size, status)
+                        (application_id, user_id, stage, document_type, original_name, stored_name, mime_type, file_size, status)
                      VALUES
-                        (:application_id, :student_id, :stage, :document_type, :original_name, :stored_name, :mime_type, :file_size, :status)'
+                        (:application_id, :user_id, :stage, :document_type, :original_name, :stored_name, :mime_type, :file_size, :status)'
                 );
                 $stmt->execute([
                     'application_id' => $applicationId,
-                    'student_id' => $studentId,
+                    'user_id' => $resolvedUserId,
                     'stage' => $stageLabel,
                     'document_type' => (string) ($meta['docType'] ?? 'Document'),
                     'original_name' => (string) ($meta['fileName'] ?? ''),
@@ -1542,7 +1631,7 @@ function uploadsForEmail(string $email): array {
     $sessionUploads = array_values(array_filter(storeGet('uploads'), static function ($u) use ($email) {
         return strcasecmp((string) $u['studentEmail'], $email) === 0;
     }));
-    $dbUploads = databaseDocuments(null, databaseStudentIdForEmail($email));
+    $dbUploads = databaseDocuments(null, databaseUserIdForEmail($email));
     $merged = [];
     $seen = [];
     foreach ($sessionUploads as $u) {
@@ -1561,20 +1650,20 @@ function uploadsForEmail(string $email): array {
 }
 
 function uploadsForApplication(int $id): array {
-    $studentId = 0;
+    $userId = 0;
     if (class_exists('DB') && $id > 0) {
         try {
-            $stmt = DB::getConnection()->prepare('SELECT student_id FROM applications WHERE application_id = :id LIMIT 1');
+            $stmt = DB::getConnection()->prepare('SELECT user_id FROM applications WHERE application_id = :id LIMIT 1');
             $stmt->execute(['id' => $id]);
-            $studentId = (int) ($stmt->fetchColumn() ?: 0);
+            $userId = (int) ($stmt->fetchColumn() ?: 0);
         } catch (Throwable $e) {
-            $studentId = 0;
+            $userId = 0;
         }
     }
     $sessionUploads = array_values(array_filter(storeGet('uploads'), static function ($u) use ($id) {
         return (int) ($u['applicationId'] ?? 0) === $id;
     }));
-    $dbUploads = databaseDocuments($id, $studentId, $studentId > 0);
+    $dbUploads = databaseDocuments($id, $userId, $userId > 0);
     $merged = [];
     $seen = [];
     foreach ($sessionUploads as $u) {
@@ -1909,12 +1998,12 @@ function getStudentProgress(string $email, string $track): array {
 
     if (class_exists('DB')) {
         try {
-            $stmt = DB::getConnection()->prepare('SELECT a.application_id AS id, a.presentation_stage AS stage, a.paper_title AS title, a.status, a.coordinator_comment AS coordinatorComment, a.grad_school_endorsed AS gradSchoolEndorsed, a.payment_recorded AS paymentRecorded, a.receipt_number AS receiptNumber, a.payment_date AS paymentDate, a.payment_amount AS paymentAmount, a.ready_for_presentation AS readyForPresentation, a.workflow_state AS workflowState, a.result AS result, a.submitted_at AS date FROM applications a INNER JOIN students s ON s.student_id = a.student_id INNER JOIN users u ON u.user_id = s.user_id WHERE u.email = :email AND a.archived_at IS NULL ORDER BY a.submitted_at ASC');
+            $stmt = DB::getConnection()->prepare('SELECT a.application_id AS id, a.presentation_stage AS stage, a.paper_title AS title, a.status, a.coordinator_comment AS coordinatorComment, a.grad_school_endorsed AS gradSchoolEndorsed, a.payment_recorded AS paymentRecorded, a.receipt_number AS receiptNumber, a.payment_date AS paymentDate, a.payment_amount AS paymentAmount, a.ready_for_presentation AS readyForPresentation, a.workflow_state AS workflowState, a.result AS result, a.submitted_at AS date FROM applications a INNER JOIN users u ON u.user_id = a.user_id WHERE u.email = :email AND a.archived_at IS NULL ORDER BY a.submitted_at ASC');
             $stmt->execute(['email' => $email]);
             $dbApps = $stmt->fetchAll();
             if ($dbApps) {
                 $apps = array_map(static function ($app) use ($email, $track) { $app['studentEmail'] = $email; $app['track'] = $track; $app['stageKey'] = stageKeyFromLabel($app['stage']); $app['workflowState'] = json_decode((string) ($app['workflowState'] ?? '[]'), true) ?: []; return $app; }, $dbApps);
-                $docStmt = DB::getConnection()->prepare('SELECT d.application_id AS applicationId, d.original_name AS fileName, d.document_type AS docType, d.stage, d.file_size AS size, d.uploaded_at AS date, d.status, d.stored_name AS storedFile, d.mime_type AS mimeType FROM application_documents d INNER JOIN students s ON s.student_id = d.student_id INNER JOIN users u ON u.user_id = s.user_id WHERE u.email = :email ORDER BY d.uploaded_at ASC');
+                $docStmt = DB::getConnection()->prepare('SELECT d.application_id AS applicationId, d.original_name AS fileName, d.document_type AS docType, d.stage, d.file_size AS size, d.uploaded_at AS date, d.status, d.stored_name AS storedFile, d.mime_type AS mimeType FROM application_documents d INNER JOIN users u ON u.user_id = d.user_id WHERE u.email = :email ORDER BY d.uploaded_at ASC');
                 $docStmt->execute(['email' => $email]);
                 $dbUploads = $docStmt->fetchAll();
                 if ($dbUploads) $uploads = $dbUploads;

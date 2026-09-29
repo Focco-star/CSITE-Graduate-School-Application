@@ -17,7 +17,7 @@ if ($appId > 0) {
             "SELECT
                 a.application_id AS id,
                 u.email AS studentEmail,
-                COALESCE(NULLIF(TRIM(CONCAT_WS(' ', s.first_name, NULLIF(TRIM(REPLACE(s.middle_initial, '.', '')), ''), s.last_name)), ''), u.full_name) AS student,
+                COALESCE(NULLIF(TRIM(CONCAT(s.last_name, ', ', s.first_name, IF(s.middle_initial IS NULL OR TRIM(REPLACE(s.middle_initial, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(s.middle_initial, '.', '')))))), ''), u.full_name) AS student,
                 CASE
                     WHEN s.program LIKE '%Computer Science%' THEN 'MSCS'
                     WHEN s.program LIKE '%Information Technology%' THEN 'MIT'
@@ -40,8 +40,8 @@ if ($appId > 0) {
                 a.result AS result,
                 a.submitted_at AS date
              FROM applications a
-             INNER JOIN students s ON s.student_id = a.student_id
-             INNER JOIN users u ON u.user_id = s.user_id
+             INNER JOIN users u ON u.user_id = a.user_id
+             LEFT JOIN students s ON s.user_id = u.user_id
              WHERE a.application_id = :id AND a.archived_at IS NULL
              LIMIT 1"
         );

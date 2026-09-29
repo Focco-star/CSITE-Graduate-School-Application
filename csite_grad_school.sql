@@ -45,7 +45,7 @@ CREATE TABLE `advisor_pool` (
 
 CREATE TABLE `applications` (
   `application_id` int(11) NOT NULL,
-  `student_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
   `presentation_stage` varchar(100) NOT NULL,
   `paper_title` text NOT NULL,
   `status` enum('submitted','under_review','for_payment','payment_recorded','ready_for_presentation','scheduled','approved','requires_revision','completed') DEFAULT 'submitted',
@@ -67,12 +67,12 @@ CREATE TABLE `applications` (
 -- Dumping data for table `applications`
 --
 
-INSERT INTO `applications` (`application_id`, `student_id`, `presentation_stage`, `paper_title`, `status`, `coordinator_comment`, `grad_school_endorsed`, `payment_recorded`, `receipt_number`, `payment_date`, `payment_amount`, `ready_for_presentation`, `workflow_state`, `result`, `submitted_at`, `updated_at`, `archived_at`) VALUES
-(17, 4, 'Thesis Proposal', 'Machine Learning Approaches for Predictive Analytics in Graduate Education', 'under_review', '', 0, 0, NULL, NULL, NULL, 0, NULL, NULL, '2026-09-10 01:30:00', '2026-09-13 06:58:19', NULL),
-(18, 5, 'Final Capstone', 'Development of an Automated Graduate Application Tracking System', 'submitted', '', 0, 0, NULL, NULL, NULL, 0, NULL, NULL, '2026-09-11 06:15:00', '2026-09-13 06:58:19', NULL),
-(19, 6, 'Concept Paper', 'Cloud Security Protocols for Institutional Repositories', 'submitted', '', 0, 0, NULL, NULL, NULL, 0, NULL, NULL, '2026-09-12 02:00:00', '2026-09-13 06:58:19', NULL),
-(20, 7, 'Capstone Proposal', 'Mobile-Based Student Records and Notification Management', 'approved', '', 1, 1, NULL, NULL, NULL, 1, '{\"paper\":\"verified\",\"adviser_endorsement\":\"verified\"}', 'approved', '2026-09-08 03:20:00', '2026-09-13 06:58:19', NULL),
-(21, 4, 'Final Thesis Defense', 'Optimizing Database Queries in Large-Scale Web Applications', 'requires_revision', 'Please strengthen the experimental validation chapter and resubmit.', 0, 0, NULL, NULL, NULL, 0, NULL, 'requires_revision', '2026-09-05 08:45:00', '2026-09-13 06:58:19', NULL);
+INSERT INTO `applications` (`application_id`, `user_id`, `presentation_stage`, `paper_title`, `status`, `coordinator_comment`, `grad_school_endorsed`, `payment_recorded`, `receipt_number`, `payment_date`, `payment_amount`, `ready_for_presentation`, `workflow_state`, `result`, `submitted_at`, `updated_at`, `archived_at`) VALUES
+(17, 5, 'Thesis Proposal', 'Machine Learning Approaches for Predictive Analytics in Graduate Education', 'under_review', '', 0, 0, NULL, NULL, NULL, 0, NULL, NULL, '2026-09-10 01:30:00', '2026-09-13 06:58:19', NULL),
+(18, 6, 'Final Capstone', 'Development of an Automated Graduate Application Tracking System', 'submitted', '', 0, 0, NULL, NULL, NULL, 0, NULL, NULL, '2026-09-11 06:15:00', '2026-09-13 06:58:19', NULL),
+(19, 7, 'Concept Paper', 'Cloud Security Protocols for Institutional Repositories', 'submitted', '', 0, 0, NULL, NULL, NULL, 0, NULL, NULL, '2026-09-12 02:00:00', '2026-09-13 06:58:19', NULL),
+(20, 8, 'Capstone Proposal', 'Mobile-Based Student Records and Notification Management', 'approved', '', 1, 1, NULL, NULL, NULL, 1, '{\"paper\":\"verified\",\"adviser_endorsement\":\"verified\"}', 'approved', '2026-09-08 03:20:00', '2026-09-13 06:58:19', NULL),
+(21, 5, 'Final Thesis Defense', 'Optimizing Database Queries in Large-Scale Web Applications', 'requires_revision', 'Please strengthen the experimental validation chapter and resubmit.', 0, 0, NULL, NULL, NULL, 0, NULL, 'requires_revision', '2026-09-05 08:45:00', '2026-09-13 06:58:19', NULL);
 
 -- --------------------------------------------------------
 
@@ -83,7 +83,7 @@ INSERT INTO `applications` (`application_id`, `student_id`, `presentation_stage`
 CREATE TABLE `application_documents` (
   `document_id` int(11) NOT NULL,
   `application_id` int(11) DEFAULT NULL,
-  `student_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
   `stage` varchar(100) NOT NULL,
   `document_type` varchar(150) NOT NULL,
   `original_name` varchar(255) NOT NULL,
@@ -95,27 +95,8 @@ CREATE TABLE `application_documents` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
-
---
--- Table structure for table `coordinators`
---
-
-CREATE TABLE `coordinators` (
-  `coordinator_id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `first_name` varchar(50) NOT NULL,
-  `last_name` varchar(50) NOT NULL,
-  `title` varchar(100) DEFAULT 'Graduate Program Coordinator',
-  `contact_number` varchar(30) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `coordinators`
---
-
-INSERT INTO `coordinators` (`coordinator_id`, `user_id`, `first_name`, `last_name`, `title`, `contact_number`) VALUES
-(1, 2, 'Precious', 'Opinion', 'Graduate Program Coordinator', '+63 62 991 0871');
-
+-- NOTE: No dedicated `coordinators` table. Coordinators live in `users`
+-- with role='coordinator' (see users seed below).
 -- --------------------------------------------------------
 
 --
@@ -157,7 +138,6 @@ CREATE TABLE `students` (
   `gender` varchar(20) NOT NULL,
   `program` varchar(100) NOT NULL,
   `track` enum('thesis','capstone','seminar') NOT NULL,
-  `student_number` varchar(20) DEFAULT NULL,
   `adviser_name` varchar(150) DEFAULT NULL,
   `enrollment_date` date DEFAULT NULL,
   `archived_at` timestamp NULL DEFAULT NULL
@@ -167,24 +147,47 @@ CREATE TABLE `students` (
 -- Dumping data for table `students`
 --
 
-INSERT INTO `students` (`student_id`, `user_id`, `first_name`, `last_name`, `middle_initial`, `age`, `gender`, `program`, `track`, `student_number`, `adviser_name`, `enrollment_date`, `archived_at`) VALUES
-(4, 5, 'Robbie', 'Torres', 'E', 21, 'Male', 'Master of Science in Computer Science (Thesis)', 'thesis', NULL, NULL, '2026-09-12', NULL),
-(5, 6, 'MARC', 'ARBILERA', 'M', 21, 'Male', 'Master of Science in Computer Science (Thesis)', 'thesis', NULL, NULL, '2026-09-12', NULL),
-(6, 7, 'Rhett', 'Epino', '.', 21, 'Male', 'Master of Science in Computer Science (Thesis)', 'thesis', NULL, NULL, '2026-09-13', NULL),
-(7, 8, 'John', 'Gler', '.', 21, 'Male', 'Master in Information Technology (Capstone)', 'capstone', NULL, NULL, '2026-09-13', NULL);
+INSERT INTO `students` (`student_id`, `user_id`, `first_name`, `last_name`, `middle_initial`, `age`, `gender`, `program`, `track`, `adviser_name`, `enrollment_date`, `archived_at`) VALUES
+(230159, 5, 'Robbie', 'Torres', 'E', 21, 'Male', 'Master of Science in Computer Science (Thesis)', 'thesis', NULL, '2026-09-12', NULL),
+(240527, 6, 'MARC', 'ARBILERA', 'M', 21, 'Male', 'Master of Science in Computer Science (Thesis)', 'thesis', NULL, '2026-09-12', NULL),
+(240234, 7, 'Rhett', 'Epino', NULL, 21, 'Male', 'Master of Science in Computer Science (Thesis)', 'thesis', NULL, '2026-09-13', NULL),
+(240092, 8, 'John', 'Gler', NULL, 21, 'Male', 'Master in Information Technology (Capstone)', 'capstone', NULL, '2026-09-13', NULL);
 
 --
 -- Triggers `students`
 --
 DELIMITER $$
+CREATE TRIGGER `students_before_insert_autoid` BEFORE INSERT ON `students` FOR EACH ROW
+BEGIN
+  DECLARE v_email VARCHAR(100) DEFAULT '';
+  DECLARE v_digits VARCHAR(20) DEFAULT '';
+  DECLARE v_taken INT DEFAULT 0;
+  SELECT `email` INTO v_email FROM `users` WHERE `user_id` = NEW.`user_id` LIMIT 1;
+  IF (v_email IS NOT NULL AND v_email <> '') THEN
+    SET v_digits = REGEXP_REPLACE(SUBSTRING_INDEX(v_email, '@', 1), '[^0-9]', '');
+  END IF;
+  IF (v_digits IS NOT NULL AND v_digits <> '') THEN
+    -- Official student ID = numeric part of the ADZU email (e.g. co259344 -> 259344).
+    SELECT COUNT(*) INTO v_taken FROM `students` WHERE `student_id` = CAST(v_digits AS UNSIGNED);
+    IF (v_taken = 0) THEN
+      SET NEW.`student_id` = CAST(v_digits AS UNSIGNED);
+    END IF;
+  END IF;
+  IF (NEW.`middle_initial` IS NOT NULL) THEN
+    SET NEW.`middle_initial` = NULLIF(TRIM(REPLACE(NEW.`middle_initial`, '.', '')), '');
+  END IF;
+END
+$$
+DELIMITER ;
+DELIMITER $$
 CREATE TRIGGER `students_after_insert_sync_user` AFTER INSERT ON `students` FOR EACH ROW UPDATE `users`
-SET `full_name` = TRIM(CONCAT_WS(' ', NEW.`first_name`, NULLIF(TRIM(REPLACE(NEW.`middle_initial`, '.', '')), ''), NEW.`last_name`))
+SET `full_name` = TRIM(CONCAT(NEW.`last_name`, ', ', NEW.`first_name`, IF(NEW.`middle_initial` IS NULL OR TRIM(REPLACE(NEW.`middle_initial`, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(NEW.`middle_initial`, '.', ''))))))
 WHERE `user_id` = NEW.`user_id`
 $$
 DELIMITER ;
 DELIMITER $$
 CREATE TRIGGER `students_after_update_sync_user` AFTER UPDATE ON `students` FOR EACH ROW UPDATE `users`
-SET `full_name` = TRIM(CONCAT_WS(' ', NEW.`first_name`, NULLIF(TRIM(REPLACE(NEW.`middle_initial`, '.', '')), ''), NEW.`last_name`))
+SET `full_name` = TRIM(CONCAT(NEW.`last_name`, ', ', NEW.`first_name`, IF(NEW.`middle_initial` IS NULL OR TRIM(REPLACE(NEW.`middle_initial`, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(NEW.`middle_initial`, '.', ''))))))
 WHERE `user_id` = NEW.`user_id`
 $$
 DELIMITER ;
@@ -232,11 +235,11 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`user_id`, `full_name`, `email`, `password`, `role`, `created_at`) VALUES
-(2, 'Ma\'am Precious Opinion', 'gpc-csite@adzu.edu.ph', '$2y$10$/GU6.G4XuEPjhuMik5iHCOo5Fbxb1EjYnpNxHbyt4.Rrcf.6lfhH2', 'coordinator', '2026-09-12 08:35:44'),
-(5, 'Robbie E Torres', 'co230159@adzu.edu.ph', '$2y$10$bCJWuc15jVKGbM7NoIkVGuHNiKkzMgg6BFTmPxYUSf377Ld94Uvp6', 'student', '2026-09-12 08:56:22'),
-(6, 'MARC M ARBILERA', 'co240527@adzu.edu.ph', '$2y$10$cedOtistAVNlRw0mLqcfs.BpZHbOPvOK/TCMlkYvtAo/QDrrEZ1Ka', 'student', '2026-09-12 09:01:46'),
-(7, 'Rhett Epino', 'co240234@adzu.edu.ph', '$2y$10$gs/sMbuaDzBd8PysrKHuruO3QR.dD47/yRQZD8Ir.QmDHa5/MTE8a', 'student', '2026-09-13 06:25:29'),
-(8, 'John Gler', 'co240092@adzu.edu.ph', '$2y$10$CLoYu2tFUOlcWaAN7Oy58ejJHTq5E9qgamndnNcHXyinTGphbN5PW', 'student', '2026-09-13 06:27:11');
+(2, 'Opinion, Precious', 'gpc-csite@adzu.edu.ph', '$2y$10$/GU6.G4XuEPjhuMik5iHCOo5Fbxb1EjYnpNxHbyt4.Rrcf.6lfhH2', 'coordinator', '2026-09-12 08:35:44'),
+(5, 'Torres, Robbie E', 'co230159@adzu.edu.ph', '$2y$10$bCJWuc15jVKGbM7NoIkVGuHNiKkzMgg6BFTmPxYUSf377Ld94Uvp6', 'student', '2026-09-12 08:56:22'),
+(6, 'ARBILERA, MARC M', 'co240527@adzu.edu.ph', '$2y$10$cedOtistAVNlRw0mLqcfs.BpZHbOPvOK/TCMlkYvtAo/QDrrEZ1Ka', 'student', '2026-09-12 09:01:46'),
+(7, 'Epino, Rhett', 'co240234@adzu.edu.ph', '$2y$10$gs/sMbuaDzBd8PysrKHuruO3QR.dD47/yRQZD8Ir.QmDHa5/MTE8a', 'student', '2026-09-13 06:25:29'),
+(8, 'Gler, John', 'co240092@adzu.edu.ph', '$2y$10$CLoYu2tFUOlcWaAN7Oy58ejJHTq5E9qgamndnNcHXyinTGphbN5PW', 'student', '2026-09-13 06:27:11');
 
 -- --------------------------------------------------------
 
@@ -282,7 +285,7 @@ ALTER TABLE `advisor_pool`
 --
 ALTER TABLE `applications`
   ADD PRIMARY KEY (`application_id`),
-  ADD KEY `student_id` (`student_id`);
+  ADD KEY `idx_applications_user_id` (`user_id`);
 
 --
 -- Indexes for table `application_documents`
@@ -290,14 +293,7 @@ ALTER TABLE `applications`
 ALTER TABLE `application_documents`
   ADD PRIMARY KEY (`document_id`),
   ADD KEY `application_documents_application_id` (`application_id`),
-  ADD KEY `application_documents_student_id` (`student_id`);
-
---
--- Indexes for table `coordinators`
---
-ALTER TABLE `coordinators`
-  ADD PRIMARY KEY (`coordinator_id`),
-  ADD UNIQUE KEY `user_id` (`user_id`);
+  ADD KEY `idx_application_documents_user_id` (`user_id`);
 
 --
 -- Indexes for table `programs`
@@ -313,7 +309,7 @@ ALTER TABLE `programs`
 ALTER TABLE `students`
   ADD PRIMARY KEY (`student_id`),
   ADD UNIQUE KEY `user_id` (`user_id`),
-  ADD UNIQUE KEY `student_number` (`student_number`);
+  ADD KEY `idx_students_alpha` (`last_name`, `first_name`);
 
 --
 -- Indexes for table `tracks`
@@ -327,7 +323,8 @@ ALTER TABLE `tracks`
 --
 ALTER TABLE `users`
   ADD PRIMARY KEY (`user_id`),
-  ADD UNIQUE KEY `email` (`email`);
+  ADD UNIQUE KEY `email` (`email`),
+  ADD KEY `idx_users_full_name` (`full_name`);
 
 --
 -- Indexes for table `workflow_stages`
@@ -360,12 +357,6 @@ ALTER TABLE `application_documents`
   MODIFY `document_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
--- AUTO_INCREMENT for table `coordinators`
---
-ALTER TABLE `coordinators`
-  MODIFY `coordinator_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
-
---
 -- AUTO_INCREMENT for table `programs`
 --
 ALTER TABLE `programs`
@@ -375,7 +366,7 @@ ALTER TABLE `programs`
 -- AUTO_INCREMENT for table `students`
 --
 ALTER TABLE `students`
-  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=240528;
 
 --
 -- AUTO_INCREMENT for table `tracks`
@@ -403,20 +394,14 @@ ALTER TABLE `workflow_stages`
 -- Constraints for table `applications`
 --
 ALTER TABLE `applications`
-  ADD CONSTRAINT `applications_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `applications_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `application_documents`
 --
 ALTER TABLE `application_documents`
   ADD CONSTRAINT `application_documents_application_fk` FOREIGN KEY (`application_id`) REFERENCES `applications` (`application_id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `application_documents_student_fk` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`) ON DELETE CASCADE;
-
---
--- Constraints for table `coordinators`
---
-ALTER TABLE `coordinators`
-  ADD CONSTRAINT `coordinators_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `application_documents_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `programs`
@@ -435,6 +420,42 @@ ALTER TABLE `students`
 --
 ALTER TABLE `workflow_stages`
   ADD CONSTRAINT `fk_workflow_track` FOREIGN KEY (`track_id`) REFERENCES `tracks` (`track_id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
+-- Alphabetical views: last name, then first name
+--
+CREATE OR REPLACE VIEW `v_students_alpha` AS
+SELECT `student_id`,
+       `user_id`,
+       `first_name`,
+       `last_name`,
+       `middle_initial`,
+       TRIM(CONCAT(`last_name`, ', ', `first_name`,
+            IF(`middle_initial` IS NULL OR `middle_initial` = '',
+               '', CONCAT(' ', `middle_initial`)))) AS `display_name`,
+       `age`,
+       `gender`,
+       `program`,
+       `track`,
+       `adviser_name`,
+       `enrollment_date`,
+       `archived_at`
+FROM `students`
+ORDER BY `last_name` ASC, `first_name` ASC
+LIMIT 18446744073709551615;
+
+CREATE OR REPLACE VIEW `v_users_alpha` AS
+SELECT `user_id`,
+       `full_name`,
+       `email`,
+       `role`,
+       `created_at`,
+       SUBSTRING_INDEX(`full_name`, ',', 1) AS `last_name`,
+       TRIM(SUBSTRING_INDEX(`full_name`, ',', -1)) AS `first_name`
+FROM `users`
+ORDER BY SUBSTRING_INDEX(`full_name`, ',', 1) ASC,
+         SUBSTRING_INDEX(`full_name`, ',', -1) ASC
+LIMIT 18446744073709551615;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

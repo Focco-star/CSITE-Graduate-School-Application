@@ -7,14 +7,14 @@ $currentPage = 'reports';
 $userName    = $mockCoordinator['name'];
 
 $ongoing = [
-    ['name' => 'Robbie Ryan A. Torres', 'program' => 'MSCS', 'stage' => 'Proposal', 'since' => '2024-08'],
-    ['name' => 'Sean Benedict D. Recto', 'program' => 'MSCS', 'stage' => 'Concept', 'since' => '2024-08'],
-    ['name' => 'Marc Laurence M. Arbillera', 'program' => 'MIT', 'stage' => 'Proposal', 'since' => '2024-01'],
+    ['name' => 'Arbillera, Marc Laurence M', 'program' => 'MIT', 'stage' => 'Proposal', 'since' => '2024-01'],
+    ['name' => 'Recto, Sean Benedict D', 'program' => 'MSCS', 'stage' => 'Concept', 'since' => '2024-08'],
+    ['name' => 'Torres, Robbie Ryan A', 'program' => 'MSCS', 'stage' => 'Proposal', 'since' => '2024-08'],
 ];
 
 $completed = [
-    ['name' => 'Jane Doe', 'program' => 'MSCS', 'completed' => '2024-12', 'title' => 'Machine Learning for Healthcare'],
-    ['name' => 'John Smith', 'program' => 'MIT', 'completed' => '2024-11', 'title' => 'Mobile App for Disaster Response'],
+    ['name' => 'Doe, Jane', 'program' => 'MSCS', 'completed' => '2024-12', 'title' => 'Machine Learning for Healthcare'],
+    ['name' => 'Smith, John', 'program' => 'MIT', 'completed' => '2024-11', 'title' => 'Mobile App for Disaster Response'],
 ];
 
 require_once __DIR__ . '/../../includes/header.php';

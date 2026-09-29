@@ -37,7 +37,7 @@ if ($pdo && $appId > 0) {
             SELECT 
                 a.application_id AS id,
                 COALESCE(
-                    NULLIF(TRIM(CONCAT_WS(' ', s.first_name, NULLIF(TRIM(REPLACE(s.middle_initial, '.', '')), ''), s.last_name)), ''), 
+                    NULLIF(TRIM(CONCAT(s.last_name, ', ', s.first_name, IF(s.middle_initial IS NULL OR TRIM(REPLACE(s.middle_initial, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(s.middle_initial, '.', '')))))), ''), 
                     u.full_name
                 ) AS student,
                 u.email AS studentEmail,
@@ -48,8 +48,8 @@ if ($pdo && $appId > 0) {
                 a.submitted_at AS date,
                 a.status
             FROM applications a
-            JOIN students s ON a.student_id = s.student_id
-            LEFT JOIN users u ON s.user_id = u.user_id
+            JOIN users u ON u.user_id = a.user_id
+            LEFT JOIN students s ON s.user_id = u.user_id
             WHERE a.application_id = :id
             LIMIT 1
         ");
