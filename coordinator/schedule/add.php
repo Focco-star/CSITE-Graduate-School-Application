@@ -220,7 +220,12 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 
     <div class="card">
-        <div class="card-header"><h3>Panel Assignment</h3></div>
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>Panel Assignment</h3>
+            <a href="<?= url('coordinator/panel/add.php') ?>" class="btn btn-outline" style="font-size: 0.82rem; padding: 0.35rem 0.75rem;">
+                <i class="fas fa-plus"></i> Add Panel Member
+            </a>
+        </div>
         <div class="card-body">
             <div class="form-row">
                 <div class="form-field">
@@ -250,7 +255,9 @@ require_once __DIR__ . '/../../includes/header.php';
                     <label>Adviser <span class="required">*</span></label>
                     <select name="adviser" required>
                         <option value="">Select adviser</option>
-                        <?php foreach ($adviserOpts as $adviser): ?><option><?= htmlspecialchars($adviser) ?></option><?php endforeach; ?>
+                        <option>Dr. Maria Santos</option>
+                        <option>Dr. Juan Dela Cruz</option>
+                        <option>Dr. Ana Reyes</option>
                     </select>
                 </div>
             </div>
