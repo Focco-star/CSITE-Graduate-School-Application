@@ -1,0 +1,26 @@
+-- Presentation schedule details. Panel membership is normalized separately.
+CREATE TABLE IF NOT EXISTS `schedules` (
+  `schedule_id` INT(11) NOT NULL AUTO_INCREMENT,
+  `application_id` INT(11) NOT NULL,
+  `managed_by_user_id` INT(11) NOT NULL,
+  `presentation_date` DATE NOT NULL,
+  `start_time` TIME NOT NULL,
+  `end_time` TIME DEFAULT NULL,
+  `venue` VARCHAR(200) NOT NULL,
+  `adviser_id` INT(11) DEFAULT NULL,
+  `documentor_first_name` VARCHAR(100) DEFAULT NULL,
+  `documentor_middle_name` VARCHAR(100) DEFAULT NULL,
+  `documentor_last_name` VARCHAR(100) DEFAULT NULL,
+  `status` ENUM('pending','confirmed','completed','cancelled') NOT NULL DEFAULT 'pending',
+  `notes` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`schedule_id`),
+  UNIQUE KEY `uq_schedules_application` (`application_id`),
+  KEY `idx_schedules_date_time` (`presentation_date`, `start_time`),
+  KEY `idx_schedules_manager` (`managed_by_user_id`),
+  KEY `idx_schedules_adviser` (`adviser_id`),
+  CONSTRAINT `fk_schedules_application` FOREIGN KEY (`application_id`) REFERENCES `applications` (`application_id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_schedules_manager` FOREIGN KEY (`managed_by_user_id`) REFERENCES `users` (`user_id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_schedules_adviser` FOREIGN KEY (`adviser_id`) REFERENCES `advisor_pool` (`adviser_id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
