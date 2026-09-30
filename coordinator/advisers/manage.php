@@ -14,7 +14,7 @@ try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = $_POST['action'] ?? '';
         if ($action === 'add') {
-            $name = trim($_POST['name'] ?? '');
+            $name = formatPersonName($_POST['name'] ?? '');
             $qualification = trim($_POST['qualification'] ?? '');
             $email = trim($_POST['email'] ?? '');
             if ($name === '' || $qualification === '') throw new RuntimeException('Name and qualification are required.');

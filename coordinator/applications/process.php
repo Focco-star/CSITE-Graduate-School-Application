@@ -145,6 +145,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
                     'result' => $updatedFields['result'] !== '' ? $updatedFields['result'] : null,
                     'application_id' => (int) $app['id'],
                 ]);
+                saveApplicationComment((int) $app['id'], $comment);
+                if ($updatedFields['paymentRecorded']) {
+                    saveApplicationPayment(
+                        (int) $app['id'],
+                        $updatedFields['receiptNumber'],
+                        $updatedFields['paymentDate'],
+                        $updatedFields['paymentAmount']
+                    );
+                }
             }
 
 

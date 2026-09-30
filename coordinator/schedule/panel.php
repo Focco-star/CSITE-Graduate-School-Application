@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Panel Assignment';
 $role        = 'coordinator';
@@ -7,8 +8,11 @@ $currentPage = 'schedule';
 $userName    = $mockCoordinator['name'];
 
 $sch = findSchedule((string) ($_GET['id'] ?? '')) ?? (storeGet('schedules')[0] ?? null);
-$panelNames = $sch ? array_values(array_filter(array_map('trim', explode(',', (string) ($sch['panel'] ?? ''))))) : [];
-$members = storeGet('panels');
+$assignedPanelMembers = $sch ? databaseSchedulePanelMembers((int) ($sch['applicationId'] ?? 0)) : [];
+$panelNames = array_map(static function (array $member): string {
+    return trim($member['last_name'] . ', ' . $member['first_name'] . (!empty($member['middle_name']) ? ' ' . $member['middle_name'] : ''));
+}, $assignedPanelMembers);
+$members = databasePanelMembers();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_avail'])) {
     $pm = findPanelMember((string) $_POST['toggle_avail']);

@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Panel Members';
 $role        = 'coordinator';
@@ -21,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_avail'])) {
     redirectTo('coordinator/panel/manage.php');
 }
 
-$panelMembers = storeGet('panels');
+$panelMembers = databasePanelMembers();
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>

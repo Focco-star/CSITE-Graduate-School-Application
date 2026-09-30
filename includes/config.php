@@ -514,6 +514,14 @@ function studentDisplayName(array $s): string {
     return canonicalStudentName($first, $last, $mi);
 }
 
+function formatPersonName(string $name): string {
+    $name = trim(preg_replace('/\s+/', ' ', $name) ?? '');
+    if ($name === '' || ($name !== strtoupper($name) && $name !== strtolower($name))) {
+        return $name;
+    }
+    return ucwords(strtolower($name), " \t\r\n\f\v-'");
+}
+
 /**
  * Build the single canonical student display name used everywhere.
  * Format: "Last, First MI" (no trailing dot) — the same value the database
@@ -522,8 +530,8 @@ function studentDisplayName(array $s): string {
  * alphabetical ORDER BY on this value (or on last_name, first_name) is correct.
  */
 function canonicalStudentName(string $first, string $last, string $middleInitial = ''): string {
-    $first = trim($first);
-    $last = trim($last);
+    $first = formatPersonName($first);
+    $last = formatPersonName($last);
     $mi = trim($middleInitial);
     $mi = $mi !== '' ? rtrim($mi, '.') : '';
     if ($last === '' && $first === '') {
@@ -1046,6 +1054,30 @@ function addApplicationRecord(array $a): array {
 }
 
 function findApplication(int $id): ?array {
+    if (class_exists('DB') && $id > 0) {
+        try {
+            $stmt = DB::getConnection()->prepare(
+                'SELECT a.application_id AS id, u.email AS studentEmail,
+                        COALESCE(NULLIF(TRIM(CONCAT(s.last_name, ", ", s.first_name, IF(s.middle_initial IS NULL OR s.middle_initial = "", "", CONCAT(" ", s.middle_initial)))), ""), u.full_name) AS student,
+                        CASE WHEN s.program LIKE "%Computer Science%" THEN "MSCS" WHEN s.program LIKE "%Information Technology%" THEN "MIT" WHEN s.program LIKE "%Mathematics%" THEN "MATH" ELSE s.program END AS program,
+                        s.track, s.adviser_name AS adviser, a.presentation_stage AS stage,
+                        a.paper_title AS title, a.status, a.coordinator_comment AS coordinatorComment,
+                        a.result, a.submitted_at AS date
+                 FROM applications a
+                 INNER JOIN users u ON u.user_id = a.user_id
+                 LEFT JOIN students s ON s.user_id = u.user_id
+                 WHERE a.application_id = :id AND a.archived_at IS NULL
+                 LIMIT 1'
+            );
+            $stmt->execute(['id' => $id]);
+            $row = $stmt->fetch();
+            if ($row) {
+                $row['stageKey'] = stageKeyFromLabel((string) $row['stage']);
+                return $row;
+            }
+        } catch (Throwable $e) {
+        }
+    }
     foreach (storeGet('applications') as $a) {
         if ((int) $a['id'] === $id) {
             return $a;
@@ -1055,6 +1087,30 @@ function findApplication(int $id): ?array {
 }
 
 function latestApplicationForEmail(string $email): ?array {
+    if (class_exists('DB') && $email !== '') {
+        try {
+            $stmt = DB::getConnection()->prepare(
+                'SELECT a.application_id AS id, u.email AS studentEmail,
+                        COALESCE(NULLIF(TRIM(CONCAT(s.last_name, ", ", s.first_name, IF(s.middle_initial IS NULL OR s.middle_initial = "", "", CONCAT(" ", s.middle_initial)))), ""), u.full_name) AS student,
+                        CASE WHEN s.program LIKE "%Computer Science%" THEN "MSCS" WHEN s.program LIKE "%Information Technology%" THEN "MIT" WHEN s.program LIKE "%Mathematics%" THEN "MATH" ELSE s.program END AS program,
+                        s.track, s.adviser_name AS adviser, a.presentation_stage AS stage,
+                        a.paper_title AS title, a.status, a.coordinator_comment AS coordinatorComment,
+                        a.result, a.submitted_at AS date
+                 FROM applications a
+                 INNER JOIN users u ON u.user_id = a.user_id
+                 LEFT JOIN students s ON s.user_id = u.user_id
+                 WHERE u.email = :email AND a.archived_at IS NULL
+                 ORDER BY a.submitted_at DESC LIMIT 1'
+            );
+            $stmt->execute(['email' => $email]);
+            $row = $stmt->fetch();
+            if ($row) {
+                $row['stageKey'] = stageKeyFromLabel((string) $row['stage']);
+                return $row;
+            }
+        } catch (Throwable $e) {
+        }
+    }
     $found = null;
     foreach (storeGet('applications') as $a) {
         if (strcasecmp((string) $a['studentEmail'], $email) === 0) {
@@ -1108,6 +1164,19 @@ function updateStudentStage(string $email, string $stage, string $status, ?strin
 }
 
 function updateApplicationRecord(int $id, array $patch): ?array {
+    if (class_exists('DB') && $id > 0) {
+        try {
+            $data = [];
+            if (array_key_exists('status', $patch)) $data['status'] = $patch['status'];
+            if (array_key_exists('stage', $patch)) $data['presentation_stage'] = $patch['stage'];
+            if (array_key_exists('coordinatorComment', $patch)) $data['coordinator_comment'] = $patch['coordinatorComment'];
+            if (array_key_exists('result', $patch)) $data['result'] = $patch['result'] !== '' ? $patch['result'] : null;
+            if ($data) DB::update('applications', $data, ['application_id' => $id]);
+            if (!empty($patch['coordinatorComment'])) saveApplicationComment($id, (string) $patch['coordinatorComment']);
+            return findApplication($id);
+        } catch (Throwable $e) {
+        }
+    }
     $apps = storeGet('applications');
     foreach ($apps as $i => $a) {
         if ((int) $a['id'] !== $id) {
@@ -1212,6 +1281,122 @@ function databaseUserIdForEmail(string $email): int {
     } catch (Throwable $e) {
         return 0;
     }
+}
+
+function databaseCoordinatorUserId(): int {
+    if (!class_exists('DB')) return 0;
+    try {
+        return (int) (DB::getConnection()->query("SELECT user_id FROM users WHERE role = 'coordinator' ORDER BY user_id LIMIT 1")->fetchColumn() ?: 0);
+    } catch (Throwable $e) {
+        return 0;
+    }
+}
+
+function saveApplicationComment(int $applicationId, string $comment): void {
+    $coordinatorId = databaseCoordinatorUserId();
+    if ($applicationId <= 0 || $coordinatorId <= 0 || trim($comment) === '') return;
+    $stmt = DB::getConnection()->prepare('INSERT INTO application_comments (application_id, coordinator_user_id, comment_text) VALUES (:application_id, :coordinator_user_id, :comment_text)');
+    $stmt->execute(['application_id' => $applicationId, 'coordinator_user_id' => $coordinatorId, 'comment_text' => trim($comment)]);
+}
+
+function saveApplicationPayment(int $applicationId, string $receiptNumber, string $paymentDate, string $amount): void {
+    $coordinatorId = databaseCoordinatorUserId();
+    if ($applicationId <= 0 || $coordinatorId <= 0 || $receiptNumber === '' || $paymentDate === '' || $amount === '') return;
+    $stmt = DB::getConnection()->prepare(
+        'INSERT INTO payments (application_id, recorded_by_user_id, receipt_number, payment_date, amount)
+         VALUES (:application_id, :recorded_by_user_id, :receipt_number, :payment_date, :amount)
+         ON DUPLICATE KEY UPDATE recorded_by_user_id = VALUES(recorded_by_user_id), receipt_number = VALUES(receipt_number), payment_date = VALUES(payment_date), amount = VALUES(amount)'
+    );
+    $stmt->execute([
+        'application_id' => $applicationId,
+        'recorded_by_user_id' => $coordinatorId,
+        'receipt_number' => $receiptNumber,
+        'payment_date' => $paymentDate,
+        'amount' => (float) $amount,
+    ]);
+}
+
+function databaseTemplateRows(string $trackCode = ''): array {
+    if (!class_exists('DB')) return [];
+    try {
+        $rows = DB::query(
+            'SELECT t.template_id AS id, t.template_name AS label, t.file_name AS file,
+                    t.document_type AS docType, t.file_path AS filePath,
+                    tr.track_name AS courseType, ws.stage_label AS stage,
+                    t.description, p.program_code AS programs
+             FROM templates t
+             INNER JOIN tracks tr ON tr.track_id = t.track_id
+             LEFT JOIN workflow_stages ws ON ws.stage_id = t.stage_id
+             LEFT JOIN programs p ON p.track_id = tr.track_id
+               WHERE t.is_active = 1 AND (:track_code_filter = "" OR tr.track_code = :track_code)
+             ORDER BY tr.track_name, ws.stage_order, t.template_name'
+           , ['track_code_filter' => strtolower($trackCode), 'track_code' => strtolower($trackCode)])->fetchAll();
+        foreach ($rows as &$row) {
+            $row['url'] = asset((string) $row['filePath']);
+        }
+        unset($row);
+        return $rows;
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+function createTemplateRecord(array $data, array $file): array {
+    $original = basename((string) ($file['name'] ?? ''));
+    $extension = strtolower(pathinfo($original, PATHINFO_EXTENSION));
+    if (!in_array($extension, ['pdf', 'doc', 'docx'], true)) {
+        throw new RuntimeException('Only PDF, DOC, or DOCX templates are allowed.');
+    }
+    if ((int) ($file['size'] ?? 0) > 20 * 1024 * 1024 || (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('The template file is invalid or exceeds 20 MB.');
+    }
+    $storage = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'templates';
+    if (!is_dir($storage) && !mkdir($storage, 0750, true) && !is_dir($storage)) {
+        throw new RuntimeException('Template storage is not available.');
+    }
+    $stored = bin2hex(random_bytes(16)) . '.' . $extension;
+    if (!move_uploaded_file((string) $file['tmp_name'], $storage . DIRECTORY_SEPARATOR . $stored)) {
+        throw new RuntimeException('The template file could not be saved.');
+    }
+    $track = DB::find('tracks', ['track_code' => strtolower((string) $data['program_track'])]);
+    if (!$track) throw new RuntimeException('The selected track is not configured.');
+    $stage = DB::find('workflow_stages', ['track_id' => (int) $track['track_id'], 'stage_label' => $data['stage_label']]);
+    $row = DB::insert('templates', [
+        'track_id' => (int) $track['track_id'],
+        'stage_id' => $stage['stage_id'] ?? null,
+        'template_name' => trim($data['template_name']),
+        'description' => trim((string) ($data['description'] ?? '')) ?: null,
+        'document_type' => $data['document_type'],
+        'file_name' => $original,
+        'file_path' => 'storage/templates/' . $stored,
+        'mime_type' => (string) ($file['type'] ?? '') ?: null,
+        'managed_by_user_id' => databaseCoordinatorUserId(),
+    ]);
+    return $row;
+}
+
+function findTemplateRecord(string $id): ?array {
+    if (!class_exists('DB') || !ctype_digit($id)) return null;
+    $stmt = DB::getConnection()->prepare('SELECT t.*, tr.track_code, ws.stage_label FROM templates t INNER JOIN tracks tr ON tr.track_id = t.track_id LEFT JOIN workflow_stages ws ON ws.stage_id = t.stage_id WHERE t.template_id = :id LIMIT 1');
+    $stmt->execute(['id' => (int) $id]);
+    return $stmt->fetch() ?: null;
+}
+
+function updateTemplateRecord(string $id, array $data, array $file = []): ?array {
+    $template = findTemplateRecord($id);
+    if (!$template) return null;
+    $fields = [
+        'template_name' => trim($data['template_name']),
+        'description' => trim((string) ($data['description'] ?? '')) ?: null,
+        'document_type' => $data['document_type'],
+    ];
+    if (!empty($file['name'])) {
+        $replacement = createTemplateRecord($data + ['program_track' => $template['track_code']], $file);
+        DB::update('templates', ['is_active' => 0], ['template_id' => (int) $template['template_id']]);
+        return $replacement;
+    }
+    DB::update('templates', $fields, ['template_id' => (int) $id]);
+    return findTemplateRecord($id);
 }
 
 /**
@@ -1818,27 +2003,113 @@ function deleteApplicationRecord(int $id): void {
 }
 
 function deleteScheduleRecord(string $id): void {
+    if (class_exists('DB') && ctype_digit($id)) {
+        try {
+            $stmt = DB::getConnection()->prepare('DELETE FROM schedules WHERE schedule_id = :id');
+            $stmt->execute(['id' => (int) $id]);
+            return;
+        } catch (Throwable $e) {
+        }
+    }
     storeSet('schedules', array_values(array_filter(storeGet('schedules'), static function ($s) use ($id) {
         return (string) $s['id'] !== $id;
     })));
 }
 
 function deletePanelMemberRecord(string $id): void {
+    if (class_exists('DB') && ctype_digit($id)) {
+        try {
+            $stmt = DB::getConnection()->prepare('DELETE FROM panel_members WHERE panel_member_id = :id');
+            $stmt->execute(['id' => (int) $id]);
+            return;
+        } catch (Throwable $e) {
+        }
+    }
     storeSet('panels', array_values(array_filter(storeGet('panels'), static function ($p) use ($id) {
         return (string) $p['id'] !== $id;
     })));
 }
 
+function normalizePanelMemberRow(array $row): array {
+    $firstName = trim((string) ($row['first_name'] ?? ''));
+    $middleName = trim((string) ($row['middle_name'] ?? ''));
+    $lastName = trim((string) ($row['last_name'] ?? ''));
+    $givenName = trim(implode(' ', array_filter([$firstName, $middleName])));
+    return [
+        'id' => (string) ($row['panel_member_id'] ?? $row['id'] ?? ''),
+        'name' => $lastName !== '' ? $lastName . ', ' . $givenName : (string) ($row['name'] ?? ''),
+        'first_name' => $firstName,
+        'middle_name' => $middleName,
+        'last_name' => $lastName,
+        'qualification' => (string) ($row['qualification'] ?? ''),
+        'email' => (string) ($row['email'] ?? ''),
+        'notes' => (string) ($row['notes'] ?? ''),
+        'panelSessions' => (int) ($row['panel_sessions'] ?? $row['panelSessions'] ?? 0),
+        'availability' => (string) ($row['availability'] ?? 'available'),
+    ];
+}
+
+function databasePanelMembers(): array {
+    if (class_exists('DB')) {
+        try {
+            $rows = DB::query('SELECT p.*, COUNT(a.assignment_id) AS panel_sessions FROM panel_members p LEFT JOIN schedule_panel_assignments a ON a.panel_member_id = p.panel_member_id GROUP BY p.panel_member_id ORDER BY p.last_name, p.first_name, p.middle_name')->fetchAll();
+            return array_map('normalizePanelMemberRow', $rows);
+        } catch (Throwable $e) {
+        }
+    }
+    return array_map('normalizePanelMemberRow', storeGet('panels'));
+}
+
+function databasePanelParticipation(): array {
+    if (!class_exists('DB')) return [];
+    try {
+        return DB::query(
+            'SELECT p.panel_member_id, CONCAT(p.last_name, ", ", p.first_name, IF(p.middle_name IS NULL OR p.middle_name = "", "", CONCAT(" ", p.middle_name))) AS name,
+                    p.qualification, COUNT(spa.assignment_id) AS times,
+                    MAX(sc.presentation_date) AS last_assignment
+             FROM panel_members p
+             LEFT JOIN schedule_panel_assignments spa ON spa.panel_member_id = p.panel_member_id
+             LEFT JOIN schedules sc ON sc.schedule_id = spa.schedule_id
+             GROUP BY p.panel_member_id
+             ORDER BY times DESC, p.last_name, p.first_name'
+        )->fetchAll();
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
 function findPanelMember(string $id): ?array {
     foreach (storeGet('panels') as $p) {
         if ((string) $p['id'] === $id) {
-            return $p;
+            return normalizePanelMemberRow($p);
+        }
+    }
+    if (class_exists('DB') && ctype_digit($id)) {
+        try {
+            $stmt = DB::getConnection()->prepare('SELECT * FROM panel_members WHERE panel_member_id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $id]);
+            $row = $stmt->fetch();
+            return $row ? normalizePanelMemberRow($row) : null;
+        } catch (Throwable $e) {
+            return null;
         }
     }
     return null;
 }
 
 function addPanelMemberRecord(array $m): array {
+    if (class_exists('DB') && isset($m['first_name'], $m['last_name'])) {
+        $row = DB::insert('panel_members', [
+            'first_name' => formatPersonName($m['first_name']),
+            'middle_name' => formatPersonName((string) ($m['middle_name'] ?? '')) ?: null,
+            'last_name' => formatPersonName($m['last_name']),
+            'qualification' => trim($m['qualification']),
+            'email' => trim((string) ($m['email'] ?? '')) ?: null,
+            'notes' => trim((string) ($m['notes'] ?? '')) ?: null,
+            'availability' => $m['availability'] ?? 'available',
+        ]);
+        return normalizePanelMemberRow($row);
+    }
     $list = storeGet('panels');
     $rec = [
         'id' => 'pm_' . uniqid(),
@@ -1855,6 +2126,23 @@ function addPanelMemberRecord(array $m): array {
 }
 
 function updatePanelMemberRecord(string $id, array $patch): ?array {
+    if (class_exists('DB') && ctype_digit($id)) {
+        $data = array_intersect_key($patch, array_flip(['first_name', 'middle_name', 'last_name', 'qualification', 'email', 'notes', 'availability']));
+        if ($data) {
+            foreach (['first_name', 'middle_name', 'last_name'] as $nameField) {
+                if (array_key_exists($nameField, $data)) {
+                    $data[$nameField] = formatPersonName((string) $data[$nameField]);
+                }
+            }
+            foreach (['middle_name', 'email', 'notes'] as $nullable) {
+                if (array_key_exists($nullable, $data)) {
+                    $data[$nullable] = trim((string) $data[$nullable]) ?: null;
+                }
+            }
+            DB::update('panel_members', $data, ['panel_member_id' => (int) $id]);
+        }
+        return findPanelMember($id);
+    }
     $list = storeGet('panels');
     foreach ($list as $i => $p) {
         if ((string) $p['id'] !== $id) {
@@ -1873,16 +2161,154 @@ function findSchedule(string $id): ?array {
             return $s;
         }
     }
+    if (class_exists('DB') && ctype_digit($id)) {
+        try {
+            $stmt = DB::getConnection()->prepare(
+                'SELECT sc.schedule_id AS id, sc.application_id AS applicationId,
+                        u.email AS studentEmail,
+                        TRIM(CONCAT(s.last_name, ", ", s.first_name, IF(s.middle_initial IS NULL OR s.middle_initial = "", "", CONCAT(" ", s.middle_initial)))) AS studentName,
+                        a.presentation_stage AS stage, sc.presentation_date AS date,
+                        sc.start_time AS time, sc.venue, sc.status, ap.name AS adviser,
+                        TRIM(CONCAT_WS(" ", sc.documentor_first_name, sc.documentor_middle_name, sc.documentor_last_name)) AS documentor,
+                        GROUP_CONCAT(CONCAT(pm.last_name, ", ", pm.first_name, IF(pm.middle_name IS NULL OR pm.middle_name = "", "", CONCAT(" ", pm.middle_name)) ) ORDER BY spa.assignment_id SEPARATOR ", ") AS panel
+                 FROM schedules sc
+                 INNER JOIN applications a ON a.application_id = sc.application_id
+                 INNER JOIN users u ON u.user_id = a.user_id
+                 LEFT JOIN students s ON s.user_id = u.user_id
+                 LEFT JOIN advisor_pool ap ON ap.adviser_id = sc.adviser_id
+                 LEFT JOIN schedule_panel_assignments spa ON spa.schedule_id = sc.schedule_id
+                 LEFT JOIN panel_members pm ON pm.panel_member_id = spa.panel_member_id
+                 WHERE sc.schedule_id = :id
+                 GROUP BY sc.schedule_id
+                 LIMIT 1'
+            );
+            $stmt->execute(['id' => (int) $id]);
+            return $stmt->fetch() ?: null;
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
     return null;
 }
 
+function databaseSchedules(): array {
+    if (!class_exists('DB')) {
+        return storeGet('schedules');
+    }
+    try {
+        $rows = DB::query(
+            'SELECT sc.schedule_id AS id, sc.application_id AS applicationId,
+                    u.email AS studentEmail,
+                    TRIM(CONCAT(s.last_name, ", ", s.first_name, IF(s.middle_initial IS NULL OR s.middle_initial = "", "", CONCAT(" ", s.middle_initial)))) AS studentName,
+                    a.presentation_stage AS stage, sc.presentation_date AS date,
+                    sc.start_time AS time, sc.venue, sc.status, ap.name AS adviser,
+                    TRIM(CONCAT_WS(" ", sc.documentor_first_name, sc.documentor_middle_name, sc.documentor_last_name)) AS documentor,
+                    GROUP_CONCAT(CONCAT(pm.last_name, ", ", pm.first_name, IF(pm.middle_name IS NULL OR pm.middle_name = "", "", CONCAT(" ", pm.middle_name)) ) ORDER BY spa.assignment_id SEPARATOR ", ") AS panel
+             FROM schedules sc
+             INNER JOIN applications a ON a.application_id = sc.application_id
+             INNER JOIN users u ON u.user_id = a.user_id
+             LEFT JOIN students s ON s.user_id = u.user_id
+             LEFT JOIN advisor_pool ap ON ap.adviser_id = sc.adviser_id
+             LEFT JOIN schedule_panel_assignments spa ON spa.schedule_id = sc.schedule_id
+             LEFT JOIN panel_members pm ON pm.panel_member_id = spa.panel_member_id
+             GROUP BY sc.schedule_id
+             ORDER BY sc.presentation_date, sc.start_time'
+        )->fetchAll();
+        return $rows;
+    } catch (Throwable $e) {
+        return storeGet('schedules');
+    }
+}
+
+function databaseSchedulePanelMembers(int $applicationId): array {
+    if (!class_exists('DB') || $applicationId <= 0) return [];
+    try {
+        return DB::query(
+                'SELECT pm.*, spa.panel_role
+             FROM schedules sc
+             INNER JOIN schedule_panel_assignments spa ON spa.schedule_id = sc.schedule_id
+             INNER JOIN panel_members pm ON pm.panel_member_id = spa.panel_member_id
+             WHERE sc.application_id = :application_id
+             ORDER BY spa.assignment_id'
+        , ['application_id' => $applicationId])->fetchAll();
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
 function schedulesForEmail(string $email): array {
+    if (class_exists('DB') && $email !== '') {
+        try {
+            $stmt = DB::getConnection()->prepare('SELECT sc.schedule_id AS id, sc.application_id AS applicationId, u.email AS studentEmail, a.presentation_stage AS stage, sc.presentation_date AS date, sc.start_time AS time, sc.venue, sc.status FROM schedules sc INNER JOIN applications a ON a.application_id = sc.application_id INNER JOIN users u ON u.user_id = a.user_id WHERE u.email = :email ORDER BY sc.presentation_date, sc.start_time');
+            $stmt->execute(['email' => $email]);
+            return $stmt->fetchAll();
+        } catch (Throwable $e) {
+        }
+    }
     return array_values(array_filter(storeGet('schedules'), static function ($s) use ($email) {
         return strcasecmp((string) ($s['studentEmail'] ?? ''), $email) === 0;
     }));
 }
 
 function addScheduleRecord(array $s): array {
+    if (class_exists('DB') && !empty($s['applicationId'])) {
+        $date = date('Y-m-d', strtotime((string) ($s['date'] ?? '')));
+        $time = date('H:i:s', strtotime((string) ($s['time'] ?? '')));
+        $coordinator = (int) (DB::getConnection()->query("SELECT user_id FROM users WHERE role = 'coordinator' ORDER BY user_id LIMIT 1")->fetchColumn() ?: 0);
+        $pdo = DB::getConnection();
+        $adviserStmt = $pdo->prepare('SELECT adviser_id FROM advisor_pool WHERE name = :name LIMIT 1');
+        $adviserStmt->execute(['name' => trim((string) ($s['adviser'] ?? ''))]);
+        $adviserId = (int) ($adviserStmt->fetchColumn() ?: 0);
+        $documentorParts = array_map('trim', explode(',', (string) ($s['documentor'] ?? ''), 2));
+        $documentorLast = $documentorParts[0] ?? '';
+        $documentorGiven = array_values(array_filter(preg_split('/\s+/', $documentorParts[1] ?? '') ?: []));
+        $documentorFirst = array_shift($documentorGiven) ?: null;
+        $documentorMiddle = $documentorGiven ? implode(' ', $documentorGiven) : null;
+        $pdo->beginTransaction();
+        try {
+            $stmt = $pdo->prepare('INSERT INTO schedules (application_id, managed_by_user_id, presentation_date, start_time, venue, adviser_id, documentor_first_name, documentor_middle_name, documentor_last_name, status) VALUES (:application_id, :managed_by_user_id, :presentation_date, :start_time, :venue, :adviser_id, :documentor_first_name, :documentor_middle_name, :documentor_last_name, :status)');
+            $stmt->execute([
+                'application_id' => (int) $s['applicationId'],
+                'managed_by_user_id' => $coordinator,
+                'presentation_date' => $date,
+                'start_time' => $time,
+                'venue' => trim((string) ($s['venue'] ?? '')),
+                'adviser_id' => $adviserId > 0 ? $adviserId : null,
+                'documentor_first_name' => $documentorFirst,
+                'documentor_middle_name' => $documentorMiddle,
+                'documentor_last_name' => $documentorLast !== '' ? $documentorLast : null,
+                'status' => ($s['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
+            ]);
+            $scheduleId = (int) $pdo->lastInsertId();
+            $memberStmt = $pdo->prepare('SELECT panel_member_id FROM panel_members WHERE CONCAT(last_name, ", ", first_name, IF(middle_name IS NULL OR middle_name = "", "", CONCAT(" ", middle_name))) = :name LIMIT 1');
+            $assignmentStmt = $pdo->prepare('INSERT IGNORE INTO schedule_panel_assignments (schedule_id, panel_member_id, panel_role) VALUES (:schedule_id, :panel_member_id, :panel_role)');
+            $panelText = (string) ($s['panel'] ?? '');
+            $documentorText = trim((string) ($s['documentor'] ?? ''));
+            $panelRows = $pdo->query('SELECT panel_member_id, first_name, middle_name, last_name FROM panel_members')->fetchAll();
+            foreach ($panelRows as $panelRow) {
+                $panelName = trim($panelRow['last_name'] . ', ' . $panelRow['first_name'] . (!empty($panelRow['middle_name']) ? ' ' . $panelRow['middle_name'] : ''));
+                if ($panelName === '' || $panelName === $documentorText || !str_contains($panelText, $panelName)) {
+                    continue;
+                }
+                $memberId = (int) $panelRow['panel_member_id'];
+                if ($memberId > 0) {
+                    $assignmentStmt->execute(['schedule_id' => $scheduleId, 'panel_member_id' => $memberId, 'panel_role' => 'member']);
+                }
+            }
+            if (!empty($s['documentor'])) {
+                $memberStmt->execute(['name' => trim((string) $s['documentor'])]);
+                $documentorId = (int) ($memberStmt->fetchColumn() ?: 0);
+                if ($documentorId > 0) {
+                    $assignmentStmt->execute(['schedule_id' => $scheduleId, 'panel_member_id' => $documentorId, 'panel_role' => 'documentor']);
+                }
+            }
+            $pdo->commit();
+            return findSchedule((string) $scheduleId) ?: array_merge($s, ['id' => (string) $scheduleId]);
+        } catch (Throwable $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
     $list = storeGet('schedules');
     $rec = array_merge([
         'id' => 'sch_' . uniqid(),
@@ -1906,6 +2332,36 @@ function addScheduleRecord(array $s): array {
 }
 
 function updateScheduleRecord(string $id, array $patch): ?array {
+    if (class_exists('DB') && ctype_digit($id)) {
+        $data = [];
+        if (isset($patch['date'])) $data['presentation_date'] = date('Y-m-d', strtotime((string) $patch['date']));
+        if (isset($patch['time'])) $data['start_time'] = date('H:i:s', strtotime((string) $patch['time']));
+        if (isset($patch['venue'])) $data['venue'] = trim((string) $patch['venue']);
+        if (isset($patch['status'])) $data['status'] = $patch['status'] === 'confirmed' ? 'confirmed' : 'pending';
+        if (isset($patch['adviser'])) {
+            $adviserName = trim((string) $patch['adviser']);
+            if ($adviserName !== '') {
+                $adviserStmt = DB::getConnection()->prepare('SELECT adviser_id FROM advisor_pool WHERE name = :name LIMIT 1');
+                $adviserStmt->execute(['name' => $adviserName]);
+                $data['adviser_id'] = (int) ($adviserStmt->fetchColumn() ?: 0) ?: null;
+            }
+        }
+        if ($data) DB::update('schedules', $data, ['schedule_id' => (int) $id]);
+        if (isset($patch['panel'])) {
+            $pdo = DB::getConnection();
+            $pdo->prepare('DELETE FROM schedule_panel_assignments WHERE schedule_id = :id')->execute(['id' => (int) $id]);
+            $assignmentStmt = $pdo->prepare('INSERT IGNORE INTO schedule_panel_assignments (schedule_id, panel_member_id, panel_role) VALUES (:schedule_id, :panel_member_id, "member")');
+            $panelText = (string) $patch['panel'];
+            $panelRows = $pdo->query('SELECT panel_member_id, first_name, middle_name, last_name FROM panel_members')->fetchAll();
+            foreach ($panelRows as $panelRow) {
+                $panelName = trim($panelRow['last_name'] . ', ' . $panelRow['first_name'] . (!empty($panelRow['middle_name']) ? ' ' . $panelRow['middle_name'] : ''));
+                if ($panelName !== '' && str_contains($panelText, $panelName)) {
+                    $assignmentStmt->execute(['schedule_id' => (int) $id, 'panel_member_id' => (int) $panelRow['panel_member_id']]);
+                }
+            }
+        }
+        return findSchedule($id);
+    }
     $list = storeGet('schedules');
     foreach ($list as $i => $s) {
         if ((string) $s['id'] !== $id) {
@@ -1920,7 +2376,7 @@ function updateScheduleRecord(string $id, array $patch): ?array {
 
 function panelSelectOptions(): array {
     $opts = [];
-    foreach (storeGet('panels') as $p) {
+    foreach (databasePanelMembers() as $p) {
         $opts[] = $p['name'] . ($p['qualification'] ? ' (' . $p['qualification'] . ')' : '');
     }
     return $opts ?: [

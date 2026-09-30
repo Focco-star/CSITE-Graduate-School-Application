@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Presentation Notifications';
 $role        = 'coordinator';
@@ -7,7 +8,10 @@ $currentPage = 'schedule';
 $userName    = currentCoordinatorName();
 
 $sch = findSchedule((string) ($_GET['id'] ?? '')) ?? (storeGet('schedules')[0] ?? null);
-$panelNames = $sch ? array_values(array_filter(array_map('trim', explode(',', (string) ($sch['panel'] ?? ''))))) : ['Dr. Juan Dela Cruz', 'Dr. Ana Reyes', 'Prof. Miguel Santos'];
+$notificationPanelMembers = $sch ? databaseSchedulePanelMembers((int) ($sch['applicationId'] ?? 0)) : [];
+$panelNames = array_map(static function (array $member): string {
+    return trim($member['last_name'] . ', ' . $member['first_name'] . (!empty($member['middle_name']) ? ' ' . $member['middle_name'] : ''));
+}, $notificationPanelMembers);
 $isScheduled = $sch && !empty($sch['date']) && !empty($sch['time']) && !empty($sch['venue']);
 
 require_once __DIR__ . '/../../includes/header.php';
@@ -50,12 +54,12 @@ require_once __DIR__ . '/../../includes/header.php';
                     </tr>
                     <?php endforeach; ?>
                     <tr>
-                        <td><strong><?= htmlspecialchars($sch['adviser'] ?? 'Dr. Maria Santos') ?></strong></td>
+                        <td><strong><?= htmlspecialchars($sch['adviser'] ?? '—') ?></strong></td>
                         <td>Adviser</td>
                         <td><?= $isScheduled ? '<span class="status-badge status-confirmed">Automatically ready</span>' : '<span class="status-badge status-pending">Waiting for schedule details</span>' ?></td>
                     </tr>
                     <tr>
-                        <td><strong><?= htmlspecialchars($sch['documentor'] ?? 'Prof. Lisa Fernandez') ?></strong></td>
+                        <td><strong><?= htmlspecialchars($sch['documentor'] ?? '—') ?></strong></td>
                         <td><strong>Documentor</strong></td>
                         <td><?= $isScheduled ? '<span class="status-badge status-confirmed">Automatically ready</span>' : '<span class="status-badge status-pending">Waiting for schedule details</span>' ?></td>
                     </tr>

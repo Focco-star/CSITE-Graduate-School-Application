@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Presentation Schedules';
 $role        = 'coordinator';
@@ -11,7 +12,7 @@ if (isset($_GET['delete']) && $_GET['delete'] !== '') {
     redirectTo('coordinator/schedule/manage.php');
 }
 
-$schedules = storeGet('schedules');
+$schedules = databaseSchedules();
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>

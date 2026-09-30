@@ -58,6 +58,12 @@ class DB {
                 'applications' => 'application_id',
                 'advisor_pool' => 'adviser_id',
                 'application_documents' => 'document_id',
+                'panel_members' => 'panel_member_id',
+                'templates' => 'template_id',
+                'application_comments' => 'comment_id',
+                'payments' => 'payment_id',
+                'schedules' => 'schedule_id',
+                'schedule_panel_assignments' => 'assignment_id',
             ];
             $pk = $pkMap[$table] ?? 'id';
             if (!isset($data[$pk])) {

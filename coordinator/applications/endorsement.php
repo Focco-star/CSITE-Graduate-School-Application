@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Graduate School Endorsement';
 $role        = 'coordinator';
@@ -14,6 +15,10 @@ $title = $app['title'] ?? $mockStudent['title'];
 $stage = $app['stage'] ?? 'Proposal Presentation';
 $adviser = $app['adviser'] ?? $mockStudent['adviser'];
 $coordinatorName = currentCoordinatorName();
+$endorsementPanel = databaseSchedulePanelMembers((int) ($app['id'] ?? 0));
+if (!$endorsementPanel) {
+    $endorsementPanel = array_slice(databasePanelMembers(), 0, 4);
+}
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>
@@ -48,11 +53,11 @@ require_once __DIR__ . '/../../includes/header.php';
             <table class="data-table">
                 <thead><tr><th>Role</th><th>Name</th><th>Qualification</th></tr></thead>
                 <tbody>
-                    <tr><td>Panel Member 1</td><td>Dr. Juan Dela Cruz</td><td>PhD in Computer Science</td></tr>
-                    <tr><td>Panel Member 2</td><td>Dr. Ana Reyes</td><td>PhD in Information Technology</td></tr>
-                    <tr><td>Panel Member 3</td><td>Prof. Miguel Santos</td><td>MS in Computer Science</td></tr>
+                    <?php foreach (array_slice($endorsementPanel, 0, 3) as $index => $member): ?>
+                    <tr><td>Panel Member <?= $index + 1 ?></td><td><?= htmlspecialchars($member['name']) ?></td><td><?= htmlspecialchars($member['qualification']) ?></td></tr>
+                    <?php endforeach; ?>
                     <tr><td>Adviser</td><td><?= htmlspecialchars($adviser) ?></td><td>PhD in Computer Science</td></tr>
-                    <tr><td>Documentor</td><td>Prof. Lisa Fernandez</td><td>MS in Information Technology</td></tr>
+                    <?php if (isset($endorsementPanel[3])): ?><tr><td>Documentor</td><td><?= htmlspecialchars($endorsementPanel[3]['name']) ?></td><td><?= htmlspecialchars($endorsementPanel[3]['qualification']) ?></td></tr><?php endif; ?>
                 </tbody>
             </table>
         </div>

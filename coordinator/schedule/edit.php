@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Edit Schedule';
 $role        = 'coordinator';
@@ -8,7 +9,15 @@ $userName    = $mockCoordinator['name'];
 
 $sch = findSchedule((string) ($_GET['id'] ?? '')) ?? (storeGet('schedules')[0] ?? null);
 $panelOpts = panelSelectOptions();
-$parsed = $sch ? array_map('trim', explode(',', (string) ($sch['panel'] ?? ''))) : [];
+$adviserOpts = [];
+try {
+    $adviserOpts = DB::query("SELECT name, availability FROM advisor_pool ORDER BY availability = 'available' DESC, name ASC")->fetchAll();
+} catch (Throwable $e) {
+}
+$assignedPanelMembers = $sch ? databaseSchedulePanelMembers((int) ($sch['applicationId'] ?? 0)) : [];
+$parsed = array_map(static function (array $member): string {
+    return trim($member['last_name'] . ', ' . $member['first_name'] . (!empty($member['middle_name']) ? ' ' . $member['middle_name'] : ''));
+}, $assignedPanelMembers);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $sch) {
     $panel = implode(', ', array_filter([$_POST['panel1'] ?? '', $_POST['panel2'] ?? '', $_POST['panel3'] ?? '']));
@@ -17,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $sch) {
         'time' => trim($_POST['time'] ?? $sch['time']),
         'venue' => trim($_POST['venue'] ?? ($sch['venue'] ?? '')),
         'status' => ($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
+        'adviser' => formatPersonName($_POST['adviser'] ?? ($sch['adviser'] ?? '')),
         'panel' => $panel ?: ($sch['panel'] ?? 'TBD'),
     ]);
     redirectTo('coordinator/schedule/manage.php');
@@ -58,6 +68,15 @@ require_once __DIR__ . '/../../includes/header.php';
                     <option value="confirmed" <?= $sch['status'] === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
                 </select>
             </div>
+            <div class="form-field">
+                <label>Adviser</label>
+                <select name="adviser">
+                    <option value="">Keep current</option>
+                    <?php foreach ($adviserOpts as $adviser): $isUnavailable = ($adviser['availability'] ?? '') !== 'available'; ?>
+                    <option <?= $isUnavailable ? 'disabled' : '' ?> <?= ($sch['adviser'] ?? '') === $adviser['name'] ? 'selected' : '' ?>><?= htmlspecialchars($adviser['name']) ?><?= $isUnavailable ? ' [Unavailable]' : '' ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
         </div>
     </div>
     <div class="card">
@@ -69,7 +88,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 <select name="panel<?= $i ?>">
                     <option value="">Keep current</option>
                     <?php foreach ($panelOpts as $p): ?>
-                    <option <?= $val === $p || str_contains($p, $val) ? 'selected' : '' ?>><?= htmlspecialchars($p) ?></option>
+                    <option <?= $val !== '' && ($val === $p || str_contains($p, $val)) ? 'selected' : '' ?>><?= htmlspecialchars($p) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>

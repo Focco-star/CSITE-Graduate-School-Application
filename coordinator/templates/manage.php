@@ -1,12 +1,14 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Manage Templates';
 $role        = 'coordinator';
 $currentPage = 'templates';
 $userName    = $mockCoordinator['name'];
 
-$templates = getPaperLibraryRows();
+$templates = databaseTemplateRows();
+$templates = $templates ?: getPaperLibraryRows();
 $stages    = array_values(array_unique(array_column($templates, 'stage')));
 
 require_once __DIR__ . '/../../includes/header.php';
@@ -91,7 +93,7 @@ require_once __DIR__ . '/../../includes/header.php';
                         <td><?= htmlspecialchars($tpl['docType']) ?></td>
                         <td class="actions">
                             <a href="<?= htmlspecialchars($tpl['url']) ?>" class="btn btn-sm btn-primary" download title="Download"><i class="fas fa-download"></i></a>
-                            <a href="<?= url('coordinator/templates/edit.php?id=' . ($i + 1)) ?>" class="btn btn-sm btn-outline" title="Edit"><i class="fas fa-edit"></i></a>
+                            <a href="<?= url('coordinator/templates/edit.php?id=' . urlencode((string) ($tpl['id'] ?? ($i + 1)))) ?>" class="btn btn-sm btn-outline" title="Edit"><i class="fas fa-edit"></i></a>
                         </td>
                     </tr>
                     <?php endforeach; ?>

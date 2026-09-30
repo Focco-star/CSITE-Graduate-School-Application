@@ -8,7 +8,7 @@ $student = DB::find('students', ['user_id' => (int) $user['user_id']]);
 if (!$student) redirectTo('student/login.php');
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $first = trim($_POST['first_name'] ?? ''); $last = trim($_POST['last_name'] ?? '');
+    $first = formatPersonName($_POST['first_name'] ?? ''); $last = formatPersonName($_POST['last_name'] ?? '');
     $middle = strtoupper(trim($_POST['middle_initial'] ?? '')); $age = (int) ($_POST['age'] ?? 0);
     $gender = trim($_POST['gender'] ?? ''); $programCode = $_POST['program'] ?? '';
     if ($first === '' || $last === '' || !isset(PROGRAMS[$programCode]) || $age < 18 || $gender === '') {

@@ -28,12 +28,10 @@ try {
     // Keep the prototype student list available when the database is unavailable.
 }
 $panelOpts = panelSelectOptions();
-$adviserOpts = ['Dr. Maria Santos', 'Dr. Juan Dela Cruz', 'Dr. Ana Reyes'];
+$adviserOpts = [];
 try {
-    $rows = DB::query("SELECT name FROM advisor_pool WHERE availability = 'available' ORDER BY name")->fetchAll();
-    if ($rows) $adviserOpts = array_column($rows, 'name');
+    $adviserOpts = DB::query("SELECT name, availability FROM advisor_pool ORDER BY availability = 'available' DESC, name ASC")->fetchAll();
 } catch (Throwable $e) {
-
 }
 $preselected = '';
 if (!empty($_GET['app'])) {
@@ -93,16 +91,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $panel = implode(', ', array_filter([$_POST['panel1'] ?? '', $_POST['panel2'] ?? '', $_POST['panel3'] ?? '']));
         $venue = trim($_POST['venue'] ?? '');
         $app = latestApplicationForEmail($email);
+        $applicationId = (int) ($app['id'] ?? 0);
+        $databaseUserId = databaseUserIdForEmail($email);
+        if ($databaseUserId > 0) {
+            $databaseApplicationId = databaseApplicationIdForStudent($databaseUserId, $stage);
+            if ($databaseApplicationId !== null) {
+                $applicationId = $databaseApplicationId;
+            }
+        }
         addScheduleRecord([
             'studentEmail' => $email,
             'studentName' => studentDisplayName($st),
-            'applicationId' => $app['id'] ?? null,
+            'applicationId' => $applicationId > 0 ? $applicationId : null,
             'stage' => $stage,
             'date' => $displayDate,
             'time' => $displayTime,
             'venue' => $venue,
             'panel' => $panel ?: 'TBD',
-            'adviser' => trim($_POST['adviser'] ?? ''),
+            'adviser' => formatPersonName($_POST['adviser'] ?? ''),
             'documentor' => trim($_POST['documentor'] ?? ''),
             'status' => ($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
         ]);
@@ -255,9 +261,10 @@ require_once __DIR__ . '/../../includes/header.php';
                     <label>Adviser <span class="required">*</span></label>
                     <select name="adviser" required>
                         <option value="">Select adviser</option>
-                        <option>Dr. Maria Santos</option>
-                        <option>Dr. Juan Dela Cruz</option>
-                        <option>Dr. Ana Reyes</option>
+                        <?php foreach ($adviserOpts as $adviser): $isUnavailable = ($adviser['availability'] ?? '') !== 'available'; ?>
+                        <option <?= $isUnavailable ? 'disabled' : '' ?>><?= htmlspecialchars($adviser['name']) ?><?= $isUnavailable ? ' [Unavailable]' : '' ?></option>
+                        <?php endforeach; ?>
+                        <?php if (!$adviserOpts): ?><option value="" disabled>No available advisers found</option><?php endif; ?>
                     </select>
                 </div>
             </div>

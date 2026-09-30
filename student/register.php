@@ -4,8 +4,8 @@ require_once __DIR__ . '/../includes/db.php';
 
 $registerError = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $first = trim($_POST['firstName'] ?? '');
-    $last = trim($_POST['lastName'] ?? '');
+    $first = formatPersonName($_POST['firstName'] ?? '');
+    $last = formatPersonName($_POST['lastName'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $program = $_POST['program'] ?? '';
     $password = $_POST['password'] ?? '';

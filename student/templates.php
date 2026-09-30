@@ -12,6 +12,7 @@ $userName    = $mockStudent['name'];
 $track       = $mockStudent['track'] ?? getTrackForProgram($mockStudent['program']);
 $trackLabel  = getTrackLabel($track);
 $workflow    = getWorkflow($track);
+$databaseTemplates = databaseTemplateRows($track);
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -28,6 +29,25 @@ require_once __DIR__ . '/../includes/header.php';
         Use only the files intended for your program and presentation stage.
     </div>
 </div>
+
+<?php if ($databaseTemplates): ?>
+<div class="card">
+    <div class="card-header"><h3>Database Templates</h3></div>
+    <div class="card-body">
+        <div class="template-grid">
+            <?php foreach ($databaseTemplates as $template): ?>
+            <div class="template-item">
+                <div class="template-icon"><i class="fas fa-file-word"></i></div>
+                <h4><?= htmlspecialchars($template['label']) ?></h4>
+                <p><?= htmlspecialchars($template['description'] ?? '') ?></p>
+                <span class="template-meta"><i class="fas fa-tag"></i> <?= htmlspecialchars($template['docType']) ?></span>
+                <a class="btn btn-primary btn-sm" href="<?= htmlspecialchars($template['url']) ?>" download><i class="fas fa-download"></i> Download</a>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="filter-bar" data-filter-table="#studentTplGrid" style="margin-bottom:1rem;">
     <div class="filter-search">

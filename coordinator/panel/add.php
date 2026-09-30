@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Add Panel Member';
 $role        = 'coordinator';
@@ -7,15 +8,17 @@ $currentPage = 'panel';
 $userName    = $mockCoordinator['name'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = trim($_POST['name'] ?? '');
+    $firstName = formatPersonName($_POST['first_name'] ?? '');
+    $lastName = formatPersonName($_POST['last_name'] ?? '');
     $qual = trim($_POST['qualification'] ?? '');
-    if ($name !== '' && $qual !== '') {
+    if ($firstName !== '' && $lastName !== '' && $qual !== '') {
         addPanelMemberRecord([
-            'name' => $name,
+            'first_name' => $firstName,
+            'middle_name' => formatPersonName($_POST['middle_name'] ?? ''),
+            'last_name' => $lastName,
             'qualification' => $qual,
             'email' => trim($_POST['email'] ?? ''),
             'notes' => trim($_POST['notes'] ?? ''),
-            'panelSessions' => (int) ($_POST['panelSessions'] ?? 0),
             'availability' => 'available',
         ]);
         redirectTo('coordinator/panel/manage.php');
@@ -33,8 +36,16 @@ require_once __DIR__ . '/../../includes/header.php';
 <form class="card" method="post" action="<?= url('coordinator/panel/add.php') ?>" data-validate>
     <div class="card-body">
         <div class="form-field">
-            <label>Panel Member Name <span class="required">*</span></label>
-            <input type="text" name="name" required placeholder="Full name">
+            <label>First Name <span class="required">*</span></label>
+            <input type="text" name="first_name" required>
+        </div>
+        <div class="form-field">
+            <label>Middle Name</label>
+            <input type="text" name="middle_name">
+        </div>
+        <div class="form-field">
+            <label>Last Name <span class="required">*</span></label>
+            <input type="text" name="last_name" required>
         </div>
         <div class="form-field">
             <label>Qualification / Degree <span class="required">*</span></label>
@@ -43,11 +54,6 @@ require_once __DIR__ . '/../../includes/header.php';
         <div class="form-field">
             <label>Email</label>
             <input type="email" name="email" placeholder="email@adzu.edu.ph">
-        </div>
-        <div class="form-field">
-            <label>Panel Sessions</label>
-            <input type="number" name="panelSessions" min="0" value="0">
-            <p class="field-hint">How many panel sessions has this member completed so far?</p>
         </div>
         <div class="form-field">
             <label>Notes</label>

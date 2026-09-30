@@ -1,18 +1,13 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
 
 $pageTitle   = 'Panel Participation Reports';
 $role        = 'coordinator';
 $currentPage = 'reports';
 $userName    = $mockCoordinator['name'];
 
-$panelReport = [
-    ['name' => 'Prof. Miguel Santos', 'qualification' => 'MS in CS', 'times' => 12, 'last' => '2025-03-15'],
-    ['name' => 'Prof. Lisa Fernandez', 'qualification' => 'MS in IT', 'times' => 10, 'last' => '2025-03-10'],
-    ['name' => 'Dr. Juan Dela Cruz', 'qualification' => 'PhD in CS', 'times' => 8, 'last' => '2025-02-28'],
-    ['name' => 'Dr. Ana Reyes', 'qualification' => 'PhD in IT', 'times' => 6, 'last' => '2025-03-01'],
-    ['name' => 'Dr. Maria Santos', 'qualification' => 'PhD in CS', 'times' => 5, 'last' => '2025-01-20'],
-];
+$panelReport = databasePanelParticipation();
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>
@@ -38,8 +33,8 @@ require_once __DIR__ . '/../../includes/header.php';
                     <tr>
                         <td><strong><?= htmlspecialchars($p['name']) ?></strong></td>
                         <td><?= htmlspecialchars($p['qualification']) ?></td>
-                        <td><?= $p['times'] ?></td>
-                        <td><?= date('M d, Y', strtotime($p['last'])) ?></td>
+                        <td><?= (int) $p['times'] ?></td>
+                        <td><?= !empty($p['last_assignment']) ? date('M d, Y', strtotime($p['last_assignment'])) : '—' ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
@@ -55,7 +50,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php foreach (array_slice($panelReport, 0, 4) as $p): ?>
             <div class="stat-card">
                 <div class="stat-icon blue"><i class="fas fa-user"></i></div>
-                <div class="stat-value"><?= $p['times'] ?></div>
+                <div class="stat-value"><?= (int) $p['times'] ?></div>
                 <div class="stat-label"><?= htmlspecialchars(explode(' ', $p['name'])[1] ?? $p['name']) ?></div>
             </div>
             <?php endforeach; ?>

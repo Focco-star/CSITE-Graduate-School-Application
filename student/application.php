@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'upload'
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'application') {
     $title = trim($_POST['title'] ?? '');
-    $adviser = trim($_POST['adviser'] ?? '');
+    $adviser = formatPersonName($_POST['adviser'] ?? '');
     $stageKey = $_POST['stage'] ?? '';
     if ($title === '' || $adviser === '' || !isset($stages[$stageKey])) {
         $appError = 'Research title, adviser, and presentation stage are required.';
@@ -160,8 +160,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                      WHERE user_id = :user_id'
                 );
                 $upsertStmt->execute([
-                    'first_name' => $identity['first_name'],
-                    'last_name' => $identity['last_name'],
+                    'first_name' => formatPersonName($identity['first_name']),
+                    'last_name' => formatPersonName($identity['last_name']),
                     'middle_initial' => $identity['middle_initial'],
                     'age' => (int) $identity['age'],
                     'gender' => $identity['gender'],
