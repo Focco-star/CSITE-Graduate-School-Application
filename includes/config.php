@@ -514,8 +514,8 @@ function studentDisplayName(array $s): string {
     return canonicalStudentName($first, $last, $mi);
 }
 
-function formatPersonName(string $name): string {
-    $name = trim(preg_replace('/\s+/', ' ', $name) ?? '');
+function formatPersonName(?string $name): string {
+    $name = trim(preg_replace('/\s+/', ' ', (string) $name) ?? '');
     if ($name === '' || ($name !== strtoupper($name) && $name !== strtolower($name))) {
         return $name;
     }
@@ -529,10 +529,10 @@ function formatPersonName(string $name): string {
  * Students table can never diverge. Because the last name leads, a plain
  * alphabetical ORDER BY on this value (or on last_name, first_name) is correct.
  */
-function canonicalStudentName(string $first, string $last, string $middleInitial = ''): string {
+function canonicalStudentName(string $first, string $last, ?string $middleInitial = ''): string {
     $first = formatPersonName($first);
     $last = formatPersonName($last);
-    $mi = trim($middleInitial);
+    $mi = trim((string) $middleInitial);
     $mi = $mi !== '' ? rtrim($mi, '.') : '';
     if ($last === '' && $first === '') {
         return '';

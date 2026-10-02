@@ -31,7 +31,7 @@ if (empty($userName) && !empty($_SESSION['user'])) {
     <title><?= htmlspecialchars($pageTitle) ?> | <?= htmlspecialchars(SITE_SHORT) ?></title>
     <link rel="stylesheet" href="<?= asset('vendor/fonts/fonts.css') ?>">
     <link rel="stylesheet" href="<?= asset('vendor/fontawesome/all.min.css') ?>">
-    <link rel="stylesheet" href="<?= asset('css/style.css?v=20261009') ?>">
+    <link rel="stylesheet" href="<?= asset('css/style.css?v=20261010') ?>">
 </head>
 <body class="role-<?= htmlspecialchars($role) ?> <?= htmlspecialchars($bodyClass) ?>">
 

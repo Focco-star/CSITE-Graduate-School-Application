@@ -140,12 +140,13 @@ $showCoordinatorSection = $isCoordinator;
   #sidebar.myadzu-sidebar .myadzu-avatar {
     width: 96px; height: 96px;
     margin: 0 auto .35rem;
-    border-radius: 50%;
-    border: 3px solid rgba(255,255,255,.9);
+    border-radius: 0;
+    border: none;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
     display: flex; align-items: center; justify-content: center;
-    background: #ffffff;
+    background: transparent;
+    filter: drop-shadow(0 0 5px rgba(217,181,69,.55));
   }
   #sidebar.myadzu-sidebar .myadzu-avatar img.myadzu-seal {
     position: absolute; inset: 0;

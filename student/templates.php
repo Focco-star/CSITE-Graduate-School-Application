@@ -30,25 +30,6 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<?php if ($databaseTemplates): ?>
-<div class="card">
-    <div class="card-header"><h3>Database Templates</h3></div>
-    <div class="card-body">
-        <div class="template-grid">
-            <?php foreach ($databaseTemplates as $template): ?>
-            <div class="template-item">
-                <div class="template-icon"><i class="fas fa-file-word"></i></div>
-                <h4><?= htmlspecialchars($template['label']) ?></h4>
-                <p><?= htmlspecialchars($template['description'] ?? '') ?></p>
-                <span class="template-meta"><i class="fas fa-tag"></i> <?= htmlspecialchars($template['docType']) ?></span>
-                <a class="btn btn-primary btn-sm" href="<?= htmlspecialchars($template['url']) ?>" download><i class="fas fa-download"></i> Download</a>
-            </div>
-            <?php endforeach; ?>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
-
 <div class="filter-bar" data-filter-table="#studentTplGrid" style="margin-bottom:1rem;">
     <div class="filter-search">
         <i class="fas fa-search"></i>
@@ -74,6 +55,34 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <div id="studentTplGrid">
+<?php if ($databaseTemplates): ?>
+<div class="card">
+    <div class="card-header"><h3>Database Templates</h3></div>
+    <div class="card-body">
+        <div class="template-grid">
+            <?php foreach ($databaseTemplates as $template):
+                $dbStage = trim((string) ($template['stage'] ?? ''));
+                if ($dbStage === '') {
+                    $dbStage = 'Reference Documents';
+                }
+                $dbType = ucfirst(strtolower(trim((string) ($template['docType'] ?? ''))));
+                if (!in_array($dbType, ['Form', 'Template', 'Reference'], true)) {
+                    $dbType = 'Template';
+                }
+                $dbSearch = strtolower(trim(($template['label'] ?? '') . ' ' . ($template['file'] ?? '') . ' ' . ($template['description'] ?? '') . ' ' . $dbStage . ' ' . $dbType));
+            ?>
+            <div class="template-item" data-stage="<?= htmlspecialchars($dbStage) ?>" data-type="<?= htmlspecialchars($dbType) ?>" data-search="<?= htmlspecialchars($dbSearch) ?>">
+                <div class="template-icon"><i class="fas fa-file-word"></i></div>
+                <h4><?= htmlspecialchars($template['label']) ?></h4>
+                <p><?= htmlspecialchars($template['description'] ?? '') ?></p>
+                <span class="template-meta"><i class="fas fa-tag"></i> <?= htmlspecialchars($dbType) ?></span>
+                <a class="btn btn-primary btn-sm" href="<?= htmlspecialchars($template['url']) ?>" download><i class="fas fa-download"></i> Download</a>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 <?php foreach ($workflow['stages'] as $stage):
     $stageDocs = [$stage['adviserEndorsementForm'], $stage['gradSchoolEndorsementForm']];
     foreach ($stage['documents'] as $doc) {
