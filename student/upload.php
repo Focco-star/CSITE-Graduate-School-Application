@@ -8,11 +8,30 @@ $pageTitle   = 'Document Upload';
 $role        = 'student';
 $currentPage = 'application';
 $userName    = $mockStudent['name'];
-$track       = $mockStudent['track'];
+// Same track/stage resolution as Application > Attach Documents, for every
+// course track (thesis / capstone / seminar paper).
+$track       = getTrackForProgram($mockStudent['program'] ?? 'MSCS');
+$trackLabel  = getTrackLabel($track);
 $workflow    = getWorkflow($track);
 $stages      = [];
 foreach ($workflow['stages'] as $s) {
     $stages[$s['key']] = $s;
+}
+$progress = getStudentProgress($mockStudent['email'], $track);
+// Preselect the stage: ?stage= from Requirements first, else the student's
+// current workflow stage (first non-completed one), else the track's first.
+$currentStageKey = trim($_GET['stage'] ?? $_POST['stage'] ?? '');
+if (!isset($stages[$currentStageKey])) {
+    $currentStageKey = '';
+    foreach ($progress as $p) {
+        if (!in_array($p['stageStatus'], ['completed', 'approved'], true)) {
+            $currentStageKey = $p['stageKey'];
+            break;
+        }
+    }
+    if (!isset($stages[$currentStageKey])) {
+        $currentStageKey = array_key_first($stages) ?: 'proposal';
+    }
 }
 
 $uploadError = '';
@@ -95,19 +114,22 @@ require_once __DIR__ . '/../includes/header.php';
         <form method="post" action="<?= url('student/upload.php') ?>" enctype="multipart/form-data" data-validate>
             <div class="form-row">
                 <div class="form-field">
-                    <label>Presentation Stage <span class="required">*</span></label>
-                    <select name="stage" id="uploadStage" required>
-                        <option value="">Select stage</option>
-                        <?php foreach ($stages as $key => $s): ?>
-                        <option value="<?= htmlspecialchars($key) ?>" <?= $key === ($mockStudent['current_stage'] ?? '') ? 'selected' : '' ?>><?= htmlspecialchars($s['label']) ?></option>
+                    <label>Document Type <span class="required">*</span></label>
+                    <select name="docType" id="uploadDocType" required>
+                        <option value="">Select document type (optional)</option>
+                        <?php foreach (($docTypesByStage[$currentStageKey] ?? []) as $dt): ?>
+                        <option><?= htmlspecialchars($dt) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-field">
-                    <label>Document Type <span class="required">*</span></label>
-                    <select name="docType" id="uploadDocType" required>
-                        <option value="">Select document type</option>
+                    <label>Stage <span class="required">*</span></label>
+                    <select name="stage" id="uploadStage" required>
+                        <?php foreach ($stages as $key => $s): ?>
+                        <option value="<?= htmlspecialchars($key) ?>" <?= $key === $currentStageKey ? 'selected' : '' ?>><?= htmlspecialchars($s['label']) ?></option>
+                        <?php endforeach; ?>
                     </select>
+                    <p class="field-hint">Stages shown are for the <?= htmlspecialchars($trackLabel) ?> track only.</p>
                 </div>
             </div>
             <div class="form-field">
@@ -190,7 +212,7 @@ require_once __DIR__ . '/../includes/header.php';
     const typeSel = document.getElementById('uploadDocType');
     function fill() {
         const opts = types[stage.value] || [];
-        typeSel.innerHTML = '<option value="">Select document type</option>' + opts.map(o => '<option>' + o + '</option>').join('');
+        typeSel.innerHTML = '<option value="">Select document type (optional)</option>' + opts.map(o => '<option>' + o + '</option>').join('');
     }
     stage.addEventListener('change', fill);
     fill();

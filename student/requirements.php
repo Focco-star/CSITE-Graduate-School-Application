@@ -117,7 +117,7 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
                 <div>
                     <?php if ($st === 'pending' && !$step['coord'] && $si <= $firstPending): ?>
-                    <a class="btn btn-sm btn-primary" href="<?= url('student/upload.php') ?>"><i class="fas fa-upload"></i> Upload</a>
+                    <a class="btn btn-sm btn-primary" href="<?= url('student/upload.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload</a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -154,7 +154,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <span style="font-weight:700;font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-600);">Payment Proof Required</span>
             </div>
             <p style="font-size:0.83rem;color:var(--gray-700);margin-bottom:0.75rem;"><?= htmlspecialchars($doc['label']) ?></p>
-            <a class="btn btn-primary btn-sm" href="<?= url('student/upload.php') ?>"><i class="fas fa-upload"></i> Upload Receipt</a>
+            <a class="btn btn-primary btn-sm" href="<?= url('student/upload.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload Receipt</a>
         </div>
         <?php endforeach; ?>
     </div>
