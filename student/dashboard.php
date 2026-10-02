@@ -37,27 +37,35 @@ require_once __DIR__ . '/../includes/header.php';
     <p><?= htmlspecialchars($student['program']) ?> — <?= htmlspecialchars($trackLabel) ?> Track</p>
 </div>
 
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-icon blue"><i class="fas fa-book"></i></div>
-        <div class="stat-value" style="font-size:1rem;"><?= htmlspecialchars($student['program']) ?></div>
-        <div class="stat-label">Program</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon gold"><i class="fas fa-flag"></i></div>
-        <div class="stat-value" style="font-size:1rem;"><?= htmlspecialchars($activeLabel) ?></div>
-        <div class="stat-label">Current Stage</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon purple"><i class="fas fa-clock"></i></div>
-        <div class="stat-value"><?= statusBadge($activeStage['stageStatus'] ?? 'pending') ?></div>
-        <div class="stat-label">Stage Status</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-icon green"><i class="fas fa-layer-group"></i></div>
-        <div class="stat-value"><?= count($stages) ?></div>
-        <div class="stat-label">Total Stages</div>
-    </div>
+<div class="dashstat-grid cols-4 theme-ateneo">
+    <a href="<?= url('student/profile.php') ?>" class="dashstat dashstat-blue">
+        <div class="dashstat-text">
+            <div class="dashstat-textvalue"><?= htmlspecialchars($student['program']) ?></div>
+            <div class="dashstat-label">Program</div>
+        </div>
+        <div class="dashstat-icon"><i class="fas fa-book"></i></div>
+    </a>
+    <a href="<?= url('student/requirements.php') ?>" class="dashstat dashstat-amber">
+        <div class="dashstat-text">
+            <div class="dashstat-textvalue"><?= htmlspecialchars($activeLabel) ?></div>
+            <div class="dashstat-label">Current Stage</div>
+        </div>
+        <div class="dashstat-icon"><i class="fas fa-flag"></i></div>
+    </a>
+    <a href="<?= url('student/status.php') ?>" class="dashstat dashstat-purple">
+        <div class="dashstat-text">
+            <div class="dashstat-textvalue"><?= statusBadge($activeStage['stageStatus'] ?? 'pending') ?></div>
+            <div class="dashstat-label">Stage Status</div>
+        </div>
+        <div class="dashstat-icon"><i class="fas fa-clock"></i></div>
+    </a>
+    <a href="<?= url('student/requirements.php') ?>" class="dashstat dashstat-emerald">
+        <div class="dashstat-text">
+            <div class="dashstat-value"><?= count($stages) ?></div>
+            <div class="dashstat-label">Total Stages</div>
+        </div>
+        <div class="dashstat-icon"><i class="fas fa-layer-group"></i></div>
+    </a>
 </div>
 
 <div class="card">
@@ -160,27 +168,31 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<div class="card">
-    <div class="card-header"><h3><i class="fas fa-bolt"></i> Quick Links</h3></div>
-    <div class="card-body">
-        <div class="info-grid">
-            <a href="<?= url('student/application.php') ?>" class="info-card" style="text-decoration:none;">
-                <div class="icon"><i class="fas fa-file-alt"></i></div>
-                <h3>Application &amp; Upload</h3>
-                <p>Submit your <?= htmlspecialchars(strtolower($trackLabel)) ?> application and upload required documents.</p>
-            </a>
-            <a href="<?= url('student/requirements.php') ?>" class="info-card" style="text-decoration:none;">
-                <div class="icon"><i class="fas fa-tasks"></i></div>
-                <h3>Process Tracker</h3>
-                <p>View the complete step-by-step progress for each <?= htmlspecialchars(strtolower($trackLabel)) ?> stage.</p>
-            </a>
-            <a href="<?= url('student/templates.php') ?>" class="info-card" style="text-decoration:none;">
-                <div class="icon"><i class="fas fa-download"></i></div>
-                <h3>Templates &amp; Forms</h3>
-                <p>Download forms and templates for your program.</p>
-            </a>
+<div class="dashstat-grid cols-3 theme-ateneo">
+    <a href="<?= url('student/application.php') ?>" class="dashstat dashstat-blue">
+        <div class="dashstat-text">
+            <div class="dashstat-textvalue">Application &amp; Upload</div>
+            <div class="dashstat-desc">Submit your <?= htmlspecialchars(strtolower($trackLabel)) ?> application and upload required documents.</div>
+            <div class="dashstat-link">Open <i class="fas fa-arrow-right"></i></div>
         </div>
-    </div>
+        <div class="dashstat-icon"><i class="fas fa-file-alt"></i></div>
+    </a>
+    <a href="<?= url('student/requirements.php') ?>" class="dashstat dashstat-amber">
+        <div class="dashstat-text">
+            <div class="dashstat-textvalue">Process Tracker</div>
+            <div class="dashstat-desc">View the complete step-by-step progress for each <?= htmlspecialchars(strtolower($trackLabel)) ?> stage.</div>
+            <div class="dashstat-link">Open <i class="fas fa-arrow-right"></i></div>
+        </div>
+        <div class="dashstat-icon"><i class="fas fa-tasks"></i></div>
+    </a>
+    <a href="<?= url('student/templates.php') ?>" class="dashstat dashstat-emerald">
+        <div class="dashstat-text">
+            <div class="dashstat-textvalue">Templates &amp; Forms</div>
+            <div class="dashstat-desc">Download forms and templates for your program.</div>
+            <div class="dashstat-link">Open <i class="fas fa-arrow-right"></i></div>
+        </div>
+        <div class="dashstat-icon"><i class="fas fa-download"></i></div>
+    </a>
 </div>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

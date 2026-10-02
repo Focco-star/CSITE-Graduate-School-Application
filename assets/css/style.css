@@ -1377,3 +1377,49 @@ body.login-body .public-main { min-height: 100vh; padding: 0; }
 .req-doc-row i { color: var(--adzu-navy); opacity: 0.6; width: 16px; }
 .req-doc-row span { flex: 1; color: var(--gray-700); }
 .receipt-box { margin-top: 1rem; padding: 1rem; background: rgba(255,184,43,0.06); border-radius: var(--radius-lg); border: 1px dashed rgba(255,184,43,0.5); }
+/* ---------- Dashboard stat cards v2 (gradient, clickable) ---------- */
+.dashstat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+.dashstat {
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+    padding: 1.25rem 1.25rem; border-radius: 14px; color: #fff; text-decoration: none;
+    box-shadow: 0 6px 16px rgba(6, 2, 151, 0.14);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.dashstat:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(6, 2, 151, 0.22); color: #fff; }
+.dashstat-rose { background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%); }
+.dashstat-amber { background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%); }
+.dashstat-blue { background: linear-gradient(135deg, #2563eb 0%, #060297 100%); }
+.dashstat-emerald { background: linear-gradient(135deg, #10b981 0%, #047857 100%); }
+.dashstat-value { font-size: 2rem; font-weight: 800; line-height: 1; font-family: var(--font-heading); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
+.dashstat-label { font-size: 0.82rem; font-weight: 700; opacity: 1; margin-top: 0.3rem; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+.dashstat-link { font-size: 0.72rem; font-weight: 600; opacity: 0.95; margin-top: 0.5rem; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+.dashstat-link i { font-size: 0.65rem; margin-left: 2px; }
+.dashstat-icon {
+    display: flex; align-items: center; justify-content: center;
+    width: 56px; height: 56px; flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.22); border-radius: 16px;
+    font-size: 1.5rem;
+}
+@media (max-width: 1300px) { .dashstat-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 900px) { .dashstat-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .dashstat-grid { grid-template-columns: 1fr; } }
+.dashstat-purple { background: linear-gradient(135deg, #8b5cf6 0%, #5b21b6 100%); }
+.dashstat-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.dashstat-textvalue { font-size: 1rem; font-weight: 700; line-height: 1.35; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
+.dashstat .status-badge { background: #ffffff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2); }
+@media (max-width: 1100px) { .dashstat-grid.cols-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .dashstat-grid.cols-4 { grid-template-columns: 1fr; } }
+.dashstat-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 900px) { .dashstat-grid.cols-3 { grid-template-columns: 1fr; } }
+/* ---------- v3 Ateneo theme: navy + gold (toggle via .theme-ateneo) ---------- */
+.dashstat-grid.theme-ateneo .dashstat {
+    background: linear-gradient(135deg, #2e3844 0%, #232b35 55%, #141a21 100%);
+    border-top: 2px solid #FFB82B;
+}
+.dashstat-grid.theme-ateneo .dashstat-icon {
+    background: linear-gradient(135deg, #FFB82B 0%, #e5a526 100%);
+    color: #232b35;
+}
+.dashstat-grid.theme-ateneo .dashstat:hover { box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35); }
+.dashstat-desc { font-size: 0.82rem; font-weight: 400; line-height: 1.5; opacity: 0.92; margin-top: 0.3rem; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
