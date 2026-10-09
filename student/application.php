@@ -38,6 +38,7 @@ $uploadError   = '';
 $uploadSuccess = '';
 
 $progress = getStudentProgress($mockStudent['email'], $track);
+$stageLockError = null;
 $currentStageKey = $mockStudent['current_stage'] ?? '';
 foreach ($progress as $p) {
     if (!in_array($p['stageStatus'], ['completed', 'approved'], true)) {
@@ -95,8 +96,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
     $title = trim($_POST['title'] ?? '');
     $adviser = formatPersonName($_POST['adviser'] ?? '');
     $stageKey = $_POST['stage'] ?? '';
+    $stageLockError = validateApplicationStageSequence($progress, $stages, $stageKey);
     if ($title === '' || $adviser === '' || !isset($stages[$stageKey])) {
         $appError = 'Research title, adviser, and presentation stage are required.';
+    } elseif ($stageLockError !== null) {
+        $appError = $stageLockError;
     } else {
         try {
             $pdo = DB::getConnection();
@@ -288,6 +292,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <label>Presentation Stage <span class="required">*</span></label>
                     <select name="stage" required>
                         <?php foreach ($stages as $key => $s): ?>
+                        <?php if (validateApplicationStageSequence($progress, $stages, $key) !== null) continue; ?>
                         <option value="<?= htmlspecialchars($key) ?>" <?= $key === $currentStageKey ? 'selected' : '' ?>>
                             <?= htmlspecialchars($s['label']) ?>
                         </option>

@@ -2597,6 +2597,35 @@ function getStudentProgress(string $email, string $track): array {
     return $rows;
 }
 
+/**
+ * Return an error when a student tries to submit a stage before its predecessor
+ * has been approved or completed.
+ */
+function validateApplicationStageSequence(array $progress, array $stages, string $requestedStageKey): ?string {
+    $stageKeys = array_keys($stages);
+    $requestedIndex = array_search($requestedStageKey, $stageKeys, true);
+    if ($requestedIndex === false || $requestedIndex === 0) {
+        return null;
+    }
+
+    $previousStageKey = $stageKeys[$requestedIndex - 1];
+    foreach ($progress as $stage) {
+        if (($stage['stageKey'] ?? '') !== $previousStageKey) {
+            continue;
+        }
+
+        if (in_array(($stage['stageStatus'] ?? ''), ['approved', 'completed'], true)) {
+            return null;
+        }
+
+        $previousLabel = $stages[$previousStageKey]['label'] ?? 'previous stage';
+        return 'You cannot apply for this stage yet. Complete and receive approval for the ' . $previousLabel . ' first.';
+    }
+
+    $previousLabel = $stages[$previousStageKey]['label'] ?? 'previous stage';
+    return 'You cannot apply for this stage yet. Submit and complete the ' . $previousLabel . ' first.';
+}
+
 function demoProgressForTrack(string $track): array {
     if ($track === 'capstone') {
         return demoCapstoneProgress();
