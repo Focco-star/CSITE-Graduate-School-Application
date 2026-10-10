@@ -210,6 +210,13 @@ $trackHints = [
                     <input type="email" id="email" name="email" placeholder="yourname@adzu.edu.ph" required>
                 </div>
             </div>
+            <div class="form-group">
+                <label for="studentId">ADZU ID Number *</label>
+                <div class="input-icon-wrap">
+                    <i class="fas fa-id-card"></i>
+                    <input type="text" id="studentId" name="studentId" placeholder="e.g. 259344" required>
+                </div>
+            </div>
             <div class="register-grid-2">
                 <div class="form-group">
                     <label for="regPassword">Password *</label>
