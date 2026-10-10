@@ -1349,18 +1349,83 @@ body.login-body .public-footer { display: none; }
 body.login-body .public-main { min-height: 100vh; padding: 0; }
 .input-icon-wrap input.has-toggle { padding-right: 2.75rem; }
 
-.stage-stepper { display: flex; align-items: center; overflow-x: auto; gap: 0; }
-.stage-stepper-item { display: flex; align-items: center; flex: 1; min-width: 110px; }
-.stage-stepper-btn { background: none; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0 4px; text-decoration: none; color: inherit; }
-.stage-stepper-num { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--gray-100); color: var(--gray-400); font-weight: 700; font-size: 1.05rem; border: 3px solid transparent; }
+/* Stage stepper (dashboard + process tracker): centered, formal, simple */
+.stage-stepper {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    overflow-x: auto;
+    padding: 0.25rem 0;
+}
+.stage-stepper-item {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 120px;
+    max-width: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.stage-stepper-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    padding: 0 0.5rem;
+    background: none;
+    border: none;
+    text-align: center;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+}
+.stage-stepper-num {
+    position: relative;
+    z-index: 1;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--white);
+    color: var(--gray-500);
+    border: 2px solid var(--gray-300);
+    font-weight: 700;
+    font-size: 0.95rem;
+}
 .stage-stepper-num.active { background: var(--adzu-navy); color: #fff; border-color: var(--adzu-gold); }
 .stage-stepper-num.done,
-.stage-stepper-num.highlighted { background: var(--success); color: #fff; border-color: transparent; }
-.stage-stepper-label { font-size: 0.72rem; font-weight: 500; color: var(--gray-500); text-align: center; max-width: 90px; line-height: 1.2; }
+.stage-stepper-num.highlighted { background: var(--success); color: #fff; border-color: var(--success); }
+.stage-stepper-label {
+    max-width: 150px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--gray-600);
+    text-align: center;
+}
+a.stage-stepper-btn:hover .stage-stepper-label { color: var(--adzu-navy); }
 .stage-stepper-label.is-active { font-weight: 700; color: var(--adzu-navy); }
 .stage-stepper-label.is-done { color: var(--success); }
-.stage-stepper-line { flex: 1; height: 3px; background: var(--gray-200); border-radius: 2px; margin: 0 4px; margin-top: -14px; }
+.stage-stepper-btn .status-badge { margin-top: 0.1rem; }
+/* connector runs from this step's circle to the next step's circle */
+.stage-stepper-line {
+    position: absolute;
+    top: 19px;
+    left: calc(50% + 28px);
+    right: calc(-50% + 28px);
+    height: 2px;
+    margin: 0;
+    background: var(--gray-200);
+    border-radius: 2px;
+}
 .stage-stepper-line.done { background: var(--success); }
+@media (max-width: 640px) {
+    .stage-stepper { justify-content: flex-start; }
+    .stage-stepper-item { min-width: 104px; }
+}
 .step-icon { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .step-icon-done { background: var(--success); color: #fff; font-size: 0.65rem; }
 .step-icon-flagged { background: var(--warning); color: #fff; font-size: 0.65rem; }
@@ -1425,3 +1490,298 @@ body.login-body .public-main { min-height: 100vh; padding: 0; }
 }
 .dashstat-grid.theme-ateneo .dashstat:hover { box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35); }
 .dashstat-desc { font-size: 0.82rem; font-weight: 400; line-height: 1.5; opacity: 0.92; margin-top: 0.3rem; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+
+/* ==========================================================================
+   Track indicator (student application page)
+   Capstone = yellow, Thesis = red, Seminar Paper = green.
+   ========================================================================== */
+.track-indicator {
+    --track: #FFB82B;
+    --track-ink: #3b2a00;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.45rem;
+    margin-bottom: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-left: 6px solid var(--track);
+    border-radius: var(--radius);
+}
+.track-indicator.track-thesis  { --track: #dc2626; --track-ink: #ffffff; }
+.track-indicator.track-seminar { --track: #16a34a; --track-ink: #ffffff; }
+
+.track-indicator-badge {
+    display: inline-block;
+    padding: 0.2rem 0.65rem;
+    background: var(--track);
+    color: var(--track-ink);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.track-indicator-program {
+    font-family: var(--font-heading);
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--gray-800);
+}
+
+/* ==========================================================================
+   Editable date field with themed calendar (gray + yellow, like the sidebar)
+   ========================================================================== */
+.date-picker { position: relative; }
+
+.form-field .date-picker input {
+    padding-right: 3rem;
+}
+
+.form-field .date-picker input:focus {
+    border-color: #FFB82B;
+    box-shadow: 0 0 0 3px rgba(255, 184, 43, 0.25);
+}
+
+.date-picker-btn {
+    position: absolute;
+    top: 1px; right: 1px; bottom: 1px;
+    width: 2.6rem;
+    border: 0;
+    border-radius: 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0;
+    background: #232b35;
+    color: #FFB82B;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+}
+.date-picker-btn:hover,
+.date-picker-btn[aria-expanded="true"] { background: #2e3844; color: #ffc955; }
+.date-picker-btn:focus-visible { outline: 2px solid #FFB82B; outline-offset: -2px; }
+
+.dp-popover {
+    position: fixed;
+    z-index: 2000;
+    width: 296px;
+    max-width: calc(100vw - 16px);
+    padding: 0.75rem;
+    background: #232b35;
+    color: #e8edf2;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    font-family: var(--font);
+    display: none;
+}
+.dp-popover.open { display: block; animation: dp-in 0.15s ease-out; }
+@keyframes dp-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.dp-head { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.6rem; }
+
+.dp-nav {
+    width: 32px; height: 32px;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 6px;
+    background: #2e3844;
+    color: #FFB82B;
+    cursor: pointer;
+    transition: background var(--transition);
+}
+.dp-nav:hover { background: #3a4654; }
+
+.dp-head select {
+    flex: 1 1 0;
+    min-width: 0;
+    height: 32px;
+    padding: 0 0.4rem;
+    background: #1a222c;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    font-family: var(--font);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.dp-head select:focus { outline: none; border-color: #FFB82B; }
+.dp-head select option { background: #1a222c; color: #ffffff; }
+
+.dp-week,
+.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+
+.dp-week span {
+    text-align: center;
+    padding: 0.25rem 0;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8fa0b5;
+}
+
+.dp-day {
+    aspect-ratio: 1 / 1;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #e8edf2;
+    font-family: var(--font);
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+}
+.dp-day:hover { background: #2e3844; color: #ffffff; }
+.dp-day.other { color: #64748b; }
+.dp-day.today { box-shadow: inset 0 0 0 1px #FFB82B; }
+.dp-day.selected,
+.dp-day.selected:hover { background: #FFB82B; color: #1a222c; font-weight: 700; }
+.dp-day:focus-visible { outline: 2px solid #FFB82B; outline-offset: 1px; }
+
+.dp-foot {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.dp-foot button {
+    background: none;
+    border: 0;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    color: #FFB82B;
+    font-family: var(--font);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+.dp-foot button:hover { background: #2e3844; }
+
+/* ==========================================================================
+   Success pop-up (animated giant check, auto-closes after 5 seconds)
+   Used by the student application page and the coordinator add pages.
+   ========================================================================== */
+.success-popup-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.55);
+    animation: sp-fade-in 0.2s ease-out;
+}
+.success-popup-overlay.closing { animation: sp-fade-out 0.22s ease-in forwards; }
+
+.success-popup {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    padding: 2.25rem 2rem 0;
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    overflow: hidden;
+    animation: sp-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.success-popup-close {
+    position: absolute;
+    top: 0.65rem;
+    right: 0.65rem;
+    width: 34px; height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--gray-400);
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+}
+.success-popup-close:hover { background: var(--gray-100); color: var(--gray-700); }
+.success-popup-close:focus-visible { outline: 2px solid #FFB82B; outline-offset: 1px; }
+
+.success-check { width: 150px; height: 150px; margin: 0 auto 1rem; }
+.success-check svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+.sc-bg {
+    fill: var(--success-bg);
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: sc-bg-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s both;
+}
+.sc-ring {
+    fill: none;
+    stroke: var(--success);
+    stroke-width: 5;
+    stroke-linecap: round;
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: rotate(-90deg);
+    animation: sc-draw 0.6s ease-out 0.15s forwards;
+}
+.sc-tick {
+    fill: none;
+    stroke: var(--success);
+    stroke-width: 9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: sc-draw 0.4s ease-out 0.65s forwards;
+}
+.sc-pulse {
+    fill: none;
+    stroke: var(--success);
+    stroke-width: 3;
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: sc-pulse 0.7s ease-out 0.95s;
+}
+
+.success-popup h3 {
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--gray-800);
+    margin-bottom: 0.4rem;
+}
+.success-popup p {
+    font-size: 0.9rem;
+    color: var(--gray-500);
+    padding-bottom: 1.6rem;
+}
+
+.success-popup-timer { height: 5px; margin: 0 -2rem; background: var(--gray-200); }
+.success-popup-timer span {
+    display: block;
+    height: 100%;
+    background: #FFB82B;
+    transform-origin: left center;
+    animation: sp-countdown 5s linear forwards;
+}
+
+@keyframes sp-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sp-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes sp-pop      { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+@keyframes sc-draw     { to { stroke-dashoffset: 0; } }
+@keyframes sc-bg-pop   { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes sc-pulse    { 0% { opacity: 0.5; transform: scale(1); } 100% { opacity: 0; transform: scale(1.35); } }
+@keyframes sp-countdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .success-popup, .success-popup-overlay, .sc-bg, .sc-pulse, .dp-popover.open { animation: none; }
+    .sc-ring, .sc-tick { animation: none; stroke-dashoffset: 0; }
+}

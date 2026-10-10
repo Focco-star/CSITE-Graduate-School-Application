@@ -8,6 +8,8 @@ $role = 'coordinator';
 $currentPage = 'advisers';
 $userName = currentCoordinatorName();
 $error = '';
+$popup = $_SESSION['adviser_success_popup'] ?? null;   // set right after an adviser is added
+unset($_SESSION['adviser_success_popup']);
 
 try {
     $pdo = DB::getConnection();
@@ -21,7 +23,10 @@ try {
             if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('Enter a valid adviser email address.');
             $stmt = $pdo->prepare('INSERT INTO advisor_pool (name, qualification, email, availability, notes) VALUES (?, ?, ?, ?, ?)');
             $stmt->execute([$name, $qualification, $email ?: null, ($_POST['availability'] ?? 'available') === 'unavailable' ? 'unavailable' : 'available', trim($_POST['notes'] ?? '') ?: null]);
-            setFlash('success', 'Adviser added to the pool successfully.');
+            $_SESSION['adviser_success_popup'] = [
+                'title'   => 'Adviser Added Successfully',
+                'message' => '"' . $name . '" was added to the pool of advisers.',
+            ];
             redirectTo('coordinator/advisers/manage.php');
         }
         if ($action === 'toggle') {
@@ -40,6 +45,7 @@ require_once __DIR__ . '/../../includes/header.php';
 ?>
 <div class="page-header"><h2>Pool of Advisers</h2><p>Maintain qualified advisers who may be assigned to student applications and presentation schedules.</p></div>
 <?php if ($error): ?><div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div><?php endif; ?>
+<?php if ($popup): ?><div id="successPopupData" hidden data-title="<?= htmlspecialchars($popup['title']) ?>" data-message="<?= htmlspecialchars($popup['message']) ?>"></div><?php endif; ?>
 <div class="card"><div class="card-header"><h3>Add Adviser</h3></div><form method="post" class="card-body" data-validate><input type="hidden" name="action" value="add"><div class="form-row"><div class="form-field"><label>Name <span class="required">*</span></label><input name="name" required placeholder="Full name"></div><div class="form-field"><label>Qualification <span class="required">*</span></label><input name="qualification" required placeholder="e.g., PhD in Computer Science"></div></div><div class="form-row"><div class="form-field"><label>Email</label><input type="email" name="email" placeholder="name@adzu.edu.ph"></div><div class="form-field"><label>Availability</label><select name="availability"><option value="available">Available</option><option value="unavailable">Unavailable</option></select></div></div><div class="form-field"><label>Notes</label><textarea name="notes" placeholder="Area of expertise or availability notes"></textarea></div><div class="form-actions"><button class="btn btn-primary"><i class="fas fa-plus"></i> Add Adviser</button></div></form></div>
 <div class="card"><div class="card-header"><h3>Available Adviser Records</h3></div><div class="card-body"><div class="table-responsive"><table class="data-table"><thead><tr><th>Name</th><th>Qualification</th><th>Email</th><th>Availability</th><th>Action</th></tr></thead><tbody><?php if (!$advisers): ?><tr><td colspan="5" style="text-align:center;color:var(--gray-400);padding:2rem;">No advisers in the pool yet.</td></tr><?php endif; ?><?php foreach ($advisers as $adviser): ?><tr><td><strong><?= htmlspecialchars($adviser['name']) ?></strong></td><td><?= htmlspecialchars($adviser['qualification']) ?></td><td><?= htmlspecialchars($adviser['email'] ?: '-') ?></td><td><?= statusBadge($adviser['availability'] === 'available' ? 'confirmed' : 'pending') ?></td><td><form method="post"><input type="hidden" name="action" value="toggle"><input type="hidden" name="adviser_id" value="<?= (int) $adviser['adviser_id'] ?>"><button class="btn btn-sm btn-outline">Mark <?= $adviser['availability'] === 'available' ? 'unavailable' : 'available' ?></button></form></td></tr><?php endforeach; ?></tbody></table></div></div></div>
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

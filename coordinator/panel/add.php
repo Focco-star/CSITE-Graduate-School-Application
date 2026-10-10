@@ -2,10 +2,13 @@
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/db.php';
 
+if (session_status() === PHP_SESSION_NONE) session_start();
+
 $pageTitle   = 'Add Panel Member';
 $role        = 'coordinator';
 $currentPage = 'panel';
 $userName    = $mockCoordinator['name'];
+$popup       = null;   // success pop-up, shown after the save redirect (see below)
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $firstName = formatPersonName($_POST['first_name'] ?? '');
@@ -21,8 +24,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'notes' => trim($_POST['notes'] ?? ''),
             'availability' => 'available',
         ]);
-        redirectTo('coordinator/panel/manage.php');
+        // Post/Redirect/Get: reload this page so the success pop-up shows, then it forwards to the list
+        $_SESSION['panel_success_popup'] = [
+            'title'   => 'Panel Member Added Successfully',
+            'message' => '"' . trim($firstName . ' ' . $lastName) . '" was added to the panel.',
+        ];
+        redirectTo('coordinator/panel/add.php');
     }
+} else {
+    $popup = $_SESSION['panel_success_popup'] ?? null;
+    unset($_SESSION['panel_success_popup']);
 }
 
 require_once __DIR__ . '/../../includes/header.php';
@@ -65,5 +76,13 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 </form>
+
+<?php if ($popup): ?>
+<!-- Shows for 5 seconds (or until the X is clicked), then returns to the panel list -->
+<div id="successPopupData" hidden
+     data-title="<?= htmlspecialchars($popup['title']) ?>"
+     data-message="<?= htmlspecialchars($popup['message']) ?>"
+     data-redirect="<?= htmlspecialchars(url('coordinator/panel/manage.php')) ?>"></div>
+<?php endif; ?>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

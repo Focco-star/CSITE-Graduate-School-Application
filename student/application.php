@@ -2,6 +2,117 @@
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db.php';
 
+/* ------------------------------------------------------------------
+ * Helpers shared by "Upload Document Only", "Submit Application" and
+ * "Submit Edited Application"
+ * ------------------------------------------------------------------ */
+
+/** True when the browser actually sent a file. */
+function csiteUploadHasFile($file): bool
+{
+    return is_array($file) && ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+}
+
+/** Validates a document upload. Returns an error message, or null when it is fine. */
+function csiteCheckUpload($file, string $docType, string $stageKey, array $stages, string $email, string $track): ?string
+{
+    if ($docType === '') {
+        return 'Please select a document type.';
+    }
+    if ($stageKey === '' || !isset($stages[$stageKey])) {
+        return 'Please select a stage.';
+    }
+    if (($seqError = validateUploadSequence($email, $track, $stageKey, $docType)) !== null) {
+        return $seqError;
+    }
+    if (!csiteUploadHasFile($file)) {
+        return 'Please select a file to upload.';
+    }
+    if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+        return 'The file could not be uploaded. Try again.';
+    }
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, ['pdf', 'doc', 'docx'], true)) {
+        return 'Only PDF, DOC, or DOCX files are allowed.';
+    }
+    if ($file['size'] > 20 * 1024 * 1024) {
+        return 'File exceeds the 20 MB maximum size.';
+    }
+    return null;
+}
+
+/** Stores the file and records it in the student's upload history. Throws RuntimeException on failure. */
+function csiteSaveUpload(array $file, string $docType, string $stageKey, array $stages, string $email, int $userId): void
+{
+    $saved  = storeStudentUpload($file);
+    $linked = latestApplicationForEmail($email);
+    recordStudentDocument([
+        'applicationId' => $linked['id'] ?? null,
+        'studentEmail'  => $email,
+        'fileName'      => $file['name'],
+        'docType'       => $docType,
+        'stage'         => $stages[$stageKey]['label'],
+        'size'          => $file['size'],
+        'storedFile'    => $saved['storedFile'],
+        'mimeType'      => $saved['mimeType'],
+    ], $email, $userId);
+}
+
+/** Parses a Y-m-d date. Returns the date string, null when blank, or false when invalid. */
+function csiteParseDate($raw)
+{
+    $raw = trim((string) $raw);
+    if ($raw === '') {
+        return null;
+    }
+    $d = DateTime::createFromFormat('Y-m-d', $raw);
+    return ($d && $d->format('Y-m-d') === $raw) ? $raw : false;
+}
+
+/** Normalises a stored / posted enrollment date to Y-m-d for the editable date field ('' when unreadable). */
+function csiteDateValue($raw): string
+{
+    $raw = trim((string) $raw);
+    if ($raw === '') {
+        return '';
+    }
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) {
+        return $raw;
+    }
+    $ts = strtotime($raw);
+    return $ts ? date('Y-m-d', $ts) : '';
+}
+
+/** Editable (typeable) date input with a calendar button. The calendar itself lives in script.js. */
+function csiteDateField(string $name, $value): string
+{
+    return '<div class="date-picker" data-date-picker>'
+        . '<input type="text" name="' . htmlspecialchars($name) . '" value="' . htmlspecialchars(csiteDateValue($value)) . '"'
+        . ' placeholder="YYYY-MM-DD" inputmode="numeric" autocomplete="off" maxlength="10"'
+        . ' pattern="\d{4}-\d{2}-\d{2}" title="Use the format YYYY-MM-DD">'
+        . '<button type="button" class="date-picker-btn" data-date-toggle aria-label="Open calendar" title="Open calendar">'
+        . '<i class="fas fa-calendar-alt"></i></button>'
+        . '</div>';
+}
+
+/**
+ * Saves the enrollment / start date. It is remembered in the session and also written to
+ * students.enroll_date when that column exists (a missing column is ignored, not fatal).
+ */
+function csiteSaveEnrollDate(?PDO $pdo, int $userId, string $date): void
+{
+    $_SESSION['enroll_date_override'] = $date;
+    if (!$pdo || $userId <= 0) {
+        return;
+    }
+    try {
+        $pdo->prepare('UPDATE students SET enroll_date = :enroll_date WHERE user_id = :user_id')
+            ->execute(['enroll_date' => $date, 'user_id' => $userId]);
+    } catch (Throwable $e) {
+        // column not present in this schema; the session value above still applies
+    }
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -19,6 +130,9 @@ if (!empty($sessionUser)) {
         $mockStudent['program_name'] = $sessionUser['program_name'];
     }
 }
+if (!empty($_SESSION['enroll_date_override'])) {
+    $mockStudent['enroll_date'] = $_SESSION['enroll_date_override'];
+}
 
 $pageTitle   = 'Application';
 $role        = 'student';
@@ -32,13 +146,13 @@ foreach ($workflow['stages'] as $s) {
     $stages[$s['key']] = $s;
 }
 $isThesis      = $track === 'thesis';
-$appSuccess    = '';
+$popup         = null;   // ['title' => ..., 'message' => ...] -> shown as the success pop-up
 $appError      = '';
 $uploadError   = '';
-$uploadSuccess = '';
+$editError     = '';
+$editOpen      = false;  // re-open the edit window when saving it failed
 
 $progress = getStudentProgress($mockStudent['email'], $track);
-$stageLockError = null;
 $currentStageKey = $mockStudent['current_stage'] ?? '';
 foreach ($progress as $p) {
     if (!in_array($p['stageStatus'], ['completed', 'approved'], true)) {
@@ -50,57 +164,44 @@ if (!isset($stages[$currentStageKey])) {
     $currentStageKey = array_key_first($stages) ?: 'proposal';
 }
 
+/* ------------------------------------------------------------------
+ * POST: Upload Document Only
+ * ------------------------------------------------------------------ */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'upload') {
-    $docType = trim($_POST['docType'] ?? '');
+    $docType  = trim($_POST['docType'] ?? '');
     $stageKey = trim($_POST['stage'] ?? '');
-    $file = $_FILES['document'] ?? null;
-    if ($docType === '') {
-        $uploadError = 'Please select a document type.';
-    } elseif ($stageKey === '' || !isset($stages[$stageKey])) {
-        $uploadError = 'Please select a stage.';
-    } elseif (($seqError = validateUploadSequence($mockStudent['email'], $track, $stageKey, $docType)) !== null) {
-        $uploadError = $seqError;
-    } elseif (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-        $uploadError = 'Please select a file to upload.';
-    } elseif (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-        $uploadError = 'The file could not be uploaded. Try again.';
-    } else {
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if (!in_array($ext, ['pdf', 'doc', 'docx'], true)) {
-            $uploadError = 'Only PDF, DOC, or DOCX files are allowed.';
-        } elseif ($file['size'] > 20 * 1024 * 1024) {
-            $uploadError = 'File exceeds the 20 MB maximum size.';
-        } else {
-            try {
-                $saved = storeStudentUpload($file);
-                $linked = latestApplicationForEmail($mockStudent['email']);
-                recordStudentDocument([
-                    'applicationId' => $linked['id'] ?? null,
-                    'studentEmail' => $mockStudent['email'],
-                    'fileName' => $file['name'],
-                    'docType' => $docType,
-                    'stage' => $stages[$stageKey]['label'],
-                    'size' => $file['size'],
-                    'storedFile' => $saved['storedFile'],
-                    'mimeType' => $saved['mimeType'],
-                ], $mockStudent['email'], (int) ($sessionUser['user_id'] ?? 0));
-                $uploadSuccess = '"' . $file['name'] . '" uploaded successfully.';
-            } catch (RuntimeException $e) {
-                $uploadError = $e->getMessage();
-            }
+    $file     = $_FILES['document'] ?? null;
+    $uploadError = (string) csiteCheckUpload($file, $docType, $stageKey, $stages, $mockStudent['email'], $track);
+    if ($uploadError === '') {
+        try {
+            csiteSaveUpload($file, $docType, $stageKey, $stages, $mockStudent['email'], (int) ($sessionUser['user_id'] ?? 0));
+            $popup = [
+                'title'   => 'Document Submitted!',
+                'message' => '"' . $file['name'] . '" was uploaded successfully.',
+            ];
+        } catch (RuntimeException $e) {
+            $uploadError = $e->getMessage();
         }
     }
 }
 
+/* ------------------------------------------------------------------
+ * POST: Submit Application
+ * ------------------------------------------------------------------ */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'application') {
     $title = trim($_POST['title'] ?? '');
     $adviser = formatPersonName($_POST['adviser'] ?? '');
     $stageKey = $_POST['stage'] ?? '';
-    $stageLockError = validateApplicationStageSequence($progress, $stages, $stageKey);
+    $enrollDate = csiteParseDate($_POST['enroll_date'] ?? '');
+    $stageLockError = isset($stages[$stageKey])
+        ? validateApplicationStageSequence($progress, $stages, $stageKey)
+        : null;
     if ($title === '' || $adviser === '' || !isset($stages[$stageKey])) {
         $appError = 'Research title, adviser, and presentation stage are required.';
     } elseif ($stageLockError !== null) {
         $appError = $stageLockError;
+    } elseif ($enrollDate === false) {
+        $appError = 'Please enter a valid enrollment / start date.';
     } else {
         try {
             $pdo = DB::getConnection();
@@ -210,11 +311,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                 'abstract' => trim($_POST['abstract'] ?? ''),
             ]);
 
-            $appSuccess = 'Application submitted successfully for "' . $title . '".';
+            if ($enrollDate !== null) {
+                csiteSaveEnrollDate($pdo, $userId, $enrollDate);
+            }
+
+            $popup = [
+                'title'   => 'Application Sent Successfully',
+                'message' => 'Your application for "' . $title . '" was submitted successfully.',
+            ];
             $mockStudent = currentStudentProfile($mockStudent);
             if (!empty($sessionUser)) {
                 $mockStudent['name']  = $sessionUser['full_name'] ?? $sessionUser['name'] ?? $mockStudent['name'];
                 $mockStudent['email'] = $sessionUser['email'] ?? $mockStudent['email'];
+            }
+            if ($enrollDate !== null) {
+                $mockStudent['enroll_date'] = $enrollDate;
             }
             $track = getTrackForProgram($mockStudent['program']);
             $trackLabel = getTrackLabel($track);
@@ -229,7 +340,103 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
     }
 }
 
+/* ------------------------------------------------------------------
+ * POST: Submit Edited Application
+ * ------------------------------------------------------------------ */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'edit_application') {
+    $editTitle     = trim($_POST['title'] ?? '');
+    $editAdviser   = formatPersonName($_POST['adviser'] ?? '');
+    $editStageKey  = $_POST['stage'] ?? '';
+    $editDocType   = trim($_POST['docType'] ?? '');
+    $originalTitle = trim($_POST['original_title'] ?? '');
+    $editEnroll    = csiteParseDate($_POST['enroll_date'] ?? '');
+    $editFile      = $_FILES['document'] ?? null;
+    $editHasFile   = csiteUploadHasFile($editFile);
+    $editOpen      = true; // stays open unless everything below succeeds
+
+    // Keeping the stage the student is already on is always allowed; moving to another one follows the same stage lock as a new application.
+    $editStageLock = (isset($stages[$editStageKey]) && $editStageKey !== $currentStageKey)
+        ? validateApplicationStageSequence($progress, $stages, $editStageKey)
+        : null;
+
+    if ($editTitle === '' || $editAdviser === '' || !isset($stages[$editStageKey])) {
+        $editError = 'Research title, adviser, and presentation stage are required.';
+    } elseif ($editStageLock !== null) {
+        $editError = $editStageLock;
+    } elseif ($editEnroll === false) {
+        $editError = 'Please enter a valid enrollment / start date.';
+    } elseif ($editHasFile && ($uploadCheck = csiteCheckUpload($editFile, $editDocType, $editStageKey, $stages, $mockStudent['email'], $track)) !== null) {
+        $editError = $uploadCheck;
+    } else {
+        $applicationSaved = false;
+        try {
+            $pdo = DB::getConnection();
+            $userId = (int) ($sessionUser['user_id'] ?? $_SESSION['user_id'] ?? 0);
+
+            $pdo->beginTransaction();
+            $exists = $pdo->prepare('SELECT COUNT(*) FROM applications WHERE user_id = :user_id AND paper_title = :paper_title');
+            $exists->execute(['user_id' => $userId, 'paper_title' => $originalTitle]);
+            if ((int) $exists->fetchColumn() === 0) {
+                throw new RuntimeException('We could not find the application you are editing. Please refresh the page and try again.');
+            }
+            $pdo->prepare(
+                'UPDATE applications
+                 SET presentation_stage = :presentation_stage, paper_title = :paper_title
+                 WHERE user_id = :user_id AND paper_title = :original_title'
+            )->execute([
+                'presentation_stage' => $stages[$editStageKey]['label'],
+                'paper_title'        => $editTitle,
+                'user_id'            => $userId,
+                'original_title'     => $originalTitle,
+            ]);
+            $pdo->prepare('UPDATE students SET adviser_name = :adviser_name WHERE user_id = :user_id')
+                ->execute(['adviser_name' => $editAdviser, 'user_id' => $userId]);
+            $pdo->commit();
+            $applicationSaved = true;
+
+            if ($editEnroll !== null) {
+                csiteSaveEnrollDate($pdo, $userId, $editEnroll);
+                $mockStudent['enroll_date'] = $editEnroll;
+            }
+
+            $identity = databaseStudentIdentity();
+            if ($identity) {
+                upsertSessionStudent($identity, ['adviser' => $editAdviser, 'title' => $editTitle]);
+            }
+            $mockStudent['title']   = $editTitle;
+            $mockStudent['adviser'] = $editAdviser;
+
+            if ($editHasFile) {
+                csiteSaveUpload($editFile, $editDocType, $editStageKey, $stages, $mockStudent['email'], $userId);
+            }
+
+            $editOpen = false;
+            $popup = [
+                'title'   => 'Application Updated!',
+                'message' => $editHasFile
+                    ? 'Your application for "' . $editTitle . '" was updated and "' . $editFile['name'] . '" was uploaded.'
+                    : 'Your application for "' . $editTitle . '" was updated successfully.',
+            ];
+        } catch (Throwable $e) {
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            if ($e instanceof RuntimeException) {
+                $editError = $applicationSaved
+                    ? 'Your application changes were saved, but the document could not be uploaded: ' . $e->getMessage()
+                    : $e->getMessage();
+            } else {
+                $editError = 'Unable to save your changes. Please try again.';
+            }
+        }
+    }
+}
+
+/* ------------------------------------------------------------------
+ * View data
+ * ------------------------------------------------------------------ */
 $uploadedDocs = uploadsForEmail($mockStudent['email']);
+$hasApplication = trim((string) ($mockStudent['title'] ?? '')) !== '';
 $docTypesByStage = [];
 foreach ($stages as $key => $s) {
     $docTypesByStage[$key] = [
@@ -238,6 +445,24 @@ foreach ($stages as $key => $s) {
         'Official Receipt / Payment Proof',
         'Revised / Corrected Document',
     ];
+}
+
+$stageKeyByLabel = array_flip(array_column($stages, 'label'));
+
+// Values shown in the edit window (the posted ones again if saving failed)
+$editVals = [
+    'stage'       => $currentStageKey,
+    'title'       => $mockStudent['title'] ?? '',
+    'adviser'     => $mockStudent['adviser'] ?? '',
+    'enroll_date' => $mockStudent['enroll_date'] ?? '',
+    'docType'     => '',
+];
+if ($editOpen) {
+    $editVals['stage']       = isset($stages[$_POST['stage'] ?? '']) ? $_POST['stage'] : $editVals['stage'];
+    $editVals['title']       = trim($_POST['title'] ?? '');
+    $editVals['adviser']     = trim($_POST['adviser'] ?? '');
+    $editVals['enroll_date'] = trim($_POST['enroll_date'] ?? '');
+    $editVals['docType']     = trim($_POST['docType'] ?? '');
 }
 
 $shortPath = array_map(static function ($s) {
@@ -252,18 +477,11 @@ require_once __DIR__ . '/../includes/header.php';
     <p>Submit your application and upload required documents for the current stage.</p>
 </div>
 
-<div class="alert alert-info">
-    <i class="fas fa-info-circle"></i>
-    <div>
-        <strong><?= htmlspecialchars($mockStudent['program_name']) ?></strong>
-        — <?= htmlspecialchars($trackLabel) ?> Track
-        &nbsp;(<?= htmlspecialchars(implode(' → ', $shortPath)) ?>)
-    </div>
+<div class="track-indicator track-<?= htmlspecialchars($track) ?>">
+    <span class="track-indicator-badge"><?= htmlspecialchars($trackLabel) ?> Track</span>
+    <strong class="track-indicator-program"><?= htmlspecialchars($mockStudent['program_name']) ?></strong>
 </div>
 
-<?php if ($appSuccess): ?>
-<div class="alert alert-success" data-auto-dismiss><i class="fas fa-check-circle"></i> <?= htmlspecialchars($appSuccess) ?></div>
-<?php endif; ?>
 <?php if ($appError): ?>
 <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($appError) ?></div>
 <?php endif; ?>
@@ -312,7 +530,7 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="form-field">
                     <label>Enrollment / Start Date</label>
-                    <input type="date" value="<?= htmlspecialchars($mockStudent['enroll_date']) ?>" readonly>
+                    <?= csiteDateField('enroll_date', $mockStudent['enroll_date'] ?? '') ?>
                 </div>
             </div>
             <div class="form-field">
@@ -329,9 +547,6 @@ require_once __DIR__ . '/../includes/header.php';
             <h4 style="font-size:0.9rem;font-weight:700;color:var(--adzu-navy);margin-bottom:0.75rem;">
                 <i class="fas fa-cloud-upload-alt" style="margin-right:6px;"></i>Attach Documents
             </h4>
-            <?php if ($uploadSuccess): ?>
-            <div class="alert alert-success" data-auto-dismiss><i class="fas fa-check-circle"></i> <?= htmlspecialchars($uploadSuccess) ?></div>
-            <?php endif; ?>
             <?php if ($uploadError): ?>
             <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($uploadError) ?></div>
             <?php endif; ?>
@@ -343,9 +558,9 @@ require_once __DIR__ . '/../includes/header.php';
                 <input type="hidden" name="form" value="upload">
                 <div class="form-row">
                     <div class="form-field">
-                        <label>Document Type</label>
+                        <label>Document Type <span class="required">*</span></label>
                         <select name="docType" id="appUploadDocType">
-                            <option value="">Select document type (optional)</option>
+                            <option value="">Select document type</option>
                         </select>
                     </div>
                     <div class="form-field">
@@ -413,6 +628,12 @@ require_once __DIR__ . '/../includes/header.php';
                             <a class="btn btn-sm btn-outline btn-icon" title="View" target="_blank" href="<?= url('student/download.php?id=' . urlencode($doc['id']) . '&view=1') ?>"><i class="fas fa-eye"></i></a>
                             <a class="btn btn-sm btn-outline btn-icon" title="Download" href="<?= url('student/download.php?id=' . urlencode($doc['id'])) ?>"><i class="fas fa-download"></i></a>
                             <?php else: ?><span style="font-size:.75rem;color:var(--gray-400);">Unavailable</span><?php endif; ?>
+                            <?php if ($hasApplication): ?>
+                            <button type="button" class="btn btn-sm btn-outline btn-icon" title="Edit application" aria-label="Edit application"
+                                    data-edit-application
+                                    data-stage="<?= htmlspecialchars($stageKeyByLabel[$doc['stage']] ?? $currentStageKey) ?>"
+                                    data-doc-type="<?= htmlspecialchars($doc['docType']) ?>"><i class="fas fa-pencil-alt"></i></button>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -451,17 +672,112 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<?php if ($hasApplication): ?>
+<!-- Edit application: mini pop-up, stays open until "Submit Edited Application" (or the X / Cancel) is used -->
+<div class="edit-modal-overlay <?= $editOpen ? 'active' : '' ?>" id="editApplicationModal">
+    <div class="modal edit-modal" role="dialog" aria-modal="true" aria-labelledby="editAppHeading">
+        <form method="post" action="<?= url('student/application.php') ?>" enctype="multipart/form-data" data-validate>
+            <input type="hidden" name="form" value="edit_application">
+            <input type="hidden" name="original_title" value="<?= htmlspecialchars($mockStudent['title']) ?>">
+
+            <div class="modal-header">
+                <h3 id="editAppHeading"><i class="fas fa-pencil-alt"></i> Edit Application</h3>
+                <button type="button" class="modal-close" data-edit-close aria-label="Close"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="modal-body">
+                <?php if ($editError): ?>
+                <div class="alert alert-danger edit-modal-error"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($editError) ?></div>
+                <?php endif; ?>
+
+                <div class="form-row">
+                    <div class="form-field">
+                        <label>Presentation Stage <span class="required">*</span></label>
+                        <select name="stage" id="editAppStage" required>
+                            <?php foreach ($stages as $key => $s): ?>
+                            <?php
+                            // Hide locked stages, but never hide the stage the student is on or has picked
+                            if ($key !== $currentStageKey && $key !== $editVals['stage']
+                                && validateApplicationStageSequence($progress, $stages, $key) !== null) {
+                                continue;
+                            }
+                            ?>
+                            <option value="<?= htmlspecialchars($key) ?>" <?= $key === $editVals['stage'] ? 'selected' : '' ?>><?= htmlspecialchars($s['label']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Enrollment / Start Date</label>
+                        <?= csiteDateField('enroll_date', $editVals['enroll_date']) ?>
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label>Research / Paper Title <span class="required">*</span></label>
+                    <input type="text" name="title" value="<?= htmlspecialchars($editVals['title']) ?>" required placeholder="Enter your <?= strtolower($trackLabel) ?> title">
+                </div>
+                <div class="form-field">
+                    <label>Adviser Name <span class="required">*</span></label>
+                    <input type="text" name="adviser" value="<?= htmlspecialchars($editVals['adviser']) ?>" required placeholder="Full name of your adviser">
+                </div>
+
+                <div class="edit-modal-section"><i class="fas fa-cloud-upload-alt"></i>Attach Document <span style="font-weight:500;color:var(--gray-400);">(optional)</span></div>
+                <div class="form-field">
+                    <label>Document Type</label>
+                    <select name="docType" id="editAppDocType" data-selected="<?= htmlspecialchars($editVals['docType']) ?>">
+                        <option value="">Select document type (optional)</option>
+                    </select>
+                    <p class="field-hint">Required only if you attach a file below.</p>
+                </div>
+                <div class="form-field">
+                    <label>File</label>
+                    <div class="file-upload-area">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Drag and drop your file here, or click to browse</p>
+                        <p style="font-size:0.75rem;margin-top:0.25rem;">PDF, DOC, or DOCX — Max 20 MB</p>
+                        <div class="file-name"></div>
+                        <input type="file" name="document" accept=".pdf,.docx,.doc">
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" data-edit-close>Cancel</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Submit Edited Application</button>
+            </div>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($popup): ?>
+<div id="successPopupData" hidden
+     data-title="<?= htmlspecialchars($popup['title']) ?>"
+     data-message="<?= htmlspecialchars($popup['message']) ?>"></div>
+<?php endif; ?>
+
 <script>
 (function () {
     const types = <?= json_encode($docTypesByStage) ?>;
-    const stage = document.getElementById('appUploadStage');
-    const typeSel = document.getElementById('appUploadDocType');
-    function fill() {
-        const opts = types[stage.value] || [];
-        typeSel.innerHTML = '<option value="">Select document type (optional)</option>' + opts.map(o => '<option>' + o + '</option>').join('');
+
+    // Keeps a "Document Type" list in sync with its "Stage" select
+    function bindDocTypes(stageId, typeId, placeholder) {
+        const stage = document.getElementById(stageId);
+        const typeSel = document.getElementById(typeId);
+        if (!stage || !typeSel) return;
+        function fill() {
+            const keep = typeSel.dataset.selected || typeSel.value;
+            const opts = types[stage.value] || [];
+            typeSel.innerHTML = '<option value="">' + placeholder + '</option>' + opts.map(o => '<option>' + o + '</option>').join('');
+            if (keep && opts.indexOf(keep) !== -1) typeSel.value = keep;
+            typeSel.dataset.selected = '';
+        }
+        stage.addEventListener('change', fill);
+        fill();
     }
-    stage.addEventListener('change', fill);
-    fill();
+
+    // Upload-only form requires a type; the edit window only needs one when a file is attached
+    bindDocTypes('appUploadStage', 'appUploadDocType', 'Select document type');
+    bindDocTypes('editAppStage', 'editAppDocType', 'Select document type (optional)');
 })();
 </script>
 
