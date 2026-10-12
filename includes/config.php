@@ -607,7 +607,6 @@ function upsertStudentIdentity(array $input, int $userId): array {
             $emailForId = '';
         }
     }
-    $emailDigits = $emailForId !== '' ? extractStudentIdFromEmail($emailForId) : '';
     if ($existing) {
         $pdo->beginTransaction();
         try {
@@ -655,17 +654,29 @@ function upsertStudentIdentity(array $input, int $userId): array {
             'adviser_name' => trim((string) ($input['adviser_name'] ?? '')),
             'enrollment_date' => date('Y-m-d'),
         ];
-        // Official student ID = numeric part of the ADZU email
-        // (e.g. co259344@adzu.edu.ph -> student_id 259344).
-        $explicitStudentId = ($emailDigits !== '' && ctype_digit($emailDigits)) ? (int) $emailDigits : 0;
+        // Official student ID = the ADZU ID number typed by the student
+        // ($input['student_id'] / $input['studentId']). Falls back to the numeric
+        // part of the ADZU email only for legacy callers that omit it.
+        $postedIdRaw = trim((string) ($input['student_id'] ?? $input['studentId'] ?? ''));
+        $emailDigits = '';
+        if ($postedIdRaw === '' || !ctype_digit($postedIdRaw)) {
+            $emailDigits = $emailForId !== '' ? extractStudentIdFromEmail($emailForId) : '';
+        }
+        $explicitStudentId = ($postedIdRaw !== '' && ctype_digit($postedIdRaw)) ? (int) $postedIdRaw : 0;
+        $idFromEmail = false;
+        if ($explicitStudentId <= 0) {
+            $explicitStudentId = ($emailDigits !== '' && ctype_digit($emailDigits)) ? (int) $emailDigits : 0;
+            $idFromEmail = $explicitStudentId > 0;
+        }
         if ($explicitStudentId > 0) {
             $newRow['student_id'] = $explicitStudentId;
         }
         try {
             $student = DB::insert('students', $newRow);
         } catch (PDOException $e) {
-            // Rare digit collision (different email, same digits): fall back to auto-assign.
-            if ($explicitStudentId > 0 && (string) ($e->getCode() ?? '') === '23000') {
+            // Email-derived digit collision: fall back to auto-assign.
+            // A typed ADZU ID collision is rethrown so the caller can report it.
+            if ($idFromEmail && $explicitStudentId > 0 && (string) ($e->getCode() ?? '') === '23000') {
                 unset($newRow['student_id']);
                 $student = DB::insert('students', $newRow);
             } else {

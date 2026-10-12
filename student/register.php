@@ -13,9 +13,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $age = trim($_POST['age'] ?? '');
     $gender = $_POST['gender'] ?? '';
     $middleInitial = strtoupper(trim($_POST['middleInitial'] ?? ''));
+    $studentIdRaw = trim($_POST['studentId'] ?? '');
 
-    if ($first === '' || $last === '' || $email === '' || $program === '' || $password === '') {
+    if ($first === '' || $last === '' || $email === '' || $program === '' || $password === '' || $studentIdRaw === '') {
         $registerError = 'Please complete all required fields.';
+    } elseif (!ctype_digit($studentIdRaw) || strlen($studentIdRaw) < 4 || strlen($studentIdRaw) > 10) {
+        $registerError = 'Enter a valid ADZU ID number (4–10 digits).';
     } elseif (!isset(PROGRAMS[$program])) {
         $registerError = 'Select a valid program.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -35,10 +38,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $track = getTrackForProgram($program);
             $fullName = canonicalStudentName($first, $last, $middleInitial);
-            // Official student ID = numeric part of the ADZU email
-            // (e.g. co259344@adzu.edu.ph -> student_id 259344).
-            $officialStudentId = extractStudentIdFromEmail($email);
-            $explicitStudentId = ($officialStudentId !== '' && ctype_digit($officialStudentId)) ? (int) $officialStudentId : 0;
+            // Official student ID = the ADZU ID number typed by the student.
+            // Falls back to the numeric part of the ADZU email only when the
+            // field is missing (e.g. a stale cached form).
+            $postedStudentId = ($studentIdRaw !== '' && ctype_digit($studentIdRaw)) ? (int) $studentIdRaw : 0;
+            $emailStudentId = extractStudentIdFromEmail($email);
+            $explicitStudentId = $postedStudentId > 0
+                ? $postedStudentId
+                : (($emailStudentId !== '' && ctype_digit($emailStudentId)) ? (int) $emailStudentId : 0);
 
             $pdo->beginTransaction();
 
@@ -61,18 +68,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'enrollment_date'=> date('Y-m-d')
             ];
             if ($explicitStudentId > 0) {
+                $taken = DB::find('students', ['student_id' => $explicitStudentId]);
+                if ($taken) {
+                    throw new LogicException('This ADZU ID number is already registered. Use your own ID or contact the coordinator.');
+                }
                 $newStudent['student_id'] = $explicitStudentId;
             }
             try {
                 $student = DB::insert('students', $newStudent);
             } catch (PDOException $e) {
-                // Rare digit collision (different email, same digits): fall back to auto-assign.
+                // Race on the same ID submitted twice: report it instead of silently assigning another ID.
                 if ($explicitStudentId > 0 && (string) ($e->getCode() ?? '') === '23000') {
-                    unset($newStudent['student_id']);
-                    $student = DB::insert('students', $newStudent);
-                } else {
-                    throw $e;
+                    throw new LogicException('This ADZU ID number is already registered. Use your own ID or contact the coordinator.');
                 }
+                throw $e;
             }
             $pdo->commit();
 

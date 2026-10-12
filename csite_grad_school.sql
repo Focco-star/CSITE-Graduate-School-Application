@@ -316,16 +316,20 @@ CREATE TRIGGER `students_before_insert_autoid` BEFORE INSERT ON `students` FOR E
   DECLARE v_email VARCHAR(100) DEFAULT '';
   DECLARE v_digits VARCHAR(20) DEFAULT '';
   DECLARE v_taken INT DEFAULT 0;
+  -- Respect an explicitly typed ADZU ID number; derive from the email only
+  -- when the row arrives without one (student_id 0/NULL from AUTO_INCREMENT).
+  IF (NEW.`student_id` IS NULL OR NEW.`student_id` = 0) THEN
   SELECT `email` INTO v_email FROM `users` WHERE `user_id` = NEW.`user_id` LIMIT 1;
   IF (v_email IS NOT NULL AND v_email <> '') THEN
     SET v_digits = REGEXP_REPLACE(SUBSTRING_INDEX(v_email, '@', 1), '[^0-9]', '');
   END IF;
   IF (v_digits IS NOT NULL AND v_digits <> '') THEN
-    -- Official student ID = numeric part of the ADZU email (e.g. co259344 -> 259344).
+    -- Fallback ID = numeric part of the ADZU email (e.g. co259344 -> 259344).
     SELECT COUNT(*) INTO v_taken FROM `students` WHERE `student_id` = CAST(v_digits AS UNSIGNED);
     IF (v_taken = 0) THEN
       SET NEW.`student_id` = CAST(v_digits AS UNSIGNED);
     END IF;
+  END IF;
   END IF;
   IF (NEW.`middle_initial` IS NOT NULL) THEN
     SET NEW.`middle_initial` = NULLIF(TRIM(REPLACE(NEW.`middle_initial`, '.', '')), '');
