@@ -825,24 +825,82 @@ function currentStudentEmail(array $fallback): string {
     return $_SESSION['current_student_email'] ?? $fallback['email'];
 }
 
+function currentStudentProfilee(?array $defaultMock = null): array {
+    // If session has a logged-in user ID, fetch real profile from DB
+    if (isset($_SESSION['user_id']) && class_exists('DB')) {
+        try {
+            $stmt = DB::getConnection()->prepare("
+                SELECT s.*, u.email, u.id as user_id 
+                FROM students s 
+                INNER JOIN users u ON u.id = s.user_id 
+                WHERE s.user_id = :uid 
+                LIMIT 1
+            ");
+            $stmt->execute(['uid' => $_SESSION['user_id']]);
+            $student = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($student) {
+                return $student;
+            }
+        } catch (Throwable $e) {
+            // Fall back if DB query fails
+        }
+    }
+
+    // Fall back to mock student array if session user isn't found
+    return $defaultMock ?? [];
+}
+
 function currentStudentProfile(array $fallback): array {
     $sessionUser = $_SESSION['user'] ?? [];
-    if (($sessionUser['role'] ?? '') === 'student' && !empty($sessionUser['user_id']) && class_exists('DB')) {
+    
+    // Check session or current student ID
+    $userId = $sessionUser['user_id'] ?? $_SESSION['user_id'] ?? null;
+
+    if ($userId && class_exists('DB')) {
         try {
-            $dbStudent = DB::find('students', ['user_id' => (int) $sessionUser['user_id']]);
+            $stmt = DB::getConnection()->prepare("
+                SELECT s.*, u.email AS user_email, u.full_name AS user_full_name
+                FROM students s
+                INNER JOIN users u ON u.id = s.user_id
+                WHERE s.user_id = :uid
+                LIMIT 1
+            ");
+            $stmt->execute(['uid' => (int)$userId]);
+            $dbStudent = $stmt->fetch(PDO::FETCH_ASSOC);
+
             if ($dbStudent) {
                 $programCode = programCodeForStudent($dbStudent);
                 $programName = PROGRAMS[$programCode] ?? $dbStudent['program'];
                 $enroll = $dbStudent['enrollment_date'] ?: date('Y-m-d');
-                $fullName = trim((string) ($sessionUser['full_name'] ?? ''));
+                
+                $fullName = trim((string) ($dbStudent['user_full_name'] ?? ''));
                 if ($fullName === '') {
                     $fullName = canonicalStudentName($dbStudent['first_name'], $dbStudent['last_name'], $dbStudent['middle_initial'] ?? '');
                 }
-                return array_merge($fallback, ['id' => (string) $dbStudent['student_id'], 'name' => $fullName, 'email' => $sessionUser['email'] ?? $dbStudent['email'] ?? '', 'program' => $programCode, 'program_name' => preg_replace('/\s*\(.*\)$/', '', $programName) ?: $programName, 'track' => $dbStudent['track'], 'trackLabel' => getTrackLabel($dbStudent['track']), 'enroll_date' => $enroll, 'current_stage' => 'not_started', 'status' => 'not_started', 'title' => '', 'adviser' => $dbStudent['adviser_name'] ?? '', 'completion_deadline' => ((int) substr($enroll, 0, 4) + 3) . substr($enroll, 4)]);
+
+                return array_merge($fallback, [
+                    'id' => (string) $dbStudent['student_id'],
+                    'user_id' => (int) $dbStudent['user_id'],
+                    'name' => $fullName,
+                    'email' => $dbStudent['user_email'] ?? '',
+                    'program' => $programCode,
+                    'program_name' => preg_replace('/\s*\(.*\)$/', '', $programName) ?: $programName,
+                    'track' => $dbStudent['track'],
+                    'trackLabel' => getTrackLabel($dbStudent['track']),
+                    'enroll_date' => $enroll,
+                    'current_stage' => $dbStudent['current_stage'] ?? 'not_started',
+                    'status' => $dbStudent['status'] ?? 'not_started',
+                    'title' => $dbStudent['title'] ?? '',
+                    'adviser' => $dbStudent['adviser_name'] ?? '',
+                    'completion_deadline' => ((int) substr($enroll, 0, 4) + 3) . substr($enroll, 4)
+                ]);
             }
         } catch (Throwable $e) {
+            // Silence exception and drop down to fallbacks
         }
     }
+
+    // Keep rest of your fallback lookup logic below...
     $id = (string) ($_SESSION['current_student_id'] ?? '');
     $s = $id !== '' ? findStudentById($id) : null;
     $email = currentStudentEmail($fallback);
@@ -856,6 +914,7 @@ function currentStudentProfile(array $fallback): array {
         }
         return $fallback;
     }
+
     $program = $s['program'];
     $track = getTrackForProgram($program);
     $fullName = PROGRAMS[$program] ?? $program;
@@ -865,6 +924,7 @@ function currentStudentProfile(array $fallback): array {
         $enroll .= '-01';
     }
     $year = (int) substr($enroll, 0, 4);
+
     return array_merge($fallback, [
         'id' => $s['id'],
         'name' => studentDisplayName($s),
@@ -1259,19 +1319,20 @@ function storeStudentUpload(array $file): array {
  */
 function normalizeDatabaseDocument(array $row, string $email = ''): array {
     return [
-        'id' => (string) ($row['document_id'] ?? $row['id'] ?? ''),
+        'id'            => (string) ($row['document_id'] ?? $row['id'] ?? ''),
+        'user_id'       => isset($row['user_id']) ? (int) $row['user_id'] : null, // <-- THIS IS CRITICAL
         'applicationId' => isset($row['application_id']) && $row['application_id'] !== null ? (int) $row['application_id'] : null,
-        'studentEmail' => strtolower($email !== '' ? $email : (string) ($row['studentEmail'] ?? $row['email'] ?? '')),
-        'fileName' => (string) ($row['original_name'] ?? $row['fileName'] ?? ''),
-        'docType' => (string) ($row['document_type'] ?? $row['docType'] ?? ''),
-        'stage' => (string) ($row['stage'] ?? ''),
-        'size' => (int) ($row['file_size'] ?? $row['size'] ?? 0),
-        'date' => (string) ($row['uploaded_at'] ?? $row['date'] ?? ''),
-        'status' => (string) ($row['status'] ?? 'submitted'),
-        'notes' => (string) ($row['notes'] ?? ''),
-        'storedFile' => (string) ($row['stored_name'] ?? $row['storedFile'] ?? ''),
-        'mimeType' => (string) ($row['mime_type'] ?? $row['mimeType'] ?? ''),
-        'source' => 'db',
+        'studentEmail'  => strtolower($email !== '' ? $email : (string) ($row['studentEmail'] ?? $row['email'] ?? '')),
+        'fileName'      => (string) ($row['original_name'] ?? $row['fileName'] ?? ''),
+        'docType'       => (string) ($row['document_type'] ?? $row['docType'] ?? ''),
+        'stage'         => (string) ($row['stage'] ?? ''),
+        'size'          => (int) ($row['file_size'] ?? $row['size'] ?? 0),
+        'date'          => (string) ($row['uploaded_at'] ?? $row['date'] ?? ''),
+        'status'        => (string) ($row['status'] ?? 'submitted'),
+        'notes'         => (string) ($row['notes'] ?? ''),
+        'storedFile'    => (string) ($row['stored_name'] ?? $row['storedFile'] ?? ''),
+        'mimeType'      => (string) ($row['mime_type'] ?? $row['mimeType'] ?? ''),
+        'source'        => 'db',
     ];
 }
 
@@ -1542,11 +1603,11 @@ function databaseDocumentById(int $documentId): ?array {
     }
     try {
         $stmt = DB::getConnection()->prepare(
-            'SELECT d.document_id, d.application_id, d.user_id, d.stage, d.document_type,
+            'SELECT d.document_id AS id, d.document_id, d.application_id, d.user_id, d.stage, d.document_type,
                     d.original_name, d.stored_name, d.mime_type, d.file_size, d.status, d.uploaded_at,
                     u.email AS studentEmail
              FROM application_documents d
-             INNER JOIN users u ON u.user_id = d.user_id
+             LEFT JOIN users u ON u.id = d.user_id
              WHERE d.document_id = :document_id
              LIMIT 1'
         );
@@ -1773,17 +1834,31 @@ function findUpload(string $id): ?array {
             return $databaseUpload;
         }
     }
+
     foreach (storeGet('uploads') as $upload) {
-        if ((string) ($upload['id'] ?? '') === $id) return $upload;
+        if ((string) ($upload['id'] ?? '') === $id) {
+            return $upload;
+        }
     }
+
     return null;
 }
 
 function uploadStoragePath(array $upload): ?string {
-    $stored = basename((string) ($upload['storedFile'] ?? ''));
+    $stored = basename((string) ($upload['storedFile'] ?? $upload['stored_name'] ?? ''));
     if ($stored === '') return null;
-    $path = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $stored;
-    return is_file($path) ? $path : null;
+
+    $baseDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR;
+
+    // Check directly inside /storage/
+    $path = $baseDir . $stored;
+    if (is_file($path)) return $path;
+
+    // Check inside /storage/uploads/
+    $pathUploads = $baseDir . 'uploads' . DIRECTORY_SEPARATOR . $stored;
+    if (is_file($pathUploads)) return $pathUploads;
+
+    return null;
 }
 
 function updateUploadStatus(string $id, string $status): void {

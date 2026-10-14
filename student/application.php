@@ -625,7 +625,8 @@ require_once __DIR__ . '/../includes/header.php';
                         <td><?= statusBadge($doc['status']) ?></td>
                         <td class="actions">
                             <?php if (uploadStoragePath($doc)): ?>
-                            <a class="btn btn-sm btn-outline btn-icon" title="View" target="_blank" href="<?= url('student/download.php?id=' . urlencode($doc['id']) . '&view=1') ?>"><i class="fas fa-eye"></i></a>
+                            <!-- Change this line: -->
+<a class="btn btn-sm btn-outline btn-icon" title="View" target="_blank" href="<?= url('student/view_document.php?id=' . urlencode($doc['id'])) ?>"><i class="fas fa-eye"></i></a>
                             <a class="btn btn-sm btn-outline btn-icon" title="Download" href="<?= url('student/download.php?id=' . urlencode($doc['id'])) ?>"><i class="fas fa-download"></i></a>
                             <?php else: ?><span style="font-size:.75rem;color:var(--gray-400);">Unavailable</span><?php endif; ?>
                             <?php if ($hasApplication): ?>
