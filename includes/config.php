@@ -4,7 +4,18 @@
 define('SITE_NAME', 'CSITE Graduate School Application');
 define('SITE_SHORT', 'CSITE Graduate School Application');
 define('SITE_TAGLINE', 'Capstone, Seminar Paper and Thesis Presentation Application System');
-define('BASE_URL', '/CSITE-Graduate-School-Application');
+// Served from the domain root on InfinityFree, from a subfolder on local XAMPP.
+if (!defined('BASE_URL')) {
+    $csiteHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    $csiteEnvBase = getenv('BASE_URL');
+    if ($csiteEnvBase !== false) {
+        define('BASE_URL', rtrim($csiteEnvBase, '/'));
+    } elseif (str_contains($csiteHost, 'infinityfree')) {
+        define('BASE_URL', '');
+    } else {
+        define('BASE_URL', '/CSITE-Graduate-School-Application');
+    }
+}
 
 define('COLOR_PRIMARY', '#060297');
 define('COLOR_ACCENT', '#FFB82B');
