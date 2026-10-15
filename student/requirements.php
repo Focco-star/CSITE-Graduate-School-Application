@@ -42,7 +42,7 @@ require_once __DIR__ . '/../includes/header.php';
             ?>
             <div class="stage-stepper-item">
                 <a href="<?= url('student/requirements.php?stage=' . urlencode($stage['key'])) ?>" class="stage-stepper-btn">
-                    <span class="stage-stepper-num <?= $isHighlighted ? 'highlighted done' : '' ?>">
+                    <span class="stage-stepper-num <?= $isHighlighted ? 'highlighted done' : ($isActive ? 'active' : '') ?>">
                         <?= $idx + 1 ?>
                     </span>
                     <span class="stage-stepper-label <?= $isActive ? 'is-active' : ($isHighlighted ? 'is-done' : '') ?>"><?= htmlspecialchars($stage['shortLabel']) ?></span>
