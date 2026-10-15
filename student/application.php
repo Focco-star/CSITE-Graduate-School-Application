@@ -150,7 +150,6 @@ $popup         = null;   // ['title' => ..., 'message' => ...] -> shown as the s
 $appError      = '';
 $uploadError   = '';
 $editError     = '';
-$editOpen      = false;  // re-open the edit window when saving it failed
 
 $progress = getStudentProgress($mockStudent['email'], $track);
 $currentStageKey = $mockStudent['current_stage'] ?? '';
@@ -352,7 +351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'edit_ap
     $editEnroll    = csiteParseDate($_POST['enroll_date'] ?? '');
     $editFile      = $_FILES['document'] ?? null;
     $editHasFile   = csiteUploadHasFile($editFile);
-    $editOpen      = true; // stays open unless everything below succeeds
+    $editAppId     = (int) ($_POST['application_id'] ?? 0);
 
     // Keeping the stage the student is already on is always allowed; moving to another one follows the same stage lock as a new application.
     $editStageLock = (isset($stages[$editStageKey]) && $editStageKey !== $currentStageKey)
@@ -374,6 +373,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'edit_ap
             $userId = (int) ($sessionUser['user_id'] ?? $_SESSION['user_id'] ?? 0);
 
             $pdo->beginTransaction();
+            if ($editAppId > 0) {
+                // Editing a specific history row: verify it belongs to this student.
+                $owns = $pdo->prepare('SELECT COUNT(*) FROM applications WHERE application_id = :id AND user_id = :user_id AND archived_at IS NULL');
+                $owns->execute(['id' => $editAppId, 'user_id' => $userId]);
+                if ((int) $owns->fetchColumn() === 0) {
+                    throw new RuntimeException('We could not find the application you are editing. Please refresh the page and try again.');
+                }
+                $pdo->prepare(
+                    'UPDATE applications
+                     SET presentation_stage = :presentation_stage, paper_title = :paper_title
+                     WHERE application_id = :id AND user_id = :user_id'
+                )->execute([
+                    'presentation_stage' => $stages[$editStageKey]['label'],
+                    'paper_title'        => $editTitle,
+                    'id'                 => $editAppId,
+                    'user_id'            => $userId,
+                ]);
+            } else {
             $exists = $pdo->prepare('SELECT COUNT(*) FROM applications WHERE user_id = :user_id AND paper_title = :paper_title');
             $exists->execute(['user_id' => $userId, 'paper_title' => $originalTitle]);
             if ((int) $exists->fetchColumn() === 0) {
@@ -389,6 +406,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'edit_ap
                 'user_id'            => $userId,
                 'original_title'     => $originalTitle,
             ]);
+            }
             $pdo->prepare('UPDATE students SET adviser_name = :adviser_name WHERE user_id = :user_id')
                 ->execute(['adviser_name' => $editAdviser, 'user_id' => $userId]);
             $pdo->commit();
@@ -410,7 +428,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'edit_ap
                 csiteSaveUpload($editFile, $editDocType, $editStageKey, $stages, $mockStudent['email'], $userId);
             }
 
-            $editOpen = false;
             $popup = [
                 'title'   => 'Application Updated!',
                 'message' => $editHasFile
@@ -436,7 +453,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'edit_ap
  * View data
  * ------------------------------------------------------------------ */
 $uploadedDocs = uploadsForEmail($mockStudent['email']);
-$hasApplication = trim((string) ($mockStudent['title'] ?? '')) !== '';
+$userIdForHistory = (int) ($sessionUser['user_id'] ?? $_SESSION['user_id'] ?? 0);
+$myApplications = databaseApplicationsForUser($userIdForHistory);
+$hasApplication = trim((string) ($mockStudent['title'] ?? '')) !== '' || $myApplications !== [];
 $docTypesByStage = [];
 foreach ($stages as $key => $s) {
     $docTypesByStage[$key] = [
@@ -445,24 +464,6 @@ foreach ($stages as $key => $s) {
         'Official Receipt / Payment Proof',
         'Revised / Corrected Document',
     ];
-}
-
-$stageKeyByLabel = array_flip(array_column($stages, 'label'));
-
-// Values shown in the edit window (the posted ones again if saving failed)
-$editVals = [
-    'stage'       => $currentStageKey,
-    'title'       => $mockStudent['title'] ?? '',
-    'adviser'     => $mockStudent['adviser'] ?? '',
-    'enroll_date' => $mockStudent['enroll_date'] ?? '',
-    'docType'     => '',
-];
-if ($editOpen) {
-    $editVals['stage']       = isset($stages[$_POST['stage'] ?? '']) ? $_POST['stage'] : $editVals['stage'];
-    $editVals['title']       = trim($_POST['title'] ?? '');
-    $editVals['adviser']     = trim($_POST['adviser'] ?? '');
-    $editVals['enroll_date'] = trim($_POST['enroll_date'] ?? '');
-    $editVals['docType']     = trim($_POST['docType'] ?? '');
 }
 
 $shortPath = array_map(static function ($s) {
@@ -486,7 +487,7 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($appError) ?></div>
 <?php endif; ?>
 
-<div class="card">
+<div class="card" id="applicationFormCard">
     <div class="card-header"><h3><i class="fas fa-file-alt"></i> Application &amp; Document Upload</h3></div>
     <div class="card-body">
         <form class="form-card" style="box-shadow:none;border:none;padding:0;" method="post" action="<?= url('student/application.php') ?>" data-validate>
@@ -521,7 +522,7 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <div class="form-field">
                 <label>Research / Paper Title <span class="required">*</span></label>
-                <input type="text" name="title" value="<?= htmlspecialchars($mockStudent['title']) ?>" required placeholder="Enter your <?= strtolower($trackLabel) ?> title">
+                <input type="text" id="applicationTitle" name="title" value="<?= htmlspecialchars($mockStudent['title']) ?>" required placeholder="Enter your <?= strtolower($trackLabel) ?> title">
             </div>
             <div class="form-row">
                 <div class="form-field">
@@ -590,6 +591,75 @@ require_once __DIR__ . '/../includes/header.php';
 
 <div class="card">
     <div class="card-header">
+        <h3><i class="fas fa-clock-rotate-left"></i> My Application History</h3>
+        <span class="filter-count" data-filter-count></span>
+    </div>
+    <div class="card-body">
+        <p style="margin-bottom:1rem;font-size:0.85rem;color:var(--gray-500);">Everything you submitted, exactly as saved — check your title spelling here. Use <strong>Edit</strong> to correct a row inline; changes update the database immediately.</p>
+        <?php if ($editError): ?>
+        <div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($editError) ?></div>
+        <?php endif; ?>
+        <div class="table-responsive">
+            <table class="data-table" id="appHistoryTable">
+                <thead>
+                    <tr>
+                        <th>Research / Paper Title</th>
+                        <th>Stage</th>
+                        <th>Status</th>
+                        <th>Date Submitted</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($myApplications as $app): ?>
+                    <?php $histFormId = 'histForm-' . (int) $app['id']; ?>
+                    <tr data-hist-row="<?= (int) $app['id'] ?>">
+                        <td>
+                            <strong style="font-size:0.85rem;" data-hist-text><?= htmlspecialchars($app['title']) ?></strong>
+                            <input type="text" data-hist-title-input form="<?= $histFormId ?>" name="title" value="<?= htmlspecialchars($app['title']) ?>" required hidden style="width:100%;font-size:0.85rem;padding:0.4rem 0.5rem;">
+                        </td>
+                        <td>
+                            <span data-hist-text><?= htmlspecialchars($app['stage']) ?></span>
+                            <select data-hist-stage-input form="<?= $histFormId ?>" name="stage" hidden style="font-size:0.85rem;padding:0.4rem 0.5rem;">
+                                <?php foreach ($stages as $key => $s): ?>
+                                <?php if ($key !== $app['stageKey'] && validateApplicationStageSequence($progress, $stages, $key) !== null) continue; ?>
+                                <option value="<?= htmlspecialchars($key) ?>" <?= $key === $app['stageKey'] ? 'selected' : '' ?>><?= htmlspecialchars($s['label']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </td>
+                        <td><?= statusBadge($app['status']) ?></td>
+                        <td><?= htmlspecialchars($app['date']) ?></td>
+                        <td class="actions">
+                            <button type="button" class="btn btn-sm btn-outline btn-icon" title="Edit application" aria-label="Edit application"
+                                    data-hist-edit="<?= (int) $app['id'] ?>"><i class="fas fa-pencil-alt"></i></button>
+                            <form id="<?= $histFormId ?>" method="post" action="<?= url('student/application.php') ?>" style="display:inline;" hidden>
+                                <input type="hidden" name="form" value="edit_application">
+                                <input type="hidden" name="application_id" value="<?= (int) $app['id'] ?>">
+                                <input type="hidden" name="original_title" value="<?= htmlspecialchars($app['title']) ?>">
+                                <input type="hidden" name="adviser" value="<?= htmlspecialchars($mockStudent['adviser'] ?? '') ?>">
+                                <input type="hidden" name="enroll_date" value="<?= htmlspecialchars($mockStudent['enroll_date'] ?? '') ?>">
+                                <button type="submit" class="btn btn-sm btn-primary" title="Save changes"><i class="fas fa-check"></i></button>
+                                <button type="button" class="btn btn-sm btn-outline" title="Cancel" data-hist-cancel="<?= (int) $app['id'] ?>"><i class="fas fa-times"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                    <?php if (!$myApplications): ?>
+                    <tr>
+                        <td colspan="5" style="text-align:center;color:var(--gray-400);padding:2rem;">No applications submitted yet — your history will appear here.</td>
+                    </tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+        <div class="form-actions" style="border-top:1px solid var(--gray-100);padding-top:1rem;margin-top:1rem;">
+            <button type="button" class="btn btn-primary" id="submitAnotherBtn"><i class="fas fa-plus"></i> Submit Another Application</button>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
         <h3><i class="fas fa-history"></i> Upload History</h3>
         <span class="filter-count" data-filter-count></span>
     </div>
@@ -629,12 +699,6 @@ require_once __DIR__ . '/../includes/header.php';
 <a class="btn btn-sm btn-outline btn-icon" title="View" target="_blank" href="<?= url('student/view_document.php?id=' . urlencode($doc['id'])) ?>"><i class="fas fa-eye"></i></a>
                             <a class="btn btn-sm btn-outline btn-icon" title="Download" href="<?= url('student/download.php?id=' . urlencode($doc['id'])) ?>"><i class="fas fa-download"></i></a>
                             <?php else: ?><span style="font-size:.75rem;color:var(--gray-400);">Unavailable</span><?php endif; ?>
-                            <?php if ($hasApplication): ?>
-                            <button type="button" class="btn btn-sm btn-outline btn-icon" title="Edit application" aria-label="Edit application"
-                                    data-edit-application
-                                    data-stage="<?= htmlspecialchars($stageKeyByLabel[$doc['stage']] ?? $currentStageKey) ?>"
-                                    data-doc-type="<?= htmlspecialchars($doc['docType']) ?>"><i class="fas fa-pencil-alt"></i></button>
-                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -673,83 +737,6 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<?php if ($hasApplication): ?>
-<!-- Edit application: mini pop-up, stays open until "Submit Edited Application" (or the X / Cancel) is used -->
-<div class="edit-modal-overlay <?= $editOpen ? 'active' : '' ?>" id="editApplicationModal">
-    <div class="modal edit-modal" role="dialog" aria-modal="true" aria-labelledby="editAppHeading">
-        <form method="post" action="<?= url('student/application.php') ?>" enctype="multipart/form-data" data-validate>
-            <input type="hidden" name="form" value="edit_application">
-            <input type="hidden" name="original_title" value="<?= htmlspecialchars($mockStudent['title']) ?>">
-
-            <div class="modal-header">
-                <h3 id="editAppHeading"><i class="fas fa-pencil-alt"></i> Edit Application</h3>
-                <button type="button" class="modal-close" data-edit-close aria-label="Close"><i class="fas fa-times"></i></button>
-            </div>
-
-            <div class="modal-body">
-                <?php if ($editError): ?>
-                <div class="alert alert-danger edit-modal-error"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($editError) ?></div>
-                <?php endif; ?>
-
-                <div class="form-row">
-                    <div class="form-field">
-                        <label>Presentation Stage <span class="required">*</span></label>
-                        <select name="stage" id="editAppStage" required>
-                            <?php foreach ($stages as $key => $s): ?>
-                            <?php
-                            // Hide locked stages, but never hide the stage the student is on or has picked
-                            if ($key !== $currentStageKey && $key !== $editVals['stage']
-                                && validateApplicationStageSequence($progress, $stages, $key) !== null) {
-                                continue;
-                            }
-                            ?>
-                            <option value="<?= htmlspecialchars($key) ?>" <?= $key === $editVals['stage'] ? 'selected' : '' ?>><?= htmlspecialchars($s['label']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-field">
-                        <label>Enrollment / Start Date</label>
-                        <?= csiteDateField('enroll_date', $editVals['enroll_date']) ?>
-                    </div>
-                </div>
-                <div class="form-field">
-                    <label>Research / Paper Title <span class="required">*</span></label>
-                    <input type="text" name="title" value="<?= htmlspecialchars($editVals['title']) ?>" required placeholder="Enter your <?= strtolower($trackLabel) ?> title">
-                </div>
-                <div class="form-field">
-                    <label>Adviser Name <span class="required">*</span></label>
-                    <input type="text" name="adviser" value="<?= htmlspecialchars($editVals['adviser']) ?>" required placeholder="Full name of your adviser">
-                </div>
-
-                <div class="edit-modal-section"><i class="fas fa-cloud-upload-alt"></i>Attach Document <span style="font-weight:500;color:var(--gray-400);">(optional)</span></div>
-                <div class="form-field">
-                    <label>Document Type</label>
-                    <select name="docType" id="editAppDocType" data-selected="<?= htmlspecialchars($editVals['docType']) ?>">
-                        <option value="">Select document type (optional)</option>
-                    </select>
-                    <p class="field-hint">Required only if you attach a file below.</p>
-                </div>
-                <div class="form-field">
-                    <label>File</label>
-                    <div class="file-upload-area">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <p>Drag and drop your file here, or click to browse</p>
-                        <p style="font-size:0.75rem;margin-top:0.25rem;">PDF, DOC, or DOCX — Max 20 MB</p>
-                        <div class="file-name"></div>
-                        <input type="file" name="document" accept=".pdf,.docx,.doc">
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline" data-edit-close>Cancel</button>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Submit Edited Application</button>
-            </div>
-        </form>
-    </div>
-</div>
-<?php endif; ?>
-
 <?php if ($popup): ?>
 <div id="successPopupData" hidden
      data-title="<?= htmlspecialchars($popup['title']) ?>"
@@ -776,9 +763,55 @@ require_once __DIR__ . '/../includes/header.php';
         fill();
     }
 
-    // Upload-only form requires a type; the edit window only needs one when a file is attached
+    // Upload-only form requires a type
     bindDocTypes('appUploadStage', 'appUploadDocType', 'Select document type');
-    bindDocTypes('editAppStage', 'editAppDocType', 'Select document type (optional)');
+
+    // Inline row editing in My Application History: pencil swaps the row's
+    // title/stage cells into inputs; save submits the row's own form,
+    // cancel restores the saved values.
+    document.querySelectorAll('[data-hist-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var row = btn.closest('tr[data-hist-row]');
+            if (!row) return;
+            row.querySelectorAll('[data-hist-text]').forEach(function (el) { el.hidden = true; });
+            row.querySelectorAll('[data-hist-title-input], [data-hist-stage-input]').forEach(function (el) { el.hidden = false; });
+            var form = row.querySelector('form[id^="histForm-"]');
+            if (form) form.hidden = false;
+            btn.hidden = true;
+            var titleInput = row.querySelector('[data-hist-title-input]');
+            if (titleInput) titleInput.focus();
+        });
+    });
+    document.querySelectorAll('[data-hist-cancel]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var row = btn.closest('tr[data-hist-row]');
+            if (!row) return;
+            var titleInput = row.querySelector('[data-hist-title-input]');
+            var stageInput = row.querySelector('[data-hist-stage-input]');
+            if (titleInput) titleInput.value = titleInput.defaultValue;
+            if (stageInput) stageInput.value = stageInput.querySelector('option[selected]')?.value ?? stageInput.value;
+            row.querySelectorAll('[data-hist-text]').forEach(function (el) { el.hidden = false; });
+            row.querySelectorAll('[data-hist-title-input], [data-hist-stage-input]').forEach(function (el) { el.hidden = true; });
+            var form = row.querySelector('form[id^="histForm-"]');
+            if (form) form.hidden = true;
+            var editBtn = row.querySelector('[data-hist-edit]');
+            if (editBtn) editBtn.hidden = false;
+        });
+    });
+
+    // "Submit Another Application": jump back to the form and focus the title field.
+    var anotherBtn = document.getElementById('submitAnotherBtn');
+    if (anotherBtn) {
+        anotherBtn.addEventListener('click', function () {
+            var card = document.getElementById('applicationFormCard');
+            if (card && card.scrollIntoView) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            var titleInput = document.getElementById('applicationTitle');
+            if (titleInput) {
+                titleInput.value = '';
+                titleInput.focus();
+            }
+        });
+    }
 })();
 </script>
 
