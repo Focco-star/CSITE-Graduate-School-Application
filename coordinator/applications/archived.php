@@ -76,8 +76,8 @@ try {
             a.status,
             a.archived_at
         FROM applications a
-        JOIN students s ON a.student_id = s.student_id
-        LEFT JOIN users u ON s.user_id = u.user_id
+        INNER JOIN users u ON u.user_id = a.user_id
+        LEFT JOIN students s ON s.user_id = u.user_id
         WHERE a.archived_at IS NOT NULL
         ORDER BY a.archived_at DESC"
     );

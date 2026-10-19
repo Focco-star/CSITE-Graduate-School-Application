@@ -25,7 +25,7 @@ $uploadEmail  = strtolower(trim((string) ($upload['studentEmail'] ?? '')));
 
 if (!$uploadUserId && $uploadEmail !== '' && class_exists('DB')) {
     try {
-        $stmt = DB::getConnection()->prepare("SELECT id FROM users WHERE LOWER(email) = :email LIMIT 1");
+        $stmt = DB::getConnection()->prepare("SELECT user_id FROM users WHERE LOWER(email) = :email LIMIT 1");
         $stmt->execute(['email' => $uploadEmail]);
         $uploadUserId = $stmt->fetchColumn() ?: null;
     } catch (Throwable $e) {}
@@ -59,6 +59,28 @@ $path = uploadStoragePath($upload);
 if (!$path || !file_exists($path)) {
     http_response_code(404);
     exit('The original file is unavailable for this older upload record.');
+}
+
+// 4b. Exact-rendering PDF for Word documents (converted via LibreOffice).
+// Falls through to the original file when no conversion is available.
+if (($_GET['pdf'] ?? '') === '1' && function_exists('convertedPdfPath')) {
+    try {
+        $convertedPdf = convertedPdfPath($path);
+    } catch (Throwable $e) {
+        $convertedPdf = null;
+    }
+    if (!empty($convertedPdf)) {
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . rawurlencode(pathinfo((string) ($upload['fileName'] ?? 'document'), PATHINFO_FILENAME) . '.pdf') . '"');
+        header('Content-Length: ' . filesize($convertedPdf));
+        header('Cache-Control: private, max-age=0, must-revalidate');
+        header('Pragma: public');
+        readfile($convertedPdf);
+        exit;
+    }
 }
 
 // 5. Clean output buffers and stream file headers

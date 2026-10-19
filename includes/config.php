@@ -4,7 +4,18 @@
 define('SITE_NAME', 'CSITE Graduate School Application');
 define('SITE_SHORT', 'CSITE Graduate School Application');
 define('SITE_TAGLINE', 'Capstone, Seminar Paper and Thesis Presentation Application System');
-define('BASE_URL', '/CSITE-Graduate-School-Application');
+// Served from the domain root on InfinityFree, from a subfolder on local XAMPP.
+if (!defined('BASE_URL')) {
+    $csiteHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    $csiteEnvBase = getenv('BASE_URL');
+    if ($csiteEnvBase !== false) {
+        define('BASE_URL', rtrim($csiteEnvBase, '/'));
+    } elseif (str_contains($csiteHost, 'infinityfree')) {
+        define('BASE_URL', '');
+    } else {
+        define('BASE_URL', '/CSITE-Graduate-School-Application');
+    }
+}
 
 define('COLOR_PRIMARY', '#060297');
 define('COLOR_ACCENT', '#FFB82B');
@@ -861,7 +872,7 @@ function currentStudentProfile(array $fallback): array {
             $stmt = DB::getConnection()->prepare("
                 SELECT s.*, u.email AS user_email, u.full_name AS user_full_name
                 FROM students s
-                INNER JOIN users u ON u.id = s.user_id
+                INNER JOIN users u ON u.user_id = s.user_id
                 WHERE s.user_id = :uid
                 LIMIT 1
             ");
@@ -1542,6 +1553,36 @@ function databaseApplicationIdForStudent(int $userId, string $stageLabel = ''): 
 }
 
 /**
+ * Every non-archived application for a user, newest first.
+ * Powers the student's "My Application History" table so they can see
+ * exactly what title/stage they submitted (spelling included) and edit it.
+ */
+function databaseApplicationsForUser(int $userId): array {
+    if (!class_exists('DB') || $userId <= 0) {
+        return [];
+    }
+    try {
+        $stmt = DB::getConnection()->prepare(
+            'SELECT application_id AS id, presentation_stage AS stage,
+                    paper_title AS title, status, submitted_at AS date
+             FROM applications
+             WHERE user_id = :user_id AND archived_at IS NULL
+             ORDER BY submitted_at DESC, application_id DESC'
+        );
+        $stmt->execute(['user_id' => $userId]);
+        $rows = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $row['id'] = (int) $row['id'];
+            $row['stageKey'] = stageKeyFromLabel((string) ($row['stage'] ?? ''));
+            $rows[] = $row;
+        }
+        return $rows;
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
  * Read student documents straight from MySQL, optionally scoped.
  * This is what makes an upload visible to the coordinator: the student and the
  * coordinator are different PHP sessions, so a session-only store can never be
@@ -1607,7 +1648,7 @@ function databaseDocumentById(int $documentId): ?array {
                     d.original_name, d.stored_name, d.mime_type, d.file_size, d.status, d.uploaded_at,
                     u.email AS studentEmail
              FROM application_documents d
-             LEFT JOIN users u ON u.id = d.user_id
+             LEFT JOIN users u ON u.user_id = d.user_id
              WHERE d.document_id = :document_id
              LIMIT 1'
         );
@@ -1859,6 +1900,76 @@ function uploadStoragePath(array $upload): ?string {
     if (is_file($pathUploads)) return $pathUploads;
 
     return null;
+}
+
+/**
+ * Locate a LibreOffice binary for print-faithful Word rendering, or null when
+ * it is not installed. Result is memoized per request.
+ */
+function libreOfficePath(): ?string {
+    static $resolved = false;
+    static $path = null;
+    if ($resolved) {
+        return $path;
+    }
+    $resolved = true;
+    $candidates = [
+        'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+        'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+    ];
+    foreach ($candidates as $candidate) {
+        if (is_file($candidate)) {
+            $path = $candidate;
+            return $path;
+        }
+    }
+    try {
+        $where = @shell_exec('where soffice.exe 2>nul');
+        if (is_string($where)) {
+            foreach (preg_split('/\R/', $where) as $line) {
+                $line = trim($line);
+                if ($line !== '' && is_file($line)) {
+                    $path = $line;
+                    return $path;
+                }
+            }
+        }
+    } catch (Throwable $e) {}
+    return $path;
+}
+
+/**
+ * Render a .docx file to PDF via LibreOffice (cached in storage/converted).
+ * Returns the converted PDF path, or null when unavailable (LibreOffice not
+ * installed or conversion failed). Callers fall back to the mammoth.js preview.
+ */
+function convertedPdfPath(string $sourcePath): ?string {
+    if (strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION)) !== 'docx' || !is_file($sourcePath)) {
+        return null;
+    }
+    $dir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'converted';
+    if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
+        return null;
+    }
+    $pdf = $dir . DIRECTORY_SEPARATOR . pathinfo($sourcePath, PATHINFO_FILENAME) . '.pdf';
+    if (is_file($pdf) && filemtime($pdf) >= filemtime($sourcePath)) {
+        return $pdf;
+    }
+    $soffice = libreOfficePath();
+    if ($soffice === null || !function_exists('exec')) {
+        return null;
+    }
+    $cmd = '"' . $soffice . '" --headless --convert-to pdf --outdir '
+        . escapeshellarg($dir) . ' ' . escapeshellarg($sourcePath) . ' 2>&1';
+    try {
+        @set_time_limit(120);
+        $out = [];
+        $code = 1;
+        @exec($cmd, $out, $code);
+    } catch (Throwable $e) {
+        return null;
+    }
+    return ($code === 0 && is_file($pdf)) ? $pdf : null;
 }
 
 function updateUploadStatus(string $id, string $status): void {
