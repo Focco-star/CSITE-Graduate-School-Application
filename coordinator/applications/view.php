@@ -124,7 +124,14 @@ require_once __DIR__ . '/../../includes/header.php';
                         <td><?= htmlspecialchars($doc['docType']) ?></td>
                         <td><?= date('M d, Y', strtotime($doc['date'])) ?></td>
                         <td><?= statusBadge($doc['status']) ?></td>
-                        <td><?php if (function_exists('uploadStoragePath') && uploadStoragePath($doc)): ?><a class="btn btn-sm btn-outline" href="<?= url('coordinator/download.php?id=' . urlencode($doc['id'])) ?>"><i class="fas fa-download"></i> Download</a><?php else: ?><span style="color:var(--gray-400);font-size:.8rem;">Unavailable</span><?php endif; ?></td>
+                        <td>
+                            <?php if (function_exists('uploadStoragePath') && uploadStoragePath($doc)): ?>
+                                <a class="btn btn-sm btn-outline" href="<?= url('coordinator/view_document.php?id=' . urlencode($doc['id']) . '&mode=view') ?>" target="_blank" style="margin-right:0.25rem;"><i class="fas fa-eye"></i> View</a>
+                                <a class="btn btn-sm btn-outline" href="<?= url('coordinator/download.php?id=' . urlencode($doc['id'])) ?>"><i class="fas fa-download"></i> Download</a>
+                            <?php else: ?>
+                                <span style="color:var(--gray-400);font-size:.8rem;">Unavailable</span>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
