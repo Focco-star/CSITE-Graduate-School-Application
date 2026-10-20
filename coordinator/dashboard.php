@@ -36,6 +36,9 @@ $decidedAppsCount = 0;
 $pendingApps = [];
 $upcomingPresentations = [];
 
+// The upcoming presentations table now lives on coordinator/schedule/manage.php.
+// The list is still built here because the "Upcoming Presentations" stat tile
+// below shows its count.
 if (function_exists('databaseSchedules')) {
     try {
         $upcomingPresentations = databaseSchedules();
@@ -46,7 +49,7 @@ if (function_exists('databaseSchedules')) {
 
 // Merge database-backed scheduled applications (schedule/add.php records the
 // presentation date/time/venue/panel in applications.workflow_state), so the
-// card also works across sessions where the session-only schedule list is
+// count also works across sessions where the session-only schedule list is
 // empty. Session rows win on duplicates (same application).
 if ($pdo && class_exists('DB')) {
     try {
@@ -211,75 +214,6 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div class="dashstat-icon"><i class="fas fa-chart-bar"></i></div>
     </a>
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <h3><i class="fas fa-exclamation-circle"></i> Applications Requiring Attention</h3>
-        <a href="<?= url('coordinator/applications/manage.php') ?>" class="btn btn-sm btn-outline">View All</a>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="data-table">
-                <thead>
-                    <tr><th>Student</th><th>Program</th><th>Stage</th><th>Submitted</th><th>Status</th><th>Action</th></tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($pendingApps)): ?>
-                        <?php foreach ($pendingApps as $app): ?>
-                        <tr>
-                            <td><strong><?= htmlspecialchars($app['student']) ?></strong></td>
-                            <td><?= htmlspecialchars($app['program']) ?></td>
-                            <td><?= htmlspecialchars($app['stage']) ?></td>
-                            <td><?= date('M d, Y', strtotime($app['date'])) ?></td>
-                            <td><?= statusBadge($app['status']) ?></td>
-                            <td><a href="<?= url('coordinator/applications/view.php?id=' . $app['id']) ?>" class="btn btn-sm btn-primary">Review</a></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr>
-                            <td colspan="6" style="text-align:center; padding:1.5rem; color:var(--gray-400);">No applications requiring attention.</td>
-                        </tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <h3><i class="fas fa-calendar-check"></i> Upcoming Presentations</h3>
-        <a href="<?= url('coordinator/schedule/manage.php') ?>" class="btn btn-sm btn-outline">Manage Schedules</a>
-    </div>
-    <div class="card-body">
-        <?php if (!empty($upcomingPresentations)): ?>
-        <div class="table-responsive">
-            <table class="data-table">
-                <thead>
-                    <tr><th>Student</th><th>Stage</th><th>Date</th><th>Time</th><th>Venue</th><th>Panel</th><th>Status</th></tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($upcomingPresentations as $up): ?>
-                    <tr>
-                        <td><strong><?= htmlspecialchars($up['studentName'] ?? $up['student'] ?? '') ?></strong></td>
-                        <td><?= htmlspecialchars($up['stage'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($up['date'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($up['time'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($up['venue'] ?? '') ?></td>
-                        <td><?= htmlspecialchars($up['panel'] ?? $up['panels'] ?? '') ?></td>
-                        <td><?= statusBadge($up['status'] ?? 'scheduled') ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        </div>
-        <?php else: ?>
-        <div style="text-align: center; padding: 2rem; color: var(--gray-400); font-weight: 500;">
-            No upcoming presentations.
-        </div>
-        <?php endif; ?>
-    </div>
 </div>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
