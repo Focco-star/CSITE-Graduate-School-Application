@@ -458,11 +458,16 @@ $myApplications = databaseApplicationsForUser($userIdForHistory);
 $hasApplication = trim((string) ($mockStudent['title'] ?? '')) !== '' || $myApplications !== [];
 $docTypesByStage = [];
 foreach ($stages as $key => $s) {
+    $paperLabel = match ($key) {
+        'concept' => 'Concept Paper',
+        'proposal' => $track === 'capstone' ? 'Capstone Proposal' : ($track === 'seminar' ? 'Seminar Paper Proposal' : 'Proposal Paper'),
+        'final' => $track === 'capstone' ? 'Final Capstone' : ($track === 'seminar' ? 'Final Seminar Paper' : 'Final Paper'),
+        default => $s['shortLabel'],
+    };
     $docTypesByStage[$key] = [
-        $s['shortLabel'] . ' Paper',
-        $s['shortLabel'] . ' Adviser Endorsement Form',
-        'Official Receipt / Payment Proof',
-        'Revised / Corrected Document',
+        'Adviser Endorsement',
+        'Graduate School Endorsement',
+        $paperLabel,
     ];
 }
 

@@ -1665,6 +1665,9 @@ function classifyUploadDocType(string $docType): string {
     if (str_contains($doc, 'receipt') || str_contains($doc, 'payment')) {
         return 'receipt';
     }
+    if (str_contains($doc, 'graduate school')) {
+        return 'grad_school_endorsement';
+    }
     if (str_contains($doc, 'endorsement') || str_contains($doc, 'adviser')) {
         return 'adviser_endorsement';
     }
@@ -1694,6 +1697,12 @@ function validateUploadSequence(string $email, string $track, string $stageKey, 
     if ($kind === 'adviser_endorsement') {
         if (($row['paper']['status'] ?? 'pending') !== 'done') {
             return 'Upload the ' . $stageLabel . ' paper first before the adviser endorsement form.';
+        }
+        return null;
+    }
+    if ($kind === 'grad_school_endorsement') {
+        if (($row['adviserEndorsement']['status'] ?? 'pending') !== 'done') {
+            return 'Upload the adviser endorsement for ' . $stageLabel . ' first before the Graduate School endorsement.';
         }
         return null;
     }
@@ -2714,6 +2723,7 @@ function getStudentProgress(string $email, string $track): array {
         $wf = $app['workflowState'] ?? [];
         $paperUpload = null;
         $adviserUpload = null;
+        $gradSchoolUpload = null;
         $paymentUpload = null;
         foreach ($uploads as $u) {
             $sameStage = stripos((string) $u['stage'], $stage['shortLabel'] ?? $stage['label']) !== false
@@ -2725,6 +2735,8 @@ function getStudentProgress(string $email, string $track): array {
             $kind = classifyUploadDocType((string) $u['docType']);
             if ($kind === 'receipt') {
                 $paymentUpload = $u;
+            } elseif ($kind === 'grad_school_endorsement') {
+                $gradSchoolUpload = $u;
             } elseif ($kind === 'adviser_endorsement') {
                 $adviserUpload = $u;
             } else {
@@ -2734,6 +2746,7 @@ function getStudentProgress(string $email, string $track): array {
 
         $paperWf = $wf['paper'] ?? '';
         $advWf = $wf['adviser_endorsement'] ?? '';
+        $gradWf = $wf['grad_school_endorsement'] ?? '';
         if ($paperUpload && in_array($paperUpload['status'] ?? '', ['verified', 'approved'], true)) {
             $paperWf = 'verified';
         } elseif ($paperUpload && ($paperUpload['status'] ?? '') === 'incomplete') {
@@ -2743,6 +2756,11 @@ function getStudentProgress(string $email, string $track): array {
             $advWf = 'verified';
         } elseif ($adviserUpload && ($adviserUpload['status'] ?? '') === 'incomplete') {
             $advWf = 'incomplete';
+        }
+        if ($gradSchoolUpload && in_array($gradSchoolUpload['status'] ?? '', ['verified', 'approved'], true)) {
+            $gradWf = 'verified';
+        } elseif ($gradSchoolUpload && ($gradSchoolUpload['status'] ?? '') === 'incomplete') {
+            $gradWf = 'incomplete';
         }
         $paperStatus = $paperWf === 'verified' ? 'done' : ($paperWf === 'incomplete' ? 'flagged' : ($paperUpload ? 'done' : 'pending'));
         $adviserStatus = $advWf === 'verified' ? 'done' : ($advWf === 'incomplete' ? 'flagged' : ($adviserUpload ? 'done' : 'pending'));
@@ -2773,7 +2791,7 @@ function getStudentProgress(string $email, string $track): array {
             'paper' => ['status' => $paperStatus, 'submitted' => $paperUpload['date'] ?? ''],
             'adviserEndorsement' => ['status' => $adviserStatus, 'submitted' => $adviserUpload['date'] ?? ''],
             'coordReview' => ['status' => $coordStatus, 'comment' => $coordStatus === 'flagged' ? ($app['coordinatorComment'] ?? '') : ''],
-            'gradSchoolEndorsement' => ['status' => !empty($app['gradSchoolEndorsed']) ? 'done' : 'pending'],
+            'gradSchoolEndorsement' => ['status' => !empty($app['gradSchoolEndorsed']) || $gradWf === 'verified' || $gradSchoolUpload ? 'done' : ($gradWf === 'incomplete' ? 'flagged' : 'pending'), 'submitted' => $gradSchoolUpload['date'] ?? ''],
             'payment' => ['status' => !empty($app['paymentRecorded']) ? 'done' : 'pending', 'submitted' => !empty($app['paymentDate']) ? $app['paymentDate'] : ($paymentUpload['date'] ?? '')],
             'readyForPresentation' => ['status' => !empty($app['readyForPresentation']) ? 'done' : 'pending'],
             'presentation' => [

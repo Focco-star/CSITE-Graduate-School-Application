@@ -206,13 +206,13 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div class="dashstat-icon"><i class="fas fa-user-graduate"></i></div>
     </a>
-    <a href="<?= url('coordinator/reports/dashboard.php') ?>" class="dashstat dashstat-purple">
+    <a href="<?= url('coordinator/reports/dashboard.php') ?>" class="dashstat dashstat-purple" title="Applications marked Approved or Completed">
         <div class="dashstat-text">
             <div class="dashstat-value"><?= $decidedAppsCount ?></div>
-            <div class="dashstat-label">Decided Outcomes</div>
-            <div class="dashstat-link">Reports <i class="fas fa-arrow-right"></i></div>
+            <div class="dashstat-label">Approved Applications</div>
+            <div class="dashstat-link">View outcome reports <i class="fas fa-arrow-right"></i></div>
         </div>
-        <div class="dashstat-icon"><i class="fas fa-chart-bar"></i></div>
+        <div class="dashstat-icon"><i class="fas fa-check-circle"></i></div>
     </a>
 </div>
 
