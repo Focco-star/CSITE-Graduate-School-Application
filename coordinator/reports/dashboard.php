@@ -1,15 +1,18 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/program_chart.php';
 
 $pageTitle   = 'Reports';
 $role        = 'coordinator';
 $currentPage = 'reports';
-$userName    = $mockCoordinator['name'];
-$students    = storeGet('students');
-$ongoing     = count(array_filter($students, static function ($s) {
-    return !in_array($s['status'], ['completed', 'approved'], true);
+$userName    = $mockCoordinator['name'] ?? 'Coordinator';
+
+$students = function_exists('storeGet') ? (array) (storeGet('students') ?? []) : [];
+$ongoing  = count(array_filter($students, static function ($s) {
+    return !in_array($s['status'] ?? '', ['completed', 'approved'], true);
 }));
-$completed   = count($students) - $ongoing;
+$completed = count($students) - $ongoing;
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>
@@ -58,20 +61,6 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 </div>
 
-<div class="report-grid">
-    <a href="<?= url('coordinator/reports/students.php') ?>" class="report-link-card">
-        <div class="report-link-icon"><i class="fas fa-user-graduate"></i></div>
-        <h3>Student Reports</h3>
-        <p>Semester-based listing of ongoing and completed students, organized by capstone, thesis, and seminar paper progress.</p>
-        <span class="report-link-cta">View report <i class="fas fa-arrow-right"></i></span>
-    </a>
-    <a href="<?= url('coordinator/reports/panels.php') ?>" class="report-link-card">
-        <div class="report-link-icon"><i class="fas fa-users"></i></div>
-        <h3>Panel Participation Reports</h3>
-        <p>Summary of panel member assignments and how often each member participates in scheduled presentations.</p>
-        <span class="report-link-cta">View report <i class="fas fa-arrow-right"></i></span>
-    </a>
-</div>
-
+<?php renderProgramPopulationChart($pdo ?? null); ?>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

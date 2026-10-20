@@ -586,4 +586,451 @@
         });
     })();
 
+    /* ==========================================================================
+ * Student Population dashboard (shared by both coordinator dashboards)
+ * Pure SVG: no external chart library. Types: bar, hbar, pie, donut.
+ * Data comes from <script type="application/json" data-pop-data>.
+ * ========================================================================== */
+(function () {
+    'use strict';
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const STORAGE_KEY = 'adzuProgramChartType';
+    const DEFAULT_TYPE = 'bar';
+    const REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+    const META = {
+        bar:   { title: 'Total Students per Program',        desc: t => 'Number of enrolled students in each academic program (' + fmt(t) + ' in total).' },
+        hbar:  { title: 'Total Students per Program',        desc: t => 'Programs ranked by number of enrolled students (' + fmt(t) + ' in total).' },
+        pie:   { title: 'Share of Total Student Population', desc: t => 'Each program\'s proportion of the ' + fmt(t) + ' enrolled students.' },
+        donut: { title: 'Share of Total Student Population', desc: t => 'Each program\'s proportion of the ' + fmt(t) + ' enrolled students.' }
+    };
+
+    /* ---------- helpers ---------- */
+    function svgEl(tag, attrs, text) {
+        const node = document.createElementNS(SVG_NS, tag);
+        if (attrs) Object.keys(attrs).forEach(k => node.setAttribute(k, attrs[k]));
+        if (text !== undefined && text !== null) node.textContent = text;
+        return node;
+    }
+    function fmt(n) { return Number(n).toLocaleString('en-US'); }
+    function truncate(str, max) {
+        str = String(str);
+        max = Math.max(4, Math.floor(max));
+        return str.length > max ? str.slice(0, max - 1).trimEnd() + '\u2026' : str;
+    }
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+    /** Integer-friendly axis: returns { top, ticks } with top >= maxVal. */
+    function axisScale(maxVal) {
+        const v = Math.max(1, maxVal);
+        const raw = v / 5;
+        const exp = Math.pow(10, Math.floor(Math.log10(raw)));
+        const f = raw / exp;
+        const nf = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10;
+        const step = Math.max(1, nf * exp);
+        const top = Math.ceil(v / step) * step;
+        const ticks = [];
+        for (let t = 0; t <= top; t += step) ticks.push(t);
+        return { top: top, ticks: ticks };
+    }
+
+    function readStoredType() { try { return window.sessionStorage.getItem(STORAGE_KEY); } catch (e) { return null; } }
+    function storeType(t) { try { window.sessionStorage.setItem(STORAGE_KEY, t); } catch (e) { /* ignore */ } }
+
+    /* ---------- one chart instance ---------- */
+    function initProgramChart(root) {
+        if (root.dataset.popReady === '1') return;
+
+        const dataEl  = root.querySelector('[data-pop-data]');
+        const chartEl = root.querySelector('[data-pop-chart]');
+        const stage   = root.querySelector('[data-pop-stage]');
+        const tip     = root.querySelector('[data-pop-tooltip]');
+        const toggle  = root.querySelector('[data-pop-toggle]');
+        const menu    = root.querySelector('[data-pop-menu]');
+        const select  = root.querySelector('[data-pop-select]');
+        const titleEl = root.querySelector('[data-pop-chart-title]');
+        const descEl  = root.querySelector('[data-pop-chart-desc]');
+        const labelEl = root.querySelector('[data-pop-current-label]');
+        const iconEl  = root.querySelector('[data-pop-current-icon]');
+        if (!dataEl || !chartEl || !stage || !tip || !toggle || !menu || !select) return;
+
+        let payload;
+        try { payload = JSON.parse(dataEl.textContent); } catch (e) { payload = null; }
+        const programs = payload && Array.isArray(payload.programs) ? payload.programs : [];
+        const total = payload ? Number(payload.total) || 0 : 0;
+        if (!programs.length || total <= 0) return;
+        root.dataset.popReady = '1';
+
+        const options = Array.prototype.slice.call(menu.querySelectorAll('[data-chart-type]'));
+        const legendItems = Array.prototype.slice.call(root.querySelectorAll('.pop-legend-item'));
+
+        let type = DEFAULT_TYPE;
+        let rafId = 0;
+        let switchTimer = 0;
+        let lastW = 0;
+
+        /* ----- tooltip + highlight ----- */
+        function setActive(i) {
+            root.querySelectorAll('[data-index]').forEach(function (n) {
+                n.classList.toggle('is-active', i !== null && Number(n.getAttribute('data-index')) === i);
+            });
+            chartEl.classList.toggle('has-active', i !== null);
+        }
+
+        function hideTip() { tip.hidden = true; }
+
+        function showTip(i, x, y) {
+            const p = programs[i];
+            if (!p) return;
+            tip.textContent = '';
+            const head = document.createElement('div');
+            head.className = 'pop-tooltip-name';
+            const dot = document.createElement('span');
+            dot.className = 'pop-tooltip-dot';
+            dot.style.background = p.color;
+            head.appendChild(dot);
+            head.appendChild(document.createTextNode(p.label));
+            const meta = document.createElement('div');
+            meta.className = 'pop-tooltip-meta';
+            meta.textContent = fmt(p.count) + ' student' + (p.count === 1 ? '' : 's') + ' \u00b7 ' + p.percent + '% of total';
+            tip.appendChild(head);
+            tip.appendChild(meta);
+            tip.hidden = false;
+
+            const sr = stage.getBoundingClientRect();
+            const tw = tip.offsetWidth, th = tip.offsetHeight;
+            let left = x - sr.left + 14;
+            let top = y - sr.top + 14;
+            if (left + tw > sr.width - 4) left = x - sr.left - tw - 14;
+            if (top + th > sr.height - 4) top = y - sr.top - th - 14;
+            tip.style.left = Math.max(4, left) + 'px';
+            tip.style.top = Math.max(4, top) + 'px';
+        }
+
+        function bindShape(node, i) {
+            const p = programs[i];
+            node.setAttribute('tabindex', '0');
+            node.setAttribute('role', 'img');
+            node.setAttribute('aria-label', p.label + ': ' + fmt(p.count) + ' students, ' + p.percent + '%');
+            node.addEventListener('pointerenter', function (e) { setActive(i); showTip(i, e.clientX, e.clientY); });
+            node.addEventListener('pointermove', function (e) { showTip(i, e.clientX, e.clientY); });
+            node.addEventListener('pointerleave', function (e) {
+                if (e.pointerType === 'touch') return; // keep visible on touch until next tap elsewhere
+                setActive(null); hideTip();
+            });
+            node.addEventListener('focus', function () {
+                setActive(i);
+                const r = node.getBoundingClientRect();
+                showTip(i, r.left + r.width / 2, r.top + Math.min(r.height / 2, 40));
+            });
+            node.addEventListener('blur', function () { setActive(null); hideTip(); });
+        }
+
+        root.addEventListener('pointerdown', function (e) {
+            if (e.pointerType === 'touch' && !(e.target.closest && e.target.closest('.pop-shape'))) {
+                setActive(null); hideTip();
+            }
+        });
+
+        legendItems.forEach(function (li) {
+            const i = Number(li.getAttribute('data-index'));
+            li.setAttribute('tabindex', '0');
+            li.addEventListener('pointerenter', function () { setActive(i); });
+            li.addEventListener('pointerleave', function () { setActive(null); });
+            li.addEventListener('focus', function () { setActive(i); });
+            li.addEventListener('blur', function () { setActive(null); });
+        });
+
+        /* ----- renderers ----- */
+        function drawBar(W) {
+            const n = programs.length;
+            const rotate = n > 5 || W < 480;
+            const H = Math.round(Math.max(300, Math.min(400, W * 0.58)));
+            const m = { top: 28, right: 16, bottom: rotate ? 92 : 52, left: 48 };
+            const innerW = W - m.left - m.right;
+            const innerH = H - m.top - m.bottom;
+            const sc = axisScale(Math.max.apply(null, programs.map(function (p) { return p.count; })));
+            const svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'pop-svg', preserveAspectRatio: 'xMidYMid meet' });
+
+            sc.ticks.forEach(function (t) {
+                const y = m.top + innerH - (t / sc.top) * innerH;
+                svg.appendChild(svgEl('line', { x1: m.left, x2: W - m.right, y1: y, y2: y, class: t === 0 ? 'pop-axis' : 'pop-grid' }));
+                svg.appendChild(svgEl('text', { x: m.left - 8, y: y + 4, 'text-anchor': 'end', class: 'pop-tick' }, fmt(t)));
+            });
+
+            const band = innerW / n;
+            const barW = Math.max(6, Math.min(64, band * 0.62));
+            const maxChars = Math.floor(band / 6.6);
+
+            programs.forEach(function (p, i) {
+                const h = (p.count / sc.top) * innerH;
+                const x = m.left + band * i + (band - barW) / 2;
+                const y = m.top + innerH - h;
+                const cx = x + barW / 2;
+
+                const bar = svgEl('rect', { x: x, y: y, width: barW, height: h, rx: 4, fill: p.color, class: 'pop-shape pop-bar', 'data-index': i });
+                bar.style.animationDelay = (i * 60) + 'ms';
+                bindShape(bar, i);
+                svg.appendChild(bar);
+
+                const val = svgEl('text', { x: cx, y: y - 8, 'text-anchor': 'middle', class: 'pop-value pop-fade' }, fmt(p.count));
+                val.style.animationDelay = (350 + i * 60) + 'ms';
+                svg.appendChild(val);
+
+                const ly = m.top + innerH + 18;
+                const lbl = svgEl('text', { x: cx, y: ly, 'text-anchor': rotate ? 'end' : 'middle', class: 'pop-cat' }, truncate(p.label, rotate ? 18 : maxChars));
+                if (rotate) lbl.setAttribute('transform', 'rotate(-35 ' + cx + ' ' + ly + ')');
+                svg.appendChild(lbl);
+            });
+
+            return { svg: svg, start: null };
+        }
+
+        function drawHBar(W) {
+            const n = programs.length;
+            const rowH = 42, barH = 24;
+            const m = { top: 12, right: W < 480 ? 96 : 108, bottom: 34, left: Math.round(Math.min(170, Math.max(96, W * 0.3))) };
+            const H = m.top + m.bottom + n * rowH;
+            const innerW = Math.max(40, W - m.left - m.right);
+            const sc = axisScale(Math.max.apply(null, programs.map(function (p) { return p.count; })));
+            const svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'pop-svg', preserveAspectRatio: 'xMidYMid meet' });
+
+            sc.ticks.forEach(function (t) {
+                const x = m.left + (t / sc.top) * innerW;
+                svg.appendChild(svgEl('line', { x1: x, x2: x, y1: m.top, y2: m.top + n * rowH, class: t === 0 ? 'pop-axis' : 'pop-grid' }));
+                svg.appendChild(svgEl('text', { x: x, y: H - 12, 'text-anchor': 'middle', class: 'pop-tick' }, fmt(t)));
+            });
+
+            const maxChars = (m.left - 14) / 6.4;
+            programs.forEach(function (p, i) {
+                const y = m.top + i * rowH;
+                const by = y + (rowH - barH) / 2;
+                const w = Math.max(2, (p.count / sc.top) * innerW);
+
+                svg.appendChild(svgEl('text', { x: m.left - 10, y: by + barH / 2 + 4, 'text-anchor': 'end', class: 'pop-cat' }, truncate(p.label, maxChars)));
+
+                const bar = svgEl('rect', { x: m.left, y: by, width: w, height: barH, rx: 4, fill: p.color, class: 'pop-shape pop-bar-h', 'data-index': i });
+                bar.style.animationDelay = (i * 60) + 'ms';
+                bindShape(bar, i);
+                svg.appendChild(bar);
+
+                const val = svgEl('text', { x: m.left + w + 8, y: by + barH / 2 + 4, 'text-anchor': 'start', class: 'pop-value pop-fade' }, fmt(p.count) + ' \u00b7 ' + p.percent + '%');
+                val.style.animationDelay = (350 + i * 60) + 'ms';
+                svg.appendChild(val);
+            });
+
+            return { svg: svg, start: null };
+        }
+
+        function drawRadial(donut) {
+            const c = 200, outer = 176;
+            const sw = donut ? 70 : outer;
+            const r = outer - sw / 2;
+            const C = 2 * Math.PI * r;
+            const labelR = donut ? r : outer * 0.64;
+            const gap = programs.length > 1 ? (donut ? 1.5 : 2) : 0;
+
+            const svg = svgEl('svg', { viewBox: '0 0 400 400', class: 'pop-svg pop-svg-radial', preserveAspectRatio: 'xMidYMid meet' });
+            const g = svgEl('g', { transform: 'rotate(-90 ' + c + ' ' + c + ')' });
+            if (donut) g.appendChild(svgEl('circle', { cx: c, cy: c, r: r, fill: 'none', 'stroke-width': sw, class: 'pop-track' }));
+
+            const slices = [];
+            let acc = 0;
+            programs.forEach(function (p, i) {
+                const len = (p.count / total) * C;
+                const start = acc;
+                acc += len;
+                const node = svgEl('circle', {
+                    cx: c, cy: c, r: r, fill: 'none', stroke: p.color, 'stroke-width': sw,
+                    'stroke-dasharray': '0 ' + C, 'stroke-dashoffset': -(start + gap / 2),
+                    class: 'pop-shape pop-slice', 'data-index': i
+                });
+                bindShape(node, i);
+                g.appendChild(node);
+                slices.push({ node: node, start: start, len: len });
+            });
+            svg.appendChild(g);
+
+            // Labels (percentage, plus count on larger slices)
+            programs.forEach(function (p, i) {
+                const frac = p.count / total;
+                if (frac < 0.05) return; // too small to label: see legend / tooltip
+                const s = slices[i];
+                const a = ((s.start + s.len / 2) / C) * 2 * Math.PI;
+                const lx = c + labelR * Math.sin(a);
+                const ly = c - labelR * Math.cos(a);
+                const withCount = frac >= 0.08;
+                const pct = svgEl('text', { x: lx, y: withCount ? ly - 2 : ly + 5, fill: p.ink, class: 'pop-slice-pct pop-fade' }, p.percent + '%');
+                pct.style.animationDelay = '650ms';
+                svg.appendChild(pct);
+                if (withCount) {
+                    const cnt = svgEl('text', { x: lx, y: ly + 14, fill: p.ink, class: 'pop-slice-cnt pop-fade' }, fmt(p.count));
+                    cnt.style.animationDelay = '650ms';
+                    svg.appendChild(cnt);
+                }
+            });
+
+            if (donut) {
+                svg.appendChild(svgEl('text', { x: c, y: c + 6, class: 'pop-center-value' }, fmt(total)));
+                svg.appendChild(svgEl('text', { x: c, y: c + 28, class: 'pop-center-label' }, 'Total Students'));
+            }
+
+            function applySweep(t) {
+                const drawn = t * C;
+                slices.forEach(function (s) {
+                    const vis = Math.max(0, Math.min(s.len - gap, drawn - s.start - gap / 2));
+                    s.node.setAttribute('stroke-dasharray', vis.toFixed(3) + ' ' + C.toFixed(3));
+                });
+            }
+
+            return {
+                svg: svg,
+                start: function (animate) {
+                    if (!animate) { applySweep(1); return; }
+                    const t0 = performance.now();
+                    applySweep(0);
+                    const tick = function (now) {
+                        const t = Math.min(1, (now - t0) / 850);
+                        applySweep(easeOutCubic(t));
+                        if (t < 1) rafId = requestAnimationFrame(tick);
+                    };
+                    rafId = requestAnimationFrame(tick);
+                }
+            };
+        }
+
+        function currentWidth() { return Math.round(chartEl.clientWidth) || 640; }
+
+        function showError() {
+            chartEl.textContent = '';
+            const box = document.createElement('div');
+            box.className = 'alert alert-warning';
+            box.textContent = 'The chart could not be displayed. The figures are still available in the legend.';
+            chartEl.appendChild(box);
+        }
+
+        function draw(animate) {
+            cancelAnimationFrame(rafId);
+            hideTip();
+            setActive(null);
+            const animated = !!animate && !REDUCED_MOTION;
+            chartEl.classList.toggle('no-anim', !animated);
+            try {
+                lastW = currentWidth();
+                let result;
+                if (type === 'hbar') result = drawHBar(lastW);
+                else if (type === 'pie') result = drawRadial(false);
+                else if (type === 'donut') result = drawRadial(true);
+                else result = drawBar(lastW);
+
+                chartEl.textContent = '';
+                chartEl.appendChild(result.svg);
+                chartEl.setAttribute('aria-label', META[type].title + '. ' + programs.map(function (p) {
+                    return p.label + ': ' + fmt(p.count) + ' students (' + p.percent + '%)';
+                }).join('; '));
+                if (result.start) result.start(animated);
+            } catch (err) {
+                if (window.console) console.error('Program chart error:', err);
+                showError();
+            }
+        }
+
+        function setType(next, opts) {
+            opts = opts || {};
+            if (!META[next]) next = DEFAULT_TYPE;
+            type = next;
+
+            options.forEach(function (o) {
+                const on = o.getAttribute('data-chart-type') === type;
+                o.setAttribute('aria-checked', on ? 'true' : 'false');
+                o.classList.toggle('is-selected', on);
+                if (on) {
+                    if (labelEl) labelEl.textContent = o.getAttribute('data-label') || '';
+                    if (iconEl) iconEl.className = 'fas ' + (o.getAttribute('data-icon') || 'fa-chart-bar');
+                }
+            });
+            if (titleEl) titleEl.textContent = META[type].title;
+            if (descEl) descEl.textContent = META[type].desc(total);
+            if (opts.persist) storeType(type);
+
+            clearTimeout(switchTimer);
+            if (opts.fade && !REDUCED_MOTION) {
+                stage.classList.add('is-switching');
+                switchTimer = setTimeout(function () {
+                    draw(true);
+                    stage.classList.remove('is-switching');
+                }, 170);
+            } else {
+                stage.classList.remove('is-switching');
+                draw(true);
+            }
+        }
+
+        /* ----- dropdown ----- */
+        function openMenu() {
+            menu.hidden = false;
+            toggle.setAttribute('aria-expanded', 'true');
+            const current = options.filter(function (o) { return o.getAttribute('data-chart-type') === type; })[0] || options[0];
+            if (current) current.focus();
+        }
+        function closeMenu(returnFocus) {
+            menu.hidden = true;
+            toggle.setAttribute('aria-expanded', 'false');
+            if (returnFocus) toggle.focus();
+        }
+
+        toggle.addEventListener('click', function () { menu.hidden ? openMenu() : closeMenu(false); });
+        toggle.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowDown' && menu.hidden) { e.preventDefault(); openMenu(); }
+        });
+        options.forEach(function (opt, idx) {
+            opt.addEventListener('click', function () {
+                setType(opt.getAttribute('data-chart-type'), { persist: true, fade: true });
+                closeMenu(true);
+            });
+            opt.addEventListener('keydown', function (e) {
+                let target = null;
+                if (e.key === 'ArrowDown') target = options[(idx + 1) % options.length];
+                else if (e.key === 'ArrowUp') target = options[(idx - 1 + options.length) % options.length];
+                else if (e.key === 'Home') target = options[0];
+                else if (e.key === 'End') target = options[options.length - 1];
+                else if (e.key === 'Tab') { closeMenu(false); return; }
+                if (target) { e.preventDefault(); target.focus(); }
+            });
+        });
+        document.addEventListener('click', function (e) {
+            if (!menu.hidden && !select.contains(e.target)) closeMenu(false);
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !menu.hidden) closeMenu(true);
+        });
+
+        /* ----- responsive redraw (bar charts depend on width) ----- */
+        function onResize() {
+            if ((type === 'bar' || type === 'hbar') && Math.abs(currentWidth() - lastW) > 8) draw(false);
+        }
+        if ('ResizeObserver' in window) {
+            new ResizeObserver(onResize).observe(chartEl);
+        } else {
+            let resizeTimer = 0;
+            window.addEventListener('resize', function () { clearTimeout(resizeTimer); resizeTimer = setTimeout(onResize, 120); });
+        }
+
+        /* ----- go ----- */
+        const stored = readStoredType();
+        setType(META[stored] ? stored : DEFAULT_TYPE, { persist: false, fade: false });
+    }
+
+    function boot() {
+        document.querySelectorAll('[data-program-chart]').forEach(function (root) {
+            try { initProgramChart(root); }
+            catch (err) { if (window.console) console.error('Program chart failed to start:', err); }
+        });
+    }
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
+})();
+
 })();

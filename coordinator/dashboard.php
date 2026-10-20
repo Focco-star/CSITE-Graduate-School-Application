@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/program_chart.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -206,14 +207,16 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div class="dashstat-icon"><i class="fas fa-user-graduate"></i></div>
     </a>
-    <a href="<?= url('coordinator/reports/dashboard.php') ?>" class="dashstat dashstat-purple" title="Applications marked Approved or Completed">
+    <a href="<?= url('coordinator/reports/dashboard.php') ?>" class="dashstat dashstat-purple">
         <div class="dashstat-text">
             <div class="dashstat-value"><?= $decidedAppsCount ?></div>
-            <div class="dashstat-label">Approved Applications</div>
-            <div class="dashstat-link">View outcome reports <i class="fas fa-arrow-right"></i></div>
+            <div class="dashstat-label">Decided Outcomes</div>
+            <div class="dashstat-link">Reports <i class="fas fa-arrow-right"></i></div>
         </div>
-        <div class="dashstat-icon"><i class="fas fa-check-circle"></i></div>
+        <div class="dashstat-icon"><i class="fas fa-chart-bar"></i></div>
     </a>
 </div>
+
+<?php renderProgramPopulationChart($pdo ?? null); ?>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
