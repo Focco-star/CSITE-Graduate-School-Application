@@ -28,6 +28,6 @@ $role = $role ?? 'public';
     </div>
 </div>
 
-<script src="<?= asset('js/script.js') ?>"></script>
+<script src="<?= asset('js/script.js?v=' . filemtime(__DIR__ . '/../assets/js/script.js')) ?>"></script>
 </body>
 </html>

@@ -1985,7 +1985,7 @@ a.stage-stepper-btn:hover .stage-stepper-label { color: var(--adzu-navy); }
     flex-wrap: wrap;
     padding: 1.5rem 1.75rem;
     background: linear-gradient(135deg, #2e3844 0%, #232b35 55%, #141a21 100%);
-    border-bottom: 3px solid var(--adzu-gold);
+    border-bottom: 0;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     color: #fff;
 }
@@ -2014,14 +2014,29 @@ a.stage-stepper-btn:hover .stage-stepper-label { color: var(--adzu-navy); }
 .pop-subtitle { margin-top: 0.25rem; font-size: 0.9rem; color: #cbd5e1; }
 .pop-banner-total {
     display: flex; flex-direction: column; align-items: flex-end;
-    padding: 0.6rem 1rem;
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--radius);
-    line-height: 1.1;
+    gap: 0.35rem;
+    min-width: 150px;
+    padding: 0.85rem 1.1rem;
+    background: var(--adzu-gold);
+    border: 1px solid rgba(35, 43, 53, 0.12);
+    border-radius: var(--radius-lg);
+    line-height: 1;
 }
-.pop-banner-total strong { font-family: var(--font-heading); font-size: 1.6rem; font-weight: 800; color: var(--adzu-gold); }
-.pop-banner-total span { margin-top: 0.2rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #cbd5e1; }
+.pop-banner-total strong {
+    font-family: var(--font-heading);
+    font-size: clamp(1.8rem, 3vw, 2.25rem);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    color: #374151;
+}
+.pop-banner-total span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #4b5563;
+}
 
 /* ---------- Chart container ---------- */
 .pop-panel {
@@ -2200,7 +2215,13 @@ a.stage-stepper-btn:hover .stage-stepper-label { color: var(--adzu-navy); }
 @media (max-width: 640px) {
     .pop-banner { padding: 1.25rem; }
     .pop-title { font-size: 1.4rem; }
-    .pop-banner-total { align-items: flex-start; }
+    .pop-banner-total {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        min-width: 0;
+    }
     .pop-panel { padding: 1rem; }
     .pop-select { width: 100%; }
     .pop-select-btn { width: 100%; }
