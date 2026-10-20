@@ -63,24 +63,10 @@ require_once __DIR__ . '/../includes/header.php';
     }
     $p = $progress[$idx] ?? blankStageProgress($stage);
     $isDone = in_array($p['stageStatus'], ['completed', 'approved'], true);
-    $steps = [
-        ['label' => 'Paper Prepared & Submitted', 'state' => $p['paper'], 'coord' => false, 'detail' => !empty($p['paper']['submitted']) ? 'Uploaded: ' . $p['paper']['submitted'] : 'Upload required'],
-        ['label' => 'Adviser Endorsement Submitted', 'state' => $p['adviserEndorsement'], 'coord' => false, 'detail' => !empty($p['adviserEndorsement']['submitted']) ? 'Uploaded: ' . $p['adviserEndorsement']['submitted'] : 'Obtain signature and upload scanned form'],
-        ['label' => 'Coordinator Document Review', 'state' => $p['coordReview'], 'coord' => true, 'detail' => ($p['coordReview']['comment'] ?? '') ?: ($p['coordReview']['status'] === 'done' ? 'Documents verified' : 'Waiting for coordinator')],
-        ['label' => 'Graduate School Endorsement', 'state' => $p['gradSchoolEndorsement'], 'coord' => true, 'detail' => $p['gradSchoolEndorsement']['status'] === 'done' ? 'Endorsement issued' : 'Coordinator endorses student to Graduate School'],
-        ['label' => 'Official Receipt / Payment Uploaded', 'state' => $p['payment'], 'coord' => false, 'detail' => $p['payment']['status'] === 'done' ? (!empty($p['payment']['submitted']) ? 'Verified: ' . $p['payment']['submitted'] : 'Payment verified') : (!empty($p['payment']['submitted']) ? 'Received: ' . $p['payment']['submitted'] . ' — awaiting coordinator verification' : 'Submit official receipt after payment at the Graduate School')],
-        ['label' => 'Status Set to Ready for Presentation', 'state' => $p['readyForPresentation'], 'coord' => true, 'detail' => $p['readyForPresentation']['status'] === 'done' ? 'Coordinator confirmed readiness' : 'Coordinator marks ready after receipt is verified'],
-        ['label' => 'Presentation Scheduled', 'state' => $p['presentation'], 'coord' => true, 'detail' => !empty($p['presentation']['date']) ? trim($p['presentation']['date'] . ' – ' . ($p['presentation']['time'] ?? '') . (!empty($p['presentation']['venue']) ? ', ' . $p['presentation']['venue'] : '') . (!empty($p['presentation']['panel']) ? ' | Panel: ' . $p['presentation']['panel'] : '')) : 'Coordinator schedules date, time, venue, and panel'],
-        ['label' => 'Presentation Conducted & Result Recorded', 'state' => $p['result'], 'coord' => true, 'detail' => (($p['result']['value'] ?? '') === 'approved' ? 'Approved — proceed to next stage' : (($p['result']['value'] ?? '') === 'revision' ? 'Revision required — resubmit updated paper' : 'Awaiting presentation'))],
-    ];
-    $firstPending = 0;
-    foreach ($steps as $si => $st) {
-        if (($st['state']['status'] ?? 'pending') !== 'done') {
-            $firstPending = $si;
-            break;
-        }
-        $firstPending = $si + 1;
-    }
+    // Shared with the dashboard so both show the same milestones, worded for
+    // the student's own track and stage.
+    $steps = milestoneStepsForStage($p, $track, $stage['key']);
+    $firstPending = milestoneProgress($steps)['firstPending'];
 ?>
 <div class="card">
     <div class="card-header" style="background:<?= $isDone ? 'rgba(22,163,74,0.06)' : 'rgba(6,2,151,0.04)' ?>;">

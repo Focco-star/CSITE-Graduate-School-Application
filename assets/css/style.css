@@ -967,6 +967,80 @@ img { max-width: 100%; height: auto; }
     flex-wrap: wrap;
 }
 
+/* ==========================================================================
+   Expandable student groups (coordinator > applications list)
+   One row per student by default; clicking the name reveals the student's
+   other applications on that stage.
+   ========================================================================== */
+.student-cell-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: var(--adzu-navy);
+    cursor: pointer;
+    text-align: left;
+}
+.student-cell-toggle:hover { text-decoration: underline; }
+.student-cell-toggle:focus-visible {
+    outline: 2px solid var(--adzu-gold);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+.student-cell-toggle .toggle-caret {
+    font-size: 0.62rem;
+    color: var(--gray-400);
+    transition: transform 0.15s ease;
+    width: 0.7rem;
+}
+.student-cell-toggle[aria-expanded="true"] .toggle-caret { transform: rotate(90deg); }
+.student-group-count {
+    display: inline-block;
+    min-width: 1.35rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: var(--gray-100);
+    color: var(--gray-600);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.5;
+}
+.student-cell-toggle[aria-expanded="true"] .student-group-count {
+    background: var(--adzu-gold);
+    color: #1f2937;
+}
+tr.app-child-row { display: none; }
+tr.app-child-row.is-shown { display: table-row; }
+tr.app-child-row > td {
+    background: var(--gray-50);
+    font-size: 0.8rem;
+    color: var(--gray-600);
+}
+tr.app-child-row > td:first-child { padding-left: 2.2rem; }
+tr.app-child-row > td:first-child .child-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    color: var(--gray-500);
+}
+tr.app-child-row:hover > td { background: var(--gray-100); }
+tr.app-child-row .child-title { color: var(--gray-700); }
+/* A row the table filter has hidden must stay hidden even when its group is open.
+   Declared after .is-shown so it wins on equal specificity. */
+tr.app-child-row[hidden] { display: none; }
+.app-group-latest {
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--gray-400);
+    font-weight: 700;
+}
+
 .status-badge {
     display: inline-block;
     padding: 0.2rem 0.65rem;
@@ -1453,11 +1527,83 @@ a.stage-stepper-btn:hover .stage-stepper-label { color: var(--adzu-navy); }
 .substep-line { width: 2px; height: 20px; background: var(--gray-200); border-radius: 1px; margin-top: 2px; }
 .substep-line.done { background: var(--success); }
 .coord-chip { font-size: 0.65rem; background: var(--gray-100); color: var(--gray-500); padding: 1px 6px; border-radius: 99px; font-weight: 500; }
+
+/* ==========================================================================
+   Milestone Tracker (student dashboard)
+   One collapsible block per stage of the student's own track, each listing the
+   milestones of that stage with their live state.
+   ========================================================================== */
+.milestone-card .card-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.ms-overview { display: flex; align-items: center; gap: 0.85rem; }
+.ms-overview-bar {
+    width: 140px; height: 8px; border-radius: 99px;
+    background: var(--gray-200); overflow: hidden; display: flex;
+}
+.ms-overview-fill { height: 100%; background: linear-gradient(90deg, var(--adzu-gold), #f2c14e); border-radius: 99px; transition: width .35s ease; }
+.ms-overview-text { font-size: 0.78rem; color: var(--gray-600); font-weight: 600; white-space: nowrap; }
+
+.ms-stage { border: 1px solid var(--gray-200); border-radius: var(--radius-lg); margin-bottom: 0.85rem; overflow: hidden; background: var(--white); }
+.ms-stage:last-child { margin-bottom: 0; }
+.ms-stage.is-current { border-color: rgba(6, 2, 151, 0.28); box-shadow: 0 1px 3px rgba(6, 2, 151, 0.06); }
+.ms-stage.is-done { background: rgba(22, 163, 74, 0.04); border-color: rgba(22, 163, 74, 0.25); }
+
+.ms-stage-head {
+    width: 100%; display: flex; align-items: center; gap: 0.75rem;
+    background: none; border: none; padding: 0.95rem 1.1rem;
+    font: inherit; text-align: left; cursor: pointer; color: inherit;
+    transition: background .18s ease;
+}
+.ms-stage-head:hover { background: var(--gray-50); }
+.ms-stage-head:focus-visible { outline: 2px solid var(--adzu-gold); outline-offset: -2px; }
+.ms-stage-num {
+    width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.82rem; font-weight: 700;
+    background: var(--gray-100); color: var(--gray-500);
+}
+.ms-stage.is-current .ms-stage-num { background: var(--adzu-navy); color: #fff; box-shadow: 0 0 0 3px rgba(6, 2, 151, 0.10); }
+.ms-stage.is-done .ms-stage-num { background: var(--success); color: #fff; }
+.ms-stage-title { font-size: 0.92rem; font-weight: 700; color: var(--adzu-navy); flex: 1; }
+.ms-stage-count { font-size: 0.72rem; color: var(--gray-500); white-space: nowrap; }
+.ms-stage-caret { color: var(--gray-400); font-size: 0.72rem; transition: transform .2s ease; }
+.ms-stage.is-open .ms-stage-caret { transform: rotate(180deg); }
+
+.ms-stage-body { padding: 0.25rem 1.1rem 1.1rem; border-top: 1px solid var(--gray-100); }
+.ms-stage:not(.is-open) .ms-stage-body { display: none; }
+
+.ms-step { display: flex; gap: 0.85rem; align-items: flex-start; padding: 0.7rem 0; border-bottom: 1px solid var(--gray-100); }
+.ms-step:last-child { border-bottom: none; }
+.ms-step-col { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; margin-top: 1px; }
+.ms-step-line { width: 2px; flex: 1; min-height: 16px; background: var(--gray-200); border-radius: 1px; margin-top: 4px; }
+.ms-step-line.done { background: var(--success); }
+.ms-step-body { flex: 1; min-width: 0; }
+.ms-step-label { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; font-size: 0.86rem; font-weight: 600; color: var(--gray-700); }
+.ms-step.is-pending .ms-step-label { color: var(--gray-400); font-weight: 500; }
+.ms-step.is-active .ms-step-label { color: var(--adzu-navy); }
+.ms-step.is-flagged .ms-step-label { color: #b45309; }
+.ms-step-detail { font-size: 0.78rem; color: var(--gray-500); margin: 0.2rem 0 0; line-height: 1.45; }
+.ms-step.is-pending .ms-step-detail { color: var(--gray-400); }
+.ms-step.is-flagged .ms-step-detail { color: #b45309; }
+.ms-step-action { flex-shrink: 0; align-self: center; }
+.ms-step-tag {
+    font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em;
+    font-weight: 700; padding: 2px 7px; border-radius: 99px;
+}
+.ms-step-tag.active { background: rgba(6, 2, 151, 0.08); color: var(--adzu-navy); }
+.ms-step-tag.done { background: rgba(22, 163, 74, 0.10); color: #15803d; }
+.ms-step-tag.flagged { background: rgba(217, 119, 6, 0.12); color: #b45309; }
+.ms-empty { text-align: center; color: var(--gray-400); font-size: 0.82rem; padding: 1rem 0; }
 .req-docs-box { margin-top: 1.5rem; padding: 1rem; background: var(--gray-50); border-radius: var(--radius-lg); border: 1px solid var(--gray-200); }
 .req-docs-box h4 { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500); margin-bottom: 0.75rem; }
 .req-doc-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.83rem; margin-bottom: 0.5rem; }
 .req-doc-row i { color: var(--adzu-navy); opacity: 0.6; width: 16px; }
 .req-doc-row span { flex: 1; color: var(--gray-700); }
+/* Requirements checklist on the coordinator's Process Application page */
+.req-checklist { margin-top: 1.5rem; padding: 1rem; background: var(--gray-50); border-radius: var(--radius-lg); border: 1px solid var(--gray-200); }
+.req-checklist h4 { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500); margin-bottom: 0.75rem; }
+.req-checklist .data-table th { background: var(--white); }
+.req-checklist .data-table td { background: var(--white); border-bottom: 1px solid var(--gray-100); }
+.req-checklist .data-table tbody tr:hover > td { background: var(--gray-50); }
 .receipt-box { margin-top: 1rem; padding: 1rem; background: rgba(6, 2, 151, 0.04); border-radius: var(--radius-lg); border: 1px dashed rgba(6, 2, 151, 0.25); }
 /* ---------- Dashboard stat cards v2 (gradient, clickable) ---------- */
 .dashstat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }

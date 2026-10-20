@@ -45,7 +45,7 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div class="dashstat-icon"><i class="fas fa-book"></i></div>
     </a>
-    <a href="<?= url('student/requirements.php') ?>" class="dashstat dashstat-amber">
+    <a href="#milestone-tracker" class="dashstat dashstat-amber">
         <div class="dashstat-text">
             <div class="dashstat-textvalue"><?= htmlspecialchars($activeLabel) ?></div>
             <div class="dashstat-label">Current Stage</div>
@@ -59,7 +59,7 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div class="dashstat-icon"><i class="fas fa-clock"></i></div>
     </a>
-    <a href="<?= url('student/requirements.php') ?>" class="dashstat dashstat-emerald">
+    <a href="#milestone-tracker" class="dashstat dashstat-emerald">
         <div class="dashstat-text">
             <div class="dashstat-value"><?= count($stages) ?></div>
             <div class="dashstat-label">Total Stages</div>
@@ -106,30 +106,8 @@ require_once __DIR__ . '/../includes/header.php';
                 <i class="fas fa-map-marker-alt" style="margin-right:6px;"></i>
                 Current Stage: <?= htmlspecialchars($stages[$currentIdx]['label'] ?? '') ?>
             </h4>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.5rem;">
-                <?php
-                $checks = [
-                    ['Paper Prepared & Submitted', $activeStage['paper']['status'] ?? 'pending', $activeStage['paper']['submitted'] ?? ''],
-                    ['Adviser Endorsement Submitted', $activeStage['adviserEndorsement']['status'] ?? 'pending', $activeStage['adviserEndorsement']['submitted'] ?? ''],
-                    ['Coordinator Document Review', $activeStage['coordReview']['status'] ?? 'pending', ''],
-                    ['Graduate School Endorsement', $activeStage['gradSchoolEndorsement']['status'] ?? 'pending', ''],
-                    ['Official Receipt / Payment Uploaded', $activeStage['payment']['status'] ?? 'pending', $activeStage['payment']['submitted'] ?? ''],
-                    ['Status Set to Ready for Presentation', $activeStage['readyForPresentation']['status'] ?? 'pending', ''],
-                    ['Presentation Scheduled', $activeStage['presentation']['status'] ?? 'pending', $activeStage['presentation']['date'] ?? ''],
-                    ['Presentation Conducted & Result Recorded', $activeStage['result']['status'] ?? 'pending', $activeStage['result']['value'] ?? ''],
-                ];
-                foreach ($checks as [$label, $state, $extra]):
-                ?>
-                <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;">
-                    <?= stepIconHtml($state === 'flagged' ? 'flagged' : ($state === 'done' ? 'done' : 'pending')) ?>
-                    <span style="color:<?= $state === 'done' ? 'var(--gray-700)' : 'var(--gray-400)' ?>;">
-                        <?= htmlspecialchars($label) ?><?= $extra ? ' (' . htmlspecialchars($extra) . ')' : '' ?>
-                    </span>
-                </div>
-                <?php endforeach; ?>
-            </div>
             <?php if (!empty($activeStage['coordinatorComments'])): ?>
-            <div class="alert alert-warning" style="margin-top:1rem;margin-bottom:0;">
+            <div class="alert alert-warning" style="margin-top:0;margin-bottom:0.75rem;">
                 <i class="fas fa-comment-alt"></i>
                 <div><strong>Coordinator note:</strong> <?= htmlspecialchars($activeStage['coordinatorComments']) ?></div>
             </div>
@@ -138,6 +116,114 @@ require_once __DIR__ . '/../includes/header.php';
         <?php endif; ?>
     </div>
 </div>
+
+<?php
+/*
+ * Milestone Tracker — the same milestones the student sees on the Process
+ * Tracker (Requirements) page, shown on the dashboard for every stage of the
+ * student's own track. The wording of each milestone follows the track and the
+ * stage, so thesis, capstone and seminar-paper students each see the labels
+ * that apply to their own paper.
+ */
+$milestoneTotal = 0;
+$milestoneDone = 0;
+$milestoneBlocks = [];
+foreach ($stages as $idx => $stage) {
+    $row = $progress[$idx] ?? blankStageProgress($stage);
+    $steps = milestoneStepsForStage($row, $track, $stage['key']);
+    $stats = milestoneProgress($steps);
+    $milestoneTotal += $stats['total'];
+    $milestoneDone += $stats['done'];
+    $milestoneBlocks[] = [
+        'stage'     => $stage,
+        'index'     => $idx,
+        'steps'     => $steps,
+        'stats'     => $stats,
+        'isCurrent' => $idx === $currentIdx,
+        'isDone'    => in_array($row['stageStatus'] ?? 'not_started', ['completed', 'approved'], true) || $idx < $currentIdx,
+    ];
+}
+$milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milestoneTotal) : 0;
+?>
+<div class="card milestone-card" id="milestone-tracker">
+    <div class="card-header">
+        <h3><i class="fas fa-tasks"></i> Milestone Tracker</h3>
+        <div class="ms-overview">
+            <span class="ms-overview-text"><?= (int) $milestoneDone ?> of <?= (int) $milestoneTotal ?> milestones complete</span>
+            <span class="ms-overview-bar"><span class="ms-overview-fill" style="width:<?= (int) $milestonePct ?>%;"></span></span>
+        </div>
+    </div>
+    <div class="card-body">
+        <?php foreach ($milestoneBlocks as $block):
+            $stage = $block['stage'];
+            $steps = $block['steps'];
+            $stats = $block['stats'];
+            $stageStatus = $progress[$block['index']]['stageStatus'] ?? 'not_started';
+            $stageIsSubmitted = !in_array($stageStatus, ['not_started', 'pending', 'draft', ''], true);
+            $stageStatusLabel = $stageIsSubmitted ? (STATUSES[$stageStatus]['label'] ?? 'Submitted') : 'Not Started';
+            $stageStatusClass = $stageIsSubmitted ? (STATUSES[$stageStatus]['class'] ?? 'status-submitted') : 'status-pending';
+            $openByDefault = $block['isCurrent'] || $block['isDone'];
+        ?>
+        <div class="ms-stage<?= $block['isCurrent'] ? ' is-current' : '' ?><?= $block['isDone'] ? ' is-done' : '' ?><?= $openByDefault ? ' is-open' : '' ?>" data-ms-stage>
+            <button type="button" class="ms-stage-head" data-ms-toggle aria-expanded="<?= $openByDefault ? 'true' : 'false' ?>">
+                <span class="ms-stage-num"><?= (int) $block['index'] + 1 ?></span>
+                <span class="ms-stage-title"><?= htmlspecialchars($stage['label']) ?></span>
+                <span class="ms-stage-count"><?= (int) $stats['done'] ?> / <?= (int) $stats['total'] ?> milestones</span>
+                <span class="status-badge <?= $stageStatusClass ?>" style="font-size:0.65rem;padding:2px 6px;"><?= htmlspecialchars($stageStatusLabel) ?></span>
+                <i class="fas fa-chevron-down ms-stage-caret" aria-hidden="true"></i>
+            </button>
+            <div class="ms-stage-body">
+                <?php foreach ($steps as $si => $step):
+                    $state = $step['state']['status'] ?? 'pending';
+                    $isDone = $state === 'done';
+                    $isFlagged = $state === 'flagged';
+                    $isActive = !$isDone && !$isFlagged && $si === $stats['firstPending'];
+                    $iconState = $isFlagged ? 'flagged' : ($isDone ? 'done' : ($isActive ? 'active' : 'pending'));
+                    $rowClass = $isFlagged ? 'is-flagged' : ($isDone ? 'is-done' : ($isActive ? 'is-active' : 'is-pending'));
+                ?>
+                <div class="ms-step <?= $rowClass ?>">
+                    <div class="ms-step-col">
+                        <?= stepIconHtml($iconState) ?>
+                        <?php if ($si < count($steps) - 1): ?>
+                        <span class="ms-step-line<?= $isDone ? ' done' : '' ?>"></span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="ms-step-body">
+                        <div class="ms-step-label">
+                            <span><?= htmlspecialchars($step['label']) ?></span>
+                            <?php if ($step['coord']): ?><span class="coord-chip">Coordinator</span><?php endif; ?>
+                            <?php if ($isActive): ?><span class="ms-step-tag active">Next</span><?php endif; ?>
+                            <?php if ($isDone): ?><span class="ms-step-tag done">Done</span><?php endif; ?>
+                            <?php if ($isFlagged): ?><span class="ms-step-tag flagged">Action needed</span><?php endif; ?>
+                        </div>
+                        <p class="ms-step-detail"><?= htmlspecialchars($step['detail']) ?></p>
+                    </div>
+                    <div class="ms-step-action">
+                        <?php if (!$isDone && !$step['coord'] && $si <= $stats['firstPending']): ?>
+                        <a class="btn btn-sm btn-primary" href="<?= url('student/upload.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload</a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+
+<script>
+(function () {
+    // Collapse / expand a stage block of the milestone tracker.
+    document.querySelectorAll('[data-ms-toggle]').forEach(toggle => {
+        toggle.addEventListener('click', () => {
+            const block = toggle.closest('[data-ms-stage]');
+            if (!block) return;
+            const open = block.classList.toggle('is-open');
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    });
+})();
+</script>
 
 <div class="card">
     <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> Scheduled Presentations</h3></div>
@@ -177,10 +263,10 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
         <div class="dashstat-icon"><i class="fas fa-file-alt"></i></div>
     </a>
-    <a href="<?= url('student/requirements.php') ?>" class="dashstat dashstat-amber">
+    <a href="#milestone-tracker" class="dashstat dashstat-amber">
         <div class="dashstat-text">
-            <div class="dashstat-textvalue">Process Tracker</div>
-            <div class="dashstat-desc">View the complete step-by-step progress for each <?= htmlspecialchars(strtolower($trackLabel)) ?> stage.</div>
+            <div class="dashstat-textvalue">Milestone Tracker</div>
+            <div class="dashstat-desc">Follow the step-by-step milestones of your <?= htmlspecialchars(strtolower($trackLabel)) ?> stages below.</div>
             <div class="dashstat-link">Open <i class="fas fa-arrow-right"></i></div>
         </div>
         <div class="dashstat-icon"><i class="fas fa-tasks"></i></div>

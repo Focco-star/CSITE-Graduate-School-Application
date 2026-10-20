@@ -314,6 +314,55 @@ function getWorkflow(string $track): array {
     return getDatabaseWorkflow($track, $thesis);
 }
 
+/**
+ * The documents a student must submit for a given track and stage.
+ * The list differs per track (thesis / capstone / seminar) and per stage, so
+ * the coordinator's checklist always matches the requirements of the paper
+ * actually under review.
+ *
+ * Each entry carries: label, kind (paper | adviser_endorsement | receipt |
+ * grad_school_endorsement) and the document_type the student uploads for it.
+ */
+function requiredDocumentsForStage(string $track, string $stageKey): array {
+    $workflow = getWorkflow($track);
+    $stage = null;
+    foreach ($workflow['stages'] as $candidate) {
+        if (($candidate['key'] ?? '') === $stageKey) {
+            $stage = $candidate;
+            break;
+        }
+    }
+    if (!$stage) {
+        return [];
+    }
+
+    $shortLabel = $stage['shortLabel'] ?? 'Paper';
+    $required = [];
+    foreach (($stage['documents'] ?? []) as $doc) {
+        $isReceipt = ($doc['type'] ?? '') === 'receipt';
+        $required[] = [
+            'label'   => $doc['label'] ?? '',
+            'kind'    => $isReceipt ? 'receipt' : 'paper',
+            'docType' => $isReceipt ? 'Official Receipt / Payment Proof' : ($shortLabel . ' Paper'),
+        ];
+    }
+    if (!empty($stage['adviserEndorsementForm']['label'])) {
+        $required[] = [
+            'label'   => $stage['adviserEndorsementForm']['label'],
+            'kind'    => 'adviser_endorsement',
+            'docType' => $shortLabel . ' Adviser Endorsement Form',
+        ];
+    }
+    if (!empty($stage['gradSchoolEndorsementForm']['label'])) {
+        $required[] = [
+            'label'   => $stage['gradSchoolEndorsementForm']['label'],
+            'kind'    => 'grad_school_endorsement',
+            'docType' => '',
+        ];
+    }
+    return $required;
+}
+
 function getDatabaseWorkflow(string $track, array $workflow): array {
     if (!class_exists('DB')) {
         return $workflow;
@@ -2961,6 +3010,122 @@ function stepIconHtml(string $state): string {
         return '<span class="step-icon step-icon-active"><span class="step-icon-dot"></span></span>';
     }
     return '<span class="step-icon step-icon-pending"></span>';
+}
+
+/**
+ * The milestone steps of one stage, with labels that follow the track and the
+ * stage. A thesis student therefore sees "Thesis Proposal Prepared &
+ * Submitted" and "Thesis Proposal Endorsement to Graduate School", while a
+ * capstone student sees the capstone wording, and a seminar-paper student the
+ * seminar wording.
+ *
+ * Each step: label, detail, state (done | flagged | pending), coord (whether
+ * the coordinator is responsible) and whether the student can still upload it.
+ */
+function milestoneStepsForStage(array $p, string $track, string $stageKey): array {
+    $stage = null;
+    foreach (getWorkflow($track)['stages'] as $candidate) {
+        if (($candidate['key'] ?? '') === $stageKey) {
+            $stage = $candidate;
+            break;
+        }
+    }
+    $paperLabel = $stage['documents'][0]['label'] ?? 'Paper';
+    $adviserLabel = $stage['adviserEndorsementForm']['label'] ?? 'Adviser Endorsement Form';
+    $gradLabel = $stage['gradSchoolEndorsementForm']['label'] ?? 'Endorsement to Graduate School';
+
+    return [
+        [
+            'label'  => $paperLabel . ' Prepared & Submitted',
+            'state'  => $p['paper'] ?? ['status' => 'pending'],
+            'coord'  => false,
+            'detail' => !empty($p['paper']['submitted'])
+                ? 'Uploaded: ' . $p['paper']['submitted']
+                : 'Upload your ' . strtolower($paperLabel) . ' to continue',
+        ],
+        [
+            'label'  => 'Adviser Endorsement Submitted',
+            'state'  => $p['adviserEndorsement'] ?? ['status' => 'pending'],
+            'coord'  => false,
+            'detail' => !empty($p['adviserEndorsement']['submitted'])
+                ? 'Uploaded: ' . $p['adviserEndorsement']['submitted']
+                : 'Obtain your adviser’s signature on the ' . $adviserLabel,
+        ],
+        [
+            'label'  => 'Coordinator Document Review',
+            'state'  => $p['coordReview'] ?? ['status' => 'pending'],
+            'coord'  => true,
+            'detail' => (($p['coordReview']['comment'] ?? '') ?: (($p['coordReview']['status'] ?? '') === 'done'
+                ? 'Documents verified'
+                : 'Waiting for coordinator')),
+        ],
+        [
+            'label'  => $gradLabel,
+            'state'  => $p['gradSchoolEndorsement'] ?? ['status' => 'pending'],
+            'coord'  => true,
+            'detail' => ($p['gradSchoolEndorsement']['status'] ?? '') === 'done'
+                ? 'Endorsement issued'
+                : 'Coordinator endorses the student to the Graduate School',
+        ],
+        [
+            'label'  => 'Official Receipt / Payment Uploaded',
+            'state'  => $p['payment'] ?? ['status' => 'pending'],
+            'coord'  => false,
+            'detail' => ($p['payment']['status'] ?? '') === 'done'
+                ? (!empty($p['payment']['submitted']) ? 'Verified: ' . $p['payment']['submitted'] : 'Payment verified')
+                : (!empty($p['payment']['submitted'])
+                    ? 'Received: ' . $p['payment']['submitted'] . ' — awaiting coordinator verification'
+                    : 'Submit the official receipt after payment at the Graduate School'),
+        ],
+        [
+            'label'  => 'Status Set to Ready for Presentation',
+            'state'  => $p['readyForPresentation'] ?? ['status' => 'pending'],
+            'coord'  => true,
+            'detail' => ($p['readyForPresentation']['status'] ?? '') === 'done'
+                ? 'Coordinator confirmed readiness'
+                : 'Coordinator marks ready after the receipt is verified',
+        ],
+        [
+            'label'  => 'Presentation Scheduled',
+            'state'  => $p['presentation'] ?? ['status' => 'pending'],
+            'coord'  => true,
+            'detail' => !empty($p['presentation']['date'])
+                ? trim($p['presentation']['date'] . ' – ' . ($p['presentation']['time'] ?? '')
+                    . (!empty($p['presentation']['venue']) ? ', ' . $p['presentation']['venue'] : '')
+                    . (!empty($p['presentation']['panel']) ? ' | Panel: ' . $p['presentation']['panel'] : ''))
+                : 'Coordinator schedules the date, time, venue, and panel',
+        ],
+        [
+            'label'  => 'Presentation Conducted & Result Recorded',
+            'state'  => $p['result'] ?? ['status' => 'pending'],
+            'coord'  => true,
+            'detail' => (($p['result']['value'] ?? '') === 'approved'
+                ? 'Approved — proceed to the next stage'
+                : (($p['result']['value'] ?? '') === 'revision'
+                    ? 'Revision required — resubmit the updated paper'
+                    : 'Awaiting presentation')),
+        ],
+    ];
+}
+
+/**
+ * How many milestones of a stage are complete, and the index of the first
+ * milestone that is still outstanding (used to decide which steps may still
+ * be uploaded by the student).
+ */
+function milestoneProgress(array $steps): array {
+    $done = 0;
+    $firstPending = 0;
+    foreach ($steps as $i => $step) {
+        if (($step['state']['status'] ?? 'pending') === 'done') {
+            $done++;
+            $firstPending = $i + 1;
+        } else {
+            $firstPending = $i;
+            break;
+        }
+    }
+    return ['done' => $done, 'total' => count($steps), 'firstPending' => $firstPending];
 }
 
 initPrototypeStore();

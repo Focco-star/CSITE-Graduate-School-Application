@@ -92,6 +92,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             $key = classifyUploadDocType((string) $upload['docType']);
             $workflowState[$key] = $uploadStatus;
         }
+
+        /*
+         * The "Graduate School endorsement issued", "Official payment /
+         * receipt recorded" and "Requirements verified; ready for presentation"
+         * checkboxes used to sit in the Workflow Records card. They now follow
+         * the state of the documents themselves: the coordinator confirms each
+         * requirement in the Submitted Documents checklist and the student's
+         * Process Tracker updates from that.
+         */
+        $docStatusByKind = [];
+        $postedStatuses = $_POST['upload_status'] ?? [];
+        foreach (uploadsForApplication((int) $app['id']) as $doc) {
+            $kind = classifyUploadDocType((string) ($doc['docType'] ?? ''));
+            $posted = $postedStatuses[(string) $doc['id']] ?? null;
+            $docStatusByKind[$kind] = $posted !== null ? $posted : (string) ($doc['status'] ?? 'submitted');
+        }
+        $receiptNumberInput = trim($_POST['receiptNumber'] ?? '');
+        $paperVerified = ($docStatusByKind['paper'] ?? '') === 'verified';
+        $adviserVerified = ($docStatusByKind['adviser_endorsement'] ?? '') === 'verified';
+        $receiptVerified = ($docStatusByKind['receipt'] ?? '') === 'verified';
+        $gradEndorsed = isset($_POST['gradSchoolEndorsed']);
+        $paymentRecorded = $receiptVerified || $receiptNumberInput !== '';
+        $readyForPresentation = $paperVerified && $adviserVerified;
         if ($advance && $status === 'approved') {
             $keys = array_keys($stages);
             $idx = array_search($stageKey, $keys, true);
@@ -105,12 +128,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             'stage' => $stages[$stageKey] ?? $app['stage'],
             'coordinatorComment' => $comment,
             'workflowState' => $workflowState,
-            'gradSchoolEndorsed' => isset($_POST['gradSchoolEndorsed']),
-            'paymentRecorded' => isset($_POST['paymentRecorded']),
-            'receiptNumber' => trim($_POST['receiptNumber'] ?? ''),
+            'gradSchoolEndorsed' => $gradEndorsed,
+            'paymentRecorded' => $paymentRecorded,
+            'receiptNumber' => $receiptNumberInput,
             'paymentDate' => trim($_POST['paymentDate'] ?? ''),
             'paymentAmount' => trim($_POST['paymentAmount'] ?? ''),
-            'readyForPresentation' => isset($_POST['readyForPresentation']),
+            'readyForPresentation' => $readyForPresentation,
             'result' => trim($_POST['result'] ?? ''),
         ];
 
@@ -172,6 +195,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
 $track = $app ? ($app['track'] ?? getTrackForProgram($app['program'])) : 'thesis';
 $stages = getStagesForTrack($track);
 $uploads = $app ? uploadsForApplication((int) $app['id']) : [];
+$trackLabel = getTrackLabel($track);
+// The stage the application is currently on — it decides which documents are required.
+$stageKey = $app ? (string) ($app['stageKey'] ?? stageKeyFromLabel((string) ($app['stage'] ?? ''))) : 'proposal';
+$requiredDocs = requiredDocumentsForStage($track, $stageKey);
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>
@@ -242,37 +269,11 @@ require_once __DIR__ . '/../../includes/header.php';
     </div>
 
     <div class="card">
-        <div class="card-header"><h3>Workflow Records</h3></div>
-        <div class="card-body">
-            <div class="form-row">
-                <div class="form-field"><label><input type="checkbox" name="gradSchoolEndorsed" value="1" style="width:auto;margin-right:.5rem;" <?= !empty($app['gradSchoolEndorsed']) ? 'checked' : '' ?>>Graduate School endorsement issued</label></div>
-                <div class="form-field"><label><input type="checkbox" name="readyForPresentation" value="1" style="width:auto;margin-right:.5rem;" <?= !empty($app['readyForPresentation']) ? 'checked' : '' ?>>Requirements verified; ready for presentation</label></div>
-            </div>
-            <div class="form-row">
-                <div class="form-field"><label><input type="checkbox" name="paymentRecorded" value="1" style="width:auto;margin-right:.5rem;" <?= !empty($app['paymentRecorded']) ? 'checked' : '' ?>>Official payment / receipt recorded</label></div>
-                <div class="form-field"><label>Receipt Number</label><input type="text" name="receiptNumber" value="<?= htmlspecialchars($app['receiptNumber'] ?? '') ?>" placeholder="Receipt number"></div>
-            </div>
-            <div class="form-row">
-                <div class="form-field"><label>Payment Date</label><input type="date" name="paymentDate" value="<?= htmlspecialchars($app['paymentDate'] ?? '') ?>"></div>
-                <div class="form-field"><label>Amount</label><input type="text" name="paymentAmount" value="<?= htmlspecialchars($app['paymentAmount'] ?? '') ?>" placeholder="e.g. 1500.00"></div>
-            </div>
-            <div class="form-row">
-                <div class="form-field">
-                    <label>Presentation Result</label>
-                    <select name="result">
-                        <option value="" <?= empty($app['result']) ? 'selected' : '' ?>>Not yet presented</option>
-                        <option value="approved" <?= ($app['result'] ?? '') === 'approved' ? 'selected' : '' ?>>Approved — advance to next stage</option>
-                        <option value="requires_revision" <?= ($app['result'] ?? '') === 'requires_revision' ? 'selected' : '' ?>>Requires Revision</option>
-                    </select>
-                    <p class="field-hint">Recorded after the presentation is conducted; this is reflected on the student Process Tracker.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card">
         <div class="card-header"><h3>Submitted Documents</h3></div>
         <div class="card-body">
+            <?php if ($requiredDocs): ?>
+            <p class="field-hint" style="margin-bottom:0.75rem;">Required documents for the <strong><?= htmlspecialchars($trackLabel) ?></strong> track — <?= htmlspecialchars($stages[$stageKey] ?? $app['stage']) ?>.</p>
+            <?php endif; ?>
             <div class="table-responsive">
                 <table class="data-table">
                     <thead><tr><th>Document</th><th>Review Status</th><th>Action</th></tr></thead>
@@ -284,11 +285,90 @@ require_once __DIR__ . '/../../includes/header.php';
                         <tr>
                             <td><?= htmlspecialchars($doc['fileName']) ?></td>
                             <td><select name="upload_status[<?= htmlspecialchars($doc['id']) ?>]" style="padding:3px 8px;"><option value="submitted" <?= $doc['status'] === 'submitted' ? 'selected' : '' ?>>Submitted</option><option value="verified" <?= $doc['status'] === 'verified' || $doc['status'] === 'approved' ? 'selected' : '' ?>>Verified</option><option value="incomplete" <?= $doc['status'] === 'incomplete' ? 'selected' : '' ?>>Incomplete</option></select></td>
-                            <td><?php if (uploadStoragePath($doc)): ?><a target="_blank" class="btn btn-sm btn-outline" href="<?= url('coordinator/download.php?id=' . urlencode($doc['id']) . '&view=1') ?>"><i class="fas fa-eye"></i> View</a><?php else: ?><span style="color:var(--gray-400);font-size:.8rem;">Unavailable</span><?php endif; ?></td>
+                            <td><?php if (uploadStoragePath($doc)): ?><a class="btn btn-sm btn-outline" href="<?= url('coordinator/download.php?id=' . urlencode($doc['id'])) ?>"><i class="fas fa-download"></i> Download</a><?php else: ?><span style="color:var(--gray-400);font-size:.8rem;">Unavailable</span><?php endif; ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
+            </div>
+
+            <?php if ($requiredDocs): ?>
+            <div class="req-checklist">
+                <h4>Requirements Checklist</h4>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead><tr><th>Required Document</th><th>Status</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($requiredDocs as $req):
+                                $kind = $req['kind'];
+                                $matched = null;
+                                // Prefer an exact document-type match, then fall back
+                                // to the kind so a slightly different label still matches.
+                                foreach ($uploads as $doc) {
+                                    if ($req['docType'] !== '' && strcasecmp((string) ($doc['docType'] ?? ''), $req['docType']) === 0) {
+                                        $matched = $doc;
+                                        break;
+                                    }
+                                }
+                                if (!$matched) {
+                                    foreach ($uploads as $doc) {
+                                        if (classifyUploadDocType((string) ($doc['docType'] ?? '')) === $kind) {
+                                            $matched = $doc;
+                                            break;
+                                        }
+                                    }
+                                }
+                                $isDone = $matched && in_array($matched['status'] ?? '', ['verified', 'approved'], true);
+                                $isMissing = !$matched;
+                                $isFlagged = $matched && ($matched['status'] ?? '') === 'incomplete';
+                            ?>
+                            <tr>
+                                <td><?= htmlspecialchars($req['label']) ?></td>
+                                <td>
+                                    <?php if ($kind === 'grad_school_endorsement'): ?>
+                                        <?php // Issued by the coordinator, so it is not an upload. ?>
+                                        <label style="display:inline-flex;align-items:center;gap:.45rem;font-size:.8rem;cursor:pointer;">
+                                            <input type="checkbox" name="gradSchoolEndorsed" value="1" style="width:auto;" <?= !empty($app['gradSchoolEndorsed']) ? 'checked' : '' ?>>
+                                            <span><?= !empty($app['gradSchoolEndorsed']) ? 'Issued' : 'Not yet issued' ?></span>
+                                        </label>
+                                    <?php elseif ($isDone): ?>
+                                        <span class="status-badge status-approved">Verified</span>
+                                    <?php elseif ($isFlagged): ?>
+                                        <span class="status-badge status-revision">Incomplete</span>
+                                    <?php elseif ($isMissing): ?>
+                                        <span class="status-badge status-pending">Not Submitted</span>
+                                    <?php else: ?>
+                                        <span class="status-badge status-submitted">Submitted</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Workflow Records</h3></div>
+        <div class="card-body">
+            <div class="form-row">
+                <div class="form-field"><label>Receipt Number</label><input type="text" name="receiptNumber" value="<?= htmlspecialchars($app['receiptNumber'] ?? '') ?>" placeholder="Receipt number"></div>
+                <div class="form-field"><label>Payment Date</label><input type="date" name="paymentDate" value="<?= htmlspecialchars($app['paymentDate'] ?? '') ?>"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-field"><label>Amount</label><input type="text" name="paymentAmount" value="<?= htmlspecialchars($app['paymentAmount'] ?? '') ?>" placeholder="e.g. 1500.00"></div>
+                <div class="form-field">
+                    <label>Presentation Result</label>
+                    <select name="result">
+                        <option value="" <?= empty($app['result']) ? 'selected' : '' ?>>Not yet presented</option>
+                        <option value="approved" <?= ($app['result'] ?? '') === 'approved' ? 'selected' : '' ?>>Approved — advance to next stage</option>
+                        <option value="requires_revision" <?= ($app['result'] ?? '') === 'requires_revision' ? 'selected' : '' ?>>Requires Revision</option>
+                    </select>
+                    <p class="field-hint">Recorded after the presentation is conducted; this is reflected on the student Process Tracker.</p>
+                </div>
             </div>
         </div>
     </div>

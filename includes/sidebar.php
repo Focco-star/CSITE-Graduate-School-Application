@@ -26,15 +26,7 @@ $isCoordinator = ($role === 'coordinator');
 $studentLinks = [
     ['key' => 'dashboard',   'label' => 'Dashboard',   'icon' => 'fa-gauge-high', 'href' => url('student/dashboard.php')],
     ['key' => 'application', 'label' => 'Application', 'icon' => 'fa-file-lines', 'href' => url('student/application.php')],
-    [
-        'key'     => 'process',
-        'label'   => 'Process',
-        'icon'    => 'fa-gears',
-        'submenu' => [
-            ['key' => 'requirements', 'label' => 'Requirements', 'icon' => 'fa-list-check', 'href' => url('student/requirements.php')],
-            ['key' => 'templates',    'label' => 'Templates',    'icon' => 'fa-file-arrow-down', 'href' => url('student/templates.php')],
-        ],
-    ],
+    ['key' => 'templates',   'label' => 'Templates',   'icon' => 'fa-file-arrow-down', 'href' => url('student/templates.php')],
 ];
 
 $coordinatorLinks = [
@@ -46,15 +38,6 @@ $coordinatorLinks = [
         'submenu' => [
             ['key' => 'applications',          'label' => 'Applications',         'icon' => 'fa-inbox',       'href' => url('coordinator/applications/manage.php')],
             ['key' => 'archived_applications', 'label' => 'Archived Application', 'icon' => 'fa-box-archive', 'href' => url('coordinator/applications/archived.php')],
-        ],
-    ],
-    [
-        'key'     => 'students',
-        'label'   => 'Students',
-        'icon'    => 'fa-user-graduate',
-        'submenu' => [
-            ['key' => 'students',          'label' => 'Students',          'icon' => 'fa-users',       'href' => url('coordinator/students/manage.php')],
-            ['key' => 'archived_students', 'label' => 'Archived Students', 'icon' => 'fa-box-archive', 'href' => url('coordinator/students/archived.php')],
         ],
     ],
     ['key' => 'templates', 'label' => 'Templates/Form',         'icon' => 'fa-file-pen',      'href' => url('coordinator/templates/manage.php')],
