@@ -23,10 +23,30 @@ $currentPage = $currentPage ?? '';
 $userName    = $userName ?? ($_SESSION['user']['full_name'] ?? '');
 $isCoordinator = ($role === 'coordinator');
 
+/**
+ * Template updates the user has not looked at yet.
+ *
+ * A student only counts the updates of their own track; the coordinator
+ * counts all of them. The badge is refreshed in the background by
+ * template_sync.php, so a file the teacher just added to Google Drive
+ * shows up here without a page reload.
+ */
+$templateBadgeCount = 0;
+if (function_exists('templateNotificationsUnreadCount') && class_exists('DB')) {
+    try {
+        $templateBadgeCount = $isCoordinator
+            ? templateNotificationsUnreadCount('coordinator')
+            : templateNotificationsUnreadCount('student', currentStudentTrackCode());
+    } catch (Throwable $e) {
+        $templateBadgeCount = 0;
+    }
+}
+$templateBadgeCount = max(0, (int) $templateBadgeCount);
+
 $studentLinks = [
     ['key' => 'dashboard',   'label' => 'Dashboard',   'icon' => 'fa-gauge-high', 'href' => url('student/dashboard.php')],
     ['key' => 'application', 'label' => 'Application', 'icon' => 'fa-file-lines', 'href' => url('student/application.php')],
-    ['key' => 'templates',   'label' => 'Templates',   'icon' => 'fa-file-arrow-down', 'href' => url('student/templates.php')],
+    ['key' => 'templates',   'label' => 'Templates',   'icon' => 'fa-file-arrow-down', 'href' => url('student/templates.php'), 'badge' => $templateBadgeCount],
 ];
 
 $coordinatorLinks = [
@@ -40,7 +60,7 @@ $coordinatorLinks = [
             ['key' => 'archived_applications', 'label' => 'Archived Application', 'icon' => 'fa-box-archive', 'href' => url('coordinator/applications/archived.php')],
         ],
     ],
-    ['key' => 'templates', 'label' => 'Templates/Form',         'icon' => 'fa-file-pen',      'href' => url('coordinator/templates/manage.php')],
+    ['key' => 'templates', 'label' => 'Templates/Form',         'icon' => 'fa-file-pen',      'href' => url('coordinator/templates/manage.php'), 'badge' => $templateBadgeCount],
     ['key' => 'panel',     'label' => 'Panel Members',          'icon' => 'fa-users-gear',    'href' => url('coordinator/panel/manage.php')],
     ['key' => 'advisers',  'label' => 'Pool of Advisers',       'icon' => 'fa-user-tie',      'href' => url('coordinator/advisers/manage.php')],
     ['key' => 'schedule',  'label' => 'Presentation Schedules', 'icon' => 'fa-calendar-days', 'href' => url('coordinator/schedule/manage.php')],
@@ -225,6 +245,24 @@ $showCoordinatorSection = $isCoordinator;
   #sidebar.myadzu-sidebar .myadzu-social-link i { width: 20px; text-align: center; color: #FFB82B; font-size: .9rem; }
   #sidebar.myadzu-sidebar .myadzu-social-link:hover { background: #2e3844; color: #ffffff; }
   #sidebar.myadzu-sidebar .myadzu-empty { padding: .4rem 1.25rem; font-size: .78rem; color: #8a94a6; font-style: italic; }
+  /* Template update badge on the Templates menu item */
+  #sidebar.myadzu-sidebar .myadzu-badge {
+    margin-left: auto;
+    flex: 0 0 auto;
+    min-width: 1.2rem;
+    height: 1.2rem;
+    padding: 0 .32rem;
+    border-radius: 999px;
+    background: #e02424;
+    color: #ffffff;
+    font-size: .64rem;
+    font-weight: 800;
+    line-height: 1.2rem;
+    text-align: center;
+    box-shadow: 0 0 0 2px #232b35;
+  }
+  #sidebar.myadzu-sidebar .myadzu-badge[hidden] { display: none; }
+  #sidebar.myadzu-sidebar .myadzu-link.active .myadzu-badge { box-shadow: 0 0 0 2px #1a222c; }
   #sidebar.myadzu-sidebar::-webkit-scrollbar,
   #sidebar.myadzu-sidebar .myadzu-nav::-webkit-scrollbar { width: 8px; }
   #sidebar.myadzu-sidebar .myadzu-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 4px; }
@@ -298,6 +336,11 @@ $showCoordinatorSection = $isCoordinator;
                        href="<?= $item['href'] ?>">
                       <i class="fas <?= htmlspecialchars($item['icon']) ?>" aria-hidden="true"></i>
                       <span><?= htmlspecialchars($item['label']) ?></span>
+                      <?php if (array_key_exists('badge', $item)):
+                          $badgeCount = (int) $item['badge']; ?>
+                        <span class="myadzu-badge" data-template-badge<?= $badgeCount > 0 ? '' : ' hidden' ?>
+                              title="<?= $badgeCount ?> template update<?= $badgeCount === 1 ? '' : 's' ?> to review"><?= $badgeCount > 9 ? '9+' : $badgeCount ?></span>
+                      <?php endif; ?>
                     </a>
                   <?php endif; ?>
                 </li>
@@ -352,6 +395,11 @@ $showCoordinatorSection = $isCoordinator;
                        href="<?= $item['href'] ?>">
                       <i class="fas <?= htmlspecialchars($item['icon']) ?>" aria-hidden="true"></i>
                       <span><?= htmlspecialchars($item['label']) ?></span>
+                      <?php if (array_key_exists('badge', $item)):
+                          $badgeCount = (int) $item['badge']; ?>
+                        <span class="myadzu-badge" data-template-badge<?= $badgeCount > 0 ? '' : ' hidden' ?>
+                              title="<?= $badgeCount ?> template update<?= $badgeCount === 1 ? '' : 's' ?> to review"><?= $badgeCount > 9 ? '9+' : $badgeCount ?></span>
+                      <?php endif; ?>
                     </a>
                   <?php endif; ?>
                 </li>
@@ -441,5 +489,46 @@ $showCoordinatorSection = $isCoordinator;
   input.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { input.value = ''; applyFilter(); }
   });
+
+  // Keep the template update badge in step with Google Drive. The endpoint
+  // only looks at Drive when the last check has gone stale, so this stays
+  // cheap and never blocks the page.
+  var badge = document.querySelector('[data-template-badge]');
+  var pendingBadge = document.querySelector('[data-template-pending]');
+  if ((badge || pendingBadge) && window.fetch) {
+    var refreshBadge = function () {
+      fetch(<?= json_encode(url('template_sync.php')) ?>, { credentials: 'same-origin' })
+        .then(function (response) { return response.ok ? response.json() : null; })
+        .then(function (data) {
+          if (!data) return;
+          if (badge && typeof data.count === 'number') {
+            if (data.count > 0) {
+              badge.textContent = data.count > 9 ? '9+' : String(data.count);
+              badge.title = data.count + ' template update' + (data.count === 1 ? '' : 's') + ' to review';
+              badge.hidden = false;
+            } else {
+              badge.hidden = true;
+            }
+          }
+          // The number of files in Google Drive that are not in the system
+          // yet. The coordinator applies them with "Sync from Google Drive".
+          if (pendingBadge && typeof data.pending === 'number') {
+            if (data.pending > 0) {
+              pendingBadge.textContent = data.pending > 9 ? '9+' : String(data.pending);
+              pendingBadge.title = data.pending + ' file(s) waiting to be synchronized';
+              pendingBadge.hidden = false;
+            } else {
+              pendingBadge.hidden = true;
+            }
+          }
+        })
+        .catch(function () {});
+    };
+    if (document.readyState === 'complete') {
+      setTimeout(refreshBadge, 1200);
+    } else {
+      window.addEventListener('load', function () { setTimeout(refreshBadge, 1200); });
+    }
+  }
 })();
 </script>
