@@ -13,6 +13,47 @@ $track       = $mockStudent['track'] ?? getTrackForProgram($mockStudent['program
 $trackLabel  = getTrackLabel($track);
 $workflow    = getWorkflow($track);
 $databaseTemplates = databaseTemplateRows($track);
+$configuredFiles = [];
+foreach ($workflow['stages'] as $configuredStage) {
+    foreach ($configuredStage['documents'] as $configuredDocument) {
+        if (($configuredDocument['file'] ?? '') !== '') {
+            $configuredFiles[strtolower(trim($configuredDocument['file']))] = true;
+        }
+    }
+    foreach (['adviserEndorsementForm', 'gradSchoolEndorsementForm'] as $formKey) {
+        $configuredFile = $configuredStage[$formKey]['file'] ?? '';
+        if ($configuredFile !== '') {
+            $configuredFiles[strtolower(trim($configuredFile))] = true;
+        }
+    }
+}
+foreach ($workflow['refs'] as $configuredReference) {
+    if (($configuredReference['file'] ?? '') !== '') {
+        $configuredFiles[strtolower(trim($configuredReference['file']))] = true;
+    }
+}
+$databaseByStage = [];
+$databaseReferences = [];
+foreach ($databaseTemplates as $template) {
+    $databaseFile = strtolower(trim((string) ($template['file'] ?? '')));
+    if ($databaseFile !== '' && isset($configuredFiles[$databaseFile])) {
+        continue;
+    }
+    $templateStage = trim((string) ($template['stage'] ?? ''));
+    $templateDoc = [
+        'label' => $template['label'] ?? $template['file'] ?? 'Template',
+        'file' => $template['file'] ?? '',
+        'folder' => '',
+        'type' => strtolower((string) ($template['docType'] ?? 'template')),
+        'description' => $template['description'] ?? '',
+        'url' => $template['url'] ?? '',
+    ];
+    if ($templateStage === '' || $templateStage === 'Reference Documents') {
+        $databaseReferences[] = $templateDoc;
+    } else {
+        $databaseByStage[$templateStage][] = $templateDoc;
+    }
+}
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -54,43 +95,6 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <div id="studentTplGrid">
-<?php if ($databaseTemplates): ?>
-<div class="card">
-    <div class="card-header">
-        <h3><i class="fas fa-folder-open"></i> Available Templates &amp; Forms</h3>
-    </div>
-    <div class="card-body">
-        <div class="template-grid">
-            <?php foreach ($databaseTemplates as $template):
-                $dbStage = trim((string) ($template['stage'] ?? '')) ?: 'Reference Documents';
-                $dbType = ucfirst(strtolower(trim((string) ($template['docType'] ?? ''))));
-                if (!in_array($dbType, ['Form', 'Template', 'Reference'], true)) {
-                    $dbType = 'Template';
-                }
-                $dbSearch = strtolower(trim(implode(' ', [
-                    $template['label'] ?? '',
-                    $template['file'] ?? '',
-                    $template['description'] ?? '',
-                    $dbStage,
-                    $dbType,
-                ])));
-                $dbIcon = $dbType === 'Form' ? 'fa-file-signature' : ($dbType === 'Reference' ? 'fa-book-open' : 'fa-file-word');
-            ?>
-            <div class="template-item" data-stage="<?= htmlspecialchars($dbStage) ?>" data-type="<?= htmlspecialchars($dbType) ?>" data-search="<?= htmlspecialchars($dbSearch) ?>">
-                <div class="template-icon"><i class="fas <?= $dbIcon ?>"></i></div>
-                <h4><?= htmlspecialchars($template['label'] ?? $template['file'] ?? 'Untitled document') ?></h4>
-                <p><?= htmlspecialchars($template['description'] ?? '') ?></p>
-                <span class="template-meta"><i class="fas fa-tag"></i> <?= htmlspecialchars($dbType) ?></span>
-                <a class="btn btn-primary btn-sm" href="<?= htmlspecialchars($template['url']) ?>" download>
-                    <i class="fas fa-download"></i> Download
-                </a>
-            </div>
-            <?php endforeach; ?>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
-
 <?php foreach ($workflow['stages'] as $stage):
     $stageDocs = [$stage['adviserEndorsementForm'], $stage['gradSchoolEndorsementForm']];
     foreach ($stage['documents'] as $doc) {
@@ -98,8 +102,11 @@ require_once __DIR__ . '/../includes/header.php';
             $stageDocs[] = $doc;
         }
     }
+    foreach ($databaseByStage[$stage['label']] ?? [] as $databaseDoc) {
+        $stageDocs[] = $databaseDoc;
+    }
     $stageDocs = array_values(array_filter($stageDocs, static function ($d) {
-        return ($d['file'] ?? '') !== '';
+        return ($d['file'] ?? '') !== '' || ($d['url'] ?? '') !== '';
     }));
 ?>
 <div class="card">
@@ -109,15 +116,19 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="card-body">
         <div class="template-grid">
             <?php foreach ($stageDocs as $doc):
-                $href = asset('papers/' . rawurlencode($doc['folder']) . '/' . rawurlencode($doc['file']));
-                $isForm = ($doc['type'] ?? '') === 'form';
+                $href = ($doc['url'] ?? '') !== ''
+                    ? $doc['url']
+                    : asset('papers/' . rawurlencode($doc['folder']) . '/' . rawurlencode($doc['file']));
+                $isForm = strtolower((string) ($doc['type'] ?? '')) === 'form';
+                $isReference = strtolower((string) ($doc['type'] ?? '')) === 'reference';
+                $displayType = $isForm ? 'Form' : ($isReference ? 'Reference' : 'Template');
                 $searchKeywords = strtolower($doc['label'] . ' ' . $doc['file'] . ' ' . ($doc['description'] ?? '') . ' ' . $stage['label'] . ' ' . ($stage['shortLabel'] ?? '') . ' ' . ($isForm ? 'form' : 'template'));
             ?>
-            <div class="template-item" data-stage="<?= htmlspecialchars($stage['label']) ?>" data-type="<?= $isForm ? 'Form' : 'Template' ?>" data-search="<?= htmlspecialchars($searchKeywords) ?>">
-                <div class="template-icon"><i class="fas <?= $isForm ? 'fa-file-signature' : 'fa-file-word' ?>"></i></div>
+            <div class="template-item" data-stage="<?= htmlspecialchars($stage['label']) ?>" data-type="<?= htmlspecialchars($displayType) ?>" data-search="<?= htmlspecialchars($searchKeywords) ?>">
+                <div class="template-icon"><i class="fas <?= $isForm ? 'fa-file-signature' : ($isReference ? 'fa-book-open' : 'fa-file-word') ?>"></i></div>
                 <h4><?= htmlspecialchars($doc['label']) ?></h4>
                 <p><?= htmlspecialchars($doc['description']) ?></p>
-                <span class="template-meta"><i class="fas fa-tag"></i> <?= $isForm ? 'Form' : 'Template' ?></span>
+                <span class="template-meta"><i class="fas fa-tag"></i> <?= $isForm ? 'Form' : ($isReference ? 'Reference' : 'Template') ?></span>
                 <a class="btn btn-primary btn-sm" style="align-self:flex-start;" href="<?= htmlspecialchars($href) ?>" download>
                     <i class="fas fa-download"></i> Download
                 </a>
@@ -135,15 +146,18 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
     <div class="card-body">
         <div class="template-grid">
-            <?php foreach ($workflow['refs'] as $doc):
+            <?php foreach (array_merge($workflow['refs'], $databaseReferences) as $doc):
                 $searchKeywords = strtolower($doc['label'] . ' ' . $doc['file'] . ' ' . ($doc['description'] ?? '') . ' reference documents');
+                $href = ($doc['url'] ?? '') !== ''
+                    ? $doc['url']
+                    : asset('papers/' . rawurlencode($doc['folder']) . '/' . rawurlencode($doc['file']));
             ?>
             <div class="template-item" data-stage="Reference Documents" data-type="Reference" data-search="<?= htmlspecialchars($searchKeywords) ?>">
                 <div class="template-icon"><i class="fas fa-file-word"></i></div>
                 <h4><?= htmlspecialchars($doc['label']) ?></h4>
                 <p><?= htmlspecialchars($doc['description']) ?></p>
                 <span class="template-meta"><i class="fas fa-tag"></i> Reference</span>
-                <a class="btn btn-primary btn-sm" style="align-self:flex-start;" href="<?= htmlspecialchars(asset('papers/' . rawurlencode($doc['folder']) . '/' . rawurlencode($doc['file']))) ?>" download>
+                <a class="btn btn-primary btn-sm" style="align-self:flex-start;" href="<?= htmlspecialchars($href) ?>" download>
                     <i class="fas fa-download"></i> Download
                 </a>
             </div>
