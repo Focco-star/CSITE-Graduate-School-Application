@@ -198,6 +198,7 @@ img { max-width: 100%; height: auto; }
 
 .main-wrapper {
     flex: 1;
+    min-width: 0;
     margin-left: var(--sidebar-width);
     display: flex;
     flex-direction: column;
@@ -246,6 +247,7 @@ img { max-width: 100%; height: auto; }
 
 .main-content {
     flex: 1;
+    min-width: 0;
     padding: 1.5rem;
 }
 
@@ -830,6 +832,148 @@ img { max-width: 100%; height: auto; }
     border-top: 1px solid var(--gray-200);
 }
 
+/* ------------------------------------------------------------------
+ * Application page workflow
+ *
+ * The student fills the form, uploads a document, then submits. The
+ * action buttons live under the document step and stay locked until a
+ * document has been uploaded.
+ * ------------------------------------------------------------------ */
+
+.submit-steps {
+    list-style: none;
+    margin: 0 0 1.5rem;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+}
+
+.submit-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.75rem;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    background: var(--gray-100);
+    opacity: 0.75;
+}
+
+.submit-step-num {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    background: var(--gray-300);
+    color: var(--gray-600);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.submit-step-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.78rem;
+    color: var(--gray-500);
+}
+
+.submit-step-text strong {
+    font-size: 0.82rem;
+    color: var(--gray-700);
+}
+
+.submit-step.is-current {
+    border-color: var(--adzu-navy);
+    background: var(--white);
+    opacity: 1;
+}
+
+.submit-step.is-current .submit-step-num {
+    background: var(--adzu-navy);
+    color: var(--white);
+}
+
+.submit-step.is-current .submit-step-text strong {
+    color: var(--adzu-navy);
+}
+
+.submit-step.is-done {
+    border-color: var(--success);
+    background: var(--white);
+    opacity: 1;
+}
+
+.submit-step.is-done .submit-step-num {
+    background: var(--success);
+    color: var(--white);
+}
+
+.submit-step.is-done .submit-step-text strong {
+    color: var(--success);
+}
+
+.submit-step.is-locked .submit-step-text strong {
+    color: var(--gray-400);
+}
+
+/* Locked action buttons: dimmed, and they refuse to be clicked. */
+.btn[disabled],
+.btn[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+}
+
+.btn[disabled]:hover {
+    background: var(--adzu-gold);
+    color: var(--adzu-navy-dark);
+}
+
+.btn-outline[disabled]:hover,
+.btn-outline[aria-disabled="true"]:hover {
+    border-color: var(--gray-300);
+    color: var(--gray-600);
+}
+
+.submit-actions {
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 2px solid var(--gray-200);
+}
+
+.action-lock-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--gray-500);
+}
+
+.action-lock-hint.is-unlocked {
+    color: var(--success);
+}
+
+.action-lock-hint.is-nudging {
+    color: var(--danger);
+    animation: csite-nudge 0.4s ease-in-out;
+}
+
+@keyframes csite-nudge {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
+
+@media (max-width: 768px) {
+    .submit-steps { grid-template-columns: 1fr; }
+}
+
 .file-upload-area {
     border: 2px dashed var(--gray-300);
     border-radius: var(--radius-lg);
@@ -1015,6 +1159,47 @@ img { max-width: 100%; height: auto; }
 }
 tr.app-child-row { display: none; }
 tr.app-child-row.is-shown { display: table-row; }
+
+/* Coordinator > applications menu: one row per registered student. */
+.student-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.student-name-link {
+    font-weight: 600;
+    color: var(--adzu-navy);
+}
+
+.student-name-link:hover { text-decoration: underline; }
+
+.app-title-cell {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.track-chip {
+    display: inline-block;
+    font-size: 0.75rem;
+    background: var(--gray-100);
+    color: var(--gray-600);
+    padding: 2px 8px;
+    border-radius: 99px;
+}
+
+.text-muted-soft { color: var(--gray-400); font-style: italic; }
+
+/* A student whose newest application does not pass the current filter: its
+   details are neutralised so the table never shows a filtered-out record. */
+tr.app-group-row.is-parent-mismatch td[data-app-cell] > .cell-value { display: none; }
+tr.app-group-row.is-parent-mismatch td[data-app-cell]::after {
+    content: '—';
+    color: var(--gray-400);
+}
+
 tr.app-child-row > td {
     background: var(--gray-50);
     font-size: 0.8rem;
@@ -1052,11 +1237,291 @@ tr.app-child-row[hidden] { display: none; }
 
 .status-pending { background: var(--warning-bg); color: var(--warning); }
 .status-submitted { background: var(--info-bg); color: var(--info); }
-.status-review { background: var(--purple-bg); color: var(--purple); }
+.status-review { background: var(--warning-bg); color: var(--warning); }
 .status-approved { background: var(--success-bg); color: var(--success); }
 .status-confirmed { background: rgba(6, 2, 151, 0.12); color: var(--adzu-navy); }
 .status-revision { background: var(--danger-bg); color: var(--danger); }
-.status-completed { background: var(--adzu-navy); color: var(--white); }
+.status-completed { background: var(--success); color: var(--white); }
+
+/* Application status palette of the coordinator's Applications menu.
+   Gray — Not Yet Submitted (automatic indicator, never editable)
+   Blue — Submitted
+   Yellow — Under Review
+   Green — Ready for Presentation
+   Purple — Scheduled for Presentation
+   Dark green — Presentation Complete */
+.status-not-submitted { background: var(--gray-100); color: var(--gray-600); }
+.status-ready { background: var(--success-bg); color: var(--success); }
+.status-scheduled { background: var(--purple-bg); color: var(--purple); }
+
+/* A stage the student may not work on yet. */
+.status-locked { background: var(--gray-200); color: var(--gray-600); }
+
+.stage-stepper-item.is-locked { opacity: 0.75; }
+.stage-stepper-item.is-locked .stage-stepper-num { background: var(--gray-200); color: var(--gray-500); }
+
+.timeline-item.locked { opacity: 0.75; }
+.timeline-item.locked .timeline-dot { background: var(--gray-300); }
+.timeline-item.locked h4 { color: var(--gray-500); }
+
+.ms-stage.is-locked { background: var(--gray-50); border-style: dashed; }
+.ms-stage.is-locked .ms-stage-num { background: var(--gray-200); color: var(--gray-600); }
+.ms-stage.is-locked .ms-stage-title { color: var(--gray-500); }
+
+.ms-locked-note {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.6rem 0 0.2rem;
+    font-size: 0.8rem;
+    color: var(--gray-500);
+}
+
+/* Attach status line of the Application page, in the same style as the
+   Milestone Tracker notifications on the Student Dashboard. */
+.attach-status {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0 0 0.9rem;
+}
+
+.attach-status .ms-step-tag {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    white-space: nowrap;
+}
+
+.attach-status-note {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+}
+
+/* ------------------------------------------------------------------
+ * Sliding progress tracker (coordinator > applications > edit)
+ *
+ * The stages of the student's track are shown as cards in a track that
+ * slides horizontally. The selected stage drives every section below.
+ * ------------------------------------------------------------------ */
+.stage-slider {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0.75rem;
+    width: 100%;
+    margin: 0 auto 0.75rem;
+    max-width: 1180px;
+    padding: 0.35rem 0;
+}
+
+.stage-slider-nav {
+    flex-shrink: 0;
+    width: 42px;
+    align-self: center;
+    border: 1px solid var(--gray-200);
+    background: var(--white);
+    color: var(--gray-500);
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    box-shadow: var(--shadow);
+    transition: all var(--transition);
+}
+
+.stage-slider-nav:hover { border-color: var(--adzu-navy); color: var(--adzu-navy); }
+.stage-slider-nav:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+.stage-slider-nav:focus-visible { outline: 2px solid var(--adzu-gold); outline-offset: 2px; }
+
+.stage-slider-viewport {
+    flex: 1 1 0%;
+    min-width: 0;
+    max-width: 1000px;
+    overflow: hidden;
+    padding: 2px 0 6px;
+}
+
+.stage-slider-track {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+}
+
+.stage-slider-card {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    flex: 0 1 280px;
+    min-width: 210px;
+    padding: 1rem 1.15rem;
+    border: 1px solid var(--gray-200);
+    border-left: 4px solid var(--gray-300);
+    border-radius: var(--radius-lg);
+    background: var(--white);
+    box-shadow: var(--shadow);
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+
+.stage-slider-card:hover { border-color: var(--adzu-navy); transform: translateY(-2px); }
+
+.stage-slider-card.is-selected {
+    border-color: var(--adzu-navy);
+    box-shadow: 0 0 0 3px rgba(6, 2, 151, 0.12), var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.stage-slider-num {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--gray-200);
+    color: var(--gray-600);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.stage-slider-text { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.stage-slider-label { font-size: 0.95rem; font-weight: 700; color: var(--gray-700); }
+.stage-slider-badge { font-size: 0.72rem; padding: 2px 8px; align-self: flex-start; }
+
+.stage-slider-card.is-completed { border-left-color: var(--success); }
+.stage-slider-card.is-completed .stage-slider-num { background: var(--success); color: var(--white); }
+.stage-slider-card.is-completed .stage-slider-label { color: var(--success); }
+
+.stage-slider-card.is-active { border-left-color: var(--adzu-navy); background: rgba(6, 2, 151, 0.03); }
+.stage-slider-card.is-active .stage-slider-num { background: var(--adzu-navy); color: var(--white); }
+.stage-slider-card.is-active .stage-slider-label { color: var(--adzu-navy); }
+
+.stage-slider-card.is-approved { border-left-color: var(--info); }
+.stage-slider-card.is-approved .stage-slider-num { background: var(--info-bg); color: var(--info); }
+
+.stage-slider-card.is-locked { border-left-color: var(--gray-300); opacity: 0.7; }
+.stage-slider-card.is-locked .stage-slider-num { background: var(--gray-100); color: var(--gray-500); }
+.stage-slider-card.is-locked .stage-slider-label { color: var(--gray-500); }
+
+.stage-slider-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    margin-bottom: 1rem;
+    padding: 0.6rem 0.85rem;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    font-size: 0.8rem;
+    color: var(--gray-600);
+}
+
+.stage-slider-summary strong { color: var(--adzu-navy); }
+
+/* The stage panels: only the selected one is shown. */
+.stage-panel[hidden] { display: none; }
+
+/* The stage progression controls of the Milestone Tracker. */
+.stage-approval {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--gray-100);
+}
+
+.stage-approval-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-500);
+}
+
+.stage-approval-hint {
+    font-size: 0.8rem;
+    color: var(--gray-500);
+    flex: 1 1 240px;
+}
+
+.stage-approval-hint strong { color: var(--adzu-navy); }
+
+/* A decision that is waiting for Save Process. */
+.btn.is-pending {
+    background: var(--adzu-gold);
+    border-color: var(--adzu-gold);
+    color: var(--adzu-navy-dark);
+    box-shadow: 0 0 0 3px rgba(255, 184, 43, 0.28);
+}
+
+.btn.is-pending:hover {
+    background: var(--adzu-gold-hover);
+    border-color: var(--adzu-gold-hover);
+}
+
+@media (max-width: 768px) {
+    .stage-slider-card { min-width: 190px; padding: 0.75rem 0.85rem; }
+    .stage-slider-num { width: 30px; height: 30px; font-size: 0.8rem; }
+    .stage-slider-label { font-size: 0.85rem; }
+    .stage-slider-summary { gap: 0.75rem; }
+    .stage-slider-nav { width: 34px; }
+}
+
+/* ------------------------------------------------------------------
+ * In-system notifications (coordinator > applications > edit)
+ *
+ * A small container at the top of the content area. It never blocks the
+ * page and temporary notices dismiss themselves.
+ * ------------------------------------------------------------------ */
+.page-notifications {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.page-notifications:empty { display: none; }
+
+.page-notice {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.75rem 0.95rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    animation: page-notice-in 0.25s ease;
+}
+
+.page-notice.is-success { background: #ecfdf5; border-color: #a7f3d0; color: #166534; }
+.page-notice.is-info { background: var(--info-bg); border-color: #bfdbfe; color: #1e40af; }
+.page-notice.is-warning { background: var(--warning-bg); border-color: #fde68a; color: #854d0e; }
+.page-notice.is-error { background: var(--danger-bg); border-color: #fecaca; color: #991b1b; }
+
+.page-notice .page-notice-text { flex: 1; }
+
+.page-notice .page-notice-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 0.4rem;
+    flex-shrink: 0;
+}
+
+.page-notice .btn { padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+
+@keyframes page-notice-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
 
 .progress-timeline { position: relative; padding-left: 2rem; }
 

@@ -2,31 +2,32 @@
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/db.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-$pageTitle   = 'Manage Applications';
+$pageTitle   = 'Applications';
 $role        = 'coordinator';
 $currentPage = 'applications';
 $userName    = !empty($_SESSION['user']['full_name']) ? $_SESSION['user']['full_name'] : ($mockCoordinator['name'] ?? 'Coordinator');
 
-
 if (!isset($pdo) || !($pdo instanceof PDO)) {
     try {
-        $pdo = DB::getConnection();
+        $dbHost = defined('DB_HOST') ? DB_HOST : 'localhost';
+        $dbName = defined('DB_NAME') ? DB_NAME : 'csite_grad_school';
+        $dbUser = defined('DB_USER') ? DB_USER : 'root';
+        $dbPass = defined('DB_PASS') ? DB_PASS : '';
+        $pdo = new PDO("mysql:host=$dbHost;dbname=$dbName;charset=utf8mb4", $dbUser, $dbPass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
     } catch (PDOException $e) {
         $pdo = null;
     }
 }
-
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['archive_id'])) {
     $archiveId = (int) $_POST['archive_id'];
     if ($pdo && $archiveId > 0) {
         try {
             $stmt = $pdo->prepare("UPDATE applications SET archived_at = NOW() WHERE application_id = :id AND archived_at IS NULL");
-            $stmt->execute([':id' => $archiveId]);
+            $stmt->execute(['id' => $archiveId]);
             if ($stmt->rowCount() > 0) {
                 setFlash('success', 'Application archived successfully. The record is retained for reporting.');
             } else {
@@ -48,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['restore_id'])) {
     if ($pdo && $restoreId > 0) {
         try {
             $stmt = $pdo->prepare("UPDATE applications SET archived_at = NULL WHERE application_id = :id AND archived_at IS NOT NULL");
-            $stmt->execute([':id' => $restoreId]);
+            $stmt->execute(['id' => $restoreId]);
             setFlash('success', 'Application restored to the active application list.');
         } catch (PDOException $e) {
             setFlash('error', 'The application could not be restored. Try again.');
@@ -64,67 +65,35 @@ if (($_GET['delete'] ?? '') !== '') {
     redirectTo('coordinator/applications/manage.php');
 }
 
+/* ------------------------------------------------------------------
+ * Every registered student, with the applications they have submitted.
+ *
+ * A student who has registered but not applied yet is part of the list as
+ * well: they carry the automatic "Not Yet Submitted" indicator, and their
+ * application details read N/A because there is no application to show.
+ * ------------------------------------------------------------------ */
+$students = coordinatorStudentsWithApplications();
 
-
-
-$applications = [];
-
-if ($pdo) {
-    try {
-        $stmt = $pdo->query("
-            SELECT 
-                a.application_id AS id,
-                a.user_id AS user_id,
-                COALESCE(
-                    NULLIF(TRIM(CONCAT(s.last_name, ', ', s.first_name, IF(s.middle_initial IS NULL OR TRIM(REPLACE(s.middle_initial, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(s.middle_initial, '.', '')))))), ''), 
-                    u.full_name
-                ) AS student,
-                CASE 
-                    WHEN s.program LIKE '%Computer Science%' THEN 'MSCS'
-                    WHEN s.program LIKE '%Information Technology%' THEN 'MIT'
-                    WHEN s.program LIKE '%Mathematics%' THEN 'MATH'
-                    ELSE s.program 
-                END AS program,
-                s.track AS db_track,
-                s.adviser_name AS adviser,
-                a.presentation_stage AS stage,
-                a.paper_title AS title,
-                a.submitted_at AS date,
-                a.status
-            FROM applications a
-            JOIN users u ON u.user_id = a.user_id
-            LEFT JOIN students s ON s.user_id = u.user_id
-            WHERE a.archived_at IS NULL
-              AND s.archived_at IS NULL
-            -- Alphabetical by last name, then first name ('Last, First MI' format).
-            ORDER BY SUBSTRING_INDEX(u.full_name, ',', 1) ASC, SUBSTRING_INDEX(u.full_name, ',', -1) ASC, a.submitted_at DESC
-        ");
-        $applications = $stmt->fetchAll();
-    } catch (PDOException $e) {
-        $applications = [];
+$totalStudents      = count($students);
+$withApplication    = 0;
+$withoutApplication = 0;
+$applicationCount   = 0;
+foreach ($students as $student) {
+    if ($student['applications']) {
+        $withApplication++;
+        $applicationCount += count($student['applications']);
+    } else {
+        $withoutApplication++;
     }
 }
 
-/*
- * Group the applications by student so the list shows one row per student
- * instead of one row per submission. The newest application of each student
- * becomes the visible "parent" row; the student's other applications are kept
- * as child rows that are revealed when the student name is clicked.
- */
-$studentGroups = [];
-foreach ($applications as $app) {
-    $groupKey = 'u' . (int) ($app['user_id'] ?? 0) . '|' . (string) $app['student'];
-    $studentGroups[$groupKey][] = $app;
-}
-$groupedApplications = [];
-foreach ($studentGroups as $groupKey => $groupRows) {
-    // Rows arrive newest-first from the ORDER BY, so index 0 is the latest.
-    $groupedApplications[] = [
-        'key'      => $groupKey,
-        'primary'  => $groupRows[0],
-        'children' => array_slice($groupRows, 1),
-        'total'    => count($groupRows),
-    ];
+$archivedAppCount = 0;
+if ($pdo) {
+    try {
+        $archivedAppCount = (int) $pdo->query('SELECT COUNT(*) FROM applications WHERE archived_at IS NOT NULL')->fetchColumn();
+    } catch (PDOException $e) {
+        $archivedAppCount = 0;
+    }
 }
 
 require_once __DIR__ . '/../../includes/header.php';
@@ -132,18 +101,8 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <div class="page-header">
     <h2>Application Management</h2>
-    <p>View and process submitted student applications by track and program.</p>
+    <p>Every registered student and the applications they have submitted.</p>
 </div>
-<?php
-    $archivedAppCount = 0;
-    if ($pdo) {
-        try {
-            $archivedAppCount = (int) $pdo->query('SELECT COUNT(*) FROM applications WHERE archived_at IS NOT NULL')->fetchColumn();
-        } catch (PDOException $e) {
-            $archivedAppCount = 0;
-        }
-    }
-?>
 <?php if ($archivedAppCount > 0): ?>
 <div class="alert alert-info" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;">
     <div><i class="fas fa-box-archive"></i> <strong><?= $archivedAppCount ?></strong> archived application<?= $archivedAppCount === 1 ? '' : 's' ?> are retained for reporting.</div>
@@ -151,27 +110,49 @@ require_once __DIR__ . '/../../includes/header.php';
 </div>
 <?php endif; ?>
 
+<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));">
+    <div class="stat-card">
+        <div class="stat-icon blue"><i class="fas fa-user-graduate"></i></div>
+        <div class="stat-value"><?= (int) $totalStudents ?></div>
+        <div class="stat-label">Registered Students</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green"><i class="fas fa-file-alt"></i></div>
+        <div class="stat-value"><?= (int) $withApplication ?></div>
+        <div class="stat-label">Submitted an Application</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon gold"><i class="fas fa-clock"></i></div>
+        <div class="stat-value"><?= (int) $withoutApplication ?></div>
+        <div class="stat-label">Not Yet Submitted</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon purple"><i class="fas fa-layer-group"></i></div>
+        <div class="stat-value"><?= (int) $applicationCount ?></div>
+        <div class="stat-label">Applications on Record</div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header">
-        <h3>Submitted Applications <span class="filter-count" data-filter-count></span></h3>
+        <h3>Students &amp; Applications <span class="filter-count" data-filter-count></span></h3>
     </div>
     <div class="card-body">
         <div class="filter-bar" data-apps-filter="#appsTable">
             <div class="filter-search">
                 <i class="fas fa-search"></i>
-                <input type="search" data-filter-q placeholder="Search by name, title, program, stage, status...">
+                <input type="search" data-filter-q placeholder="Search by student name, title, adviser...">
             </div>
             <button type="button" class="btn btn-sm btn-outline" data-filter-clear hidden>Clear</button>
-            <select data-filter="track">
-                <option value="">All Tracks</option>
-                <option>Thesis</option>
-                <option>Capstone</option>
-                <option>Seminar Paper</option>
+            <select data-filter="submission">
+                <option value="">All Submission Statuses</option>
+                <option value="not_submitted">Not Yet Submitted</option>
+                <option value="submitted">Submitted</option>
             </select>
-            <select data-filter="status">
-                <option value="">All Statuses</option>
-                <?php foreach (STATUSES as $key => $info): ?>
-                <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars($info['label']) ?></option>
+            <select data-filter="appstatus">
+                <option value="">All Application Statuses</option>
+                <?php foreach (COORDINATOR_STATUSES as $key): ?>
+                <option value="<?= htmlspecialchars($key) ?>"><?= htmlspecialchars(STATUSES[$key]['label']) ?></option>
                 <?php endforeach; ?>
             </select>
             <select data-filter="program">
@@ -180,86 +161,132 @@ require_once __DIR__ . '/../../includes/header.php';
                 <option><?= htmlspecialchars($code) ?></option>
                 <?php endforeach; ?>
             </select>
+            <select data-filter="track">
+                <option value="">All Tracks</option>
+                <option>Thesis</option>
+                <option>Capstone</option>
+                <option>Seminar Paper</option>
+            </select>
         </div>
         <div class="table-responsive">
             <table class="data-table" id="appsTable">
                 <thead>
                     <tr>
-                        <th>Student</th>
+                        <th>Student Name</th>
+                        <th>Submission Status</th>
+                        <th>Application Status</th>
                         <th>Program</th>
                         <th>Track</th>
+                        <th>Application Title</th>
                         <th>Adviser</th>
-                        <th>Stage</th>
-                        <th>Title</th>
-                        <th>Submitted</th>
-                        <th>Status</th>
+                        <th>Current Stage</th>
+                        <th>Submission Date</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($groupedApplications as $group):
-                        $app = $group['primary'];
-                        $rawTrack = $app['db_track'] ?? (function_exists('getTrackForProgram') ? getTrackForProgram($app['program']) : 'thesis');
-                        $track = function_exists('getTrackLabel') ? getTrackLabel($rawTrack) : ucfirst($rawTrack);
-                        $childCount = count($group['children']);
-                        $groupId = 'grp-' . preg_replace('/[^A-Za-z0-9_-]/', '', (string) $group['key']);
-                        // Searchable text for the whole group (parent + children) so a
-                        // search still finds a student whose match sits in a child row.
-                        $groupSearch = [];
-                        foreach (array_merge([$app], $group['children']) as $row) {
-                            $groupSearch[] = $row['student'] . ' ' . $row['program'] . ' ' . $row['stage'] . ' ' . $row['title'] . ' ' . $row['status'] . ' ' . $track;
-                        }
-                        $searchText = strtolower(implode(' ', $groupSearch));
+                    <?php foreach ($students as $student):
+                        $applications = $student['applications'];
+                        $primary = $applications[0] ?? null;
+                        $children = array_slice($applications, 1);
+                        $groupId = 'grp-' . (int) $student['userId'];
+                        $studentUrl = url('coordinator/applications/student.php?id=' . (int) $student['userId']);
+
+                        // Each row carries the program and the track of the
+                        // application it shows, so the program filter works on
+                        // the application and not only on the student.
+                        $rowProgram = $primary['program'] ?? $student['program'];
+                        $rowTrack   = $primary['track'] ?? $student['trackLabel'];
+
+                        // The searchable text of a row is its own: the student
+                        // plus the application the row shows. A search that
+                        // matches an older application therefore matches that
+                        // row and not the newest one.
+                        $parentSearch = strtolower(implode(' ', array_filter([
+                            $student['name'], $student['email'], $student['program'],
+                            $student['trackLabel'], $student['adviser'],
+                            $primary['stage'] ?? '', $primary['title'] ?? '', $primary['status'] ?? '',
+                        ])));
                     ?>
-                    <tr data-status="<?= htmlspecialchars($app['status']) ?>"
-                        data-program="<?= htmlspecialchars($app['program']) ?>"
-                        data-track="<?= htmlspecialchars($track) ?>"
+                    <?php if (!$primary): ?>
+                    <!-- Registered, but no application yet. -->
+                    <tr data-submission="not_submitted"
+                        data-appstatus=""
+                        data-program="<?= htmlspecialchars($student['program']) ?>"
+                        data-track="<?= htmlspecialchars($student['trackLabel']) ?>"
                         data-group="<?= htmlspecialchars($groupId) ?>"
-                        data-search="<?= htmlspecialchars($searchText) ?>">
+                        data-search="<?= htmlspecialchars($parentSearch) ?>">
                         <td>
-                            <?php if ($childCount > 0): ?>
-                            <button type="button" class="student-cell-toggle" data-group-toggle="<?= htmlspecialchars($groupId) ?>" aria-expanded="false" title="Show the other applications of this student">
-                                <i class="fas fa-chevron-right toggle-caret" aria-hidden="true"></i>
-                                <strong><?= htmlspecialchars($app['student']) ?></strong>
-                                <span class="student-group-count"><?= (int) $group['total'] ?></span>
-                            </button>
-                            <?php else: ?>
-                            <strong><?= htmlspecialchars($app['student']) ?></strong>
-                            <?php endif; ?>
+                            <div class="student-cell">
+                                <a href="<?= $studentUrl ?>" class="student-name-link"><?= htmlspecialchars($student['name']) ?></a>
+                            </div>
                         </td>
-                        <td><?= htmlspecialchars($app['program']) ?></td>
-                        <td><span style="font-size:0.75rem;background:var(--gray-100);padding:2px 8px;border-radius:99px;"><?= htmlspecialchars($track) ?></span></td>
-                        <td><?= htmlspecialchars($app['adviser'] ?? '—') ?></td>
-                        <td><?= htmlspecialchars($app['stage']) ?></td>
-                        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= htmlspecialchars($app['title']) ?></td>
-                        <td><?= date('M d, Y', strtotime($app['date'])) ?></td>
-                        <td><?= statusBadge($app['status']) ?></td>
+                        <td><?= submissionBadge(false) ?></td>
+                        <td><span class="text-muted-soft">N/A</span></td>
+                        <td><?= htmlspecialchars($student['program']) ?></td>
+                        <td><span class="track-chip"><?= htmlspecialchars($student['trackLabel']) ?></span></td>
+                        <td><span class="text-muted-soft">N/A</span></td>
+                        <td><?= htmlspecialchars($student['adviser'] !== '' ? $student['adviser'] : 'N/A') ?></td>
+                        <td><span class="text-muted-soft">N/A</span></td>
+                        <td><span class="text-muted-soft">N/A</span></td>
                         <td class="actions">
-                            <a href="<?= url('coordinator/applications/view.php?id=' . $app['id']) ?>" class="btn btn-sm btn-outline" title="View"><i class="fas fa-eye"></i></a>
-                            <a href="<?= url('coordinator/applications/process.php?id=' . $app['id']) ?>" class="btn btn-sm btn-primary" title="Process"><i class="fas fa-cog"></i></a>
-                            <button type="button" class="btn btn-sm btn-danger" data-archive-open data-application-id="<?= (int) $app['id'] ?>" data-application-student="<?= htmlspecialchars($app['student']) ?>" data-application-title="<?= htmlspecialchars($app['title']) ?>" title="Archive"><i class="fas fa-box-archive"></i> Archive</button>
+                            <a href="<?= $studentUrl ?>" class="btn btn-sm btn-outline"><i class="fas fa-user"></i> View Student</a>
                         </td>
                     </tr>
-                    <?php foreach ($group['children'] as $child): ?>
-                    <tr class="app-child-row" data-child-of="<?= htmlspecialchars($groupId) ?>" data-status="<?= htmlspecialchars($child['status']) ?>" data-program="<?= htmlspecialchars($child['program']) ?>" data-track="<?= htmlspecialchars($track) ?>" data-search="<?= htmlspecialchars(strtolower($child['student'] . ' ' . $child['program'] . ' ' . $child['stage'] . ' ' . $child['title'] . ' ' . $child['status'] . ' ' . $track)) ?>">
+                    <?php else: ?>
+                    <tr class="app-group-row" data-submission="submitted"
+                        data-appstatus="<?= htmlspecialchars($primary['status']) ?>"
+                        data-program="<?= htmlspecialchars($rowProgram) ?>"
+                        data-track="<?= htmlspecialchars($rowTrack) ?>"
+                        data-group="<?= htmlspecialchars($groupId) ?>"
+                        data-search="<?= htmlspecialchars($parentSearch) ?>">
+                        <td>
+                            <div class="student-cell">
+                                <?php if ($children): ?>
+                                <button type="button" class="student-cell-toggle" data-group-toggle="<?= htmlspecialchars($groupId) ?>" aria-expanded="false" title="Show the other applications of this student">
+                                    <i class="fas fa-chevron-right toggle-caret" aria-hidden="true"></i>
+                                    <span class="student-group-count"><?= count($applications) ?></span>
+                                </button>
+                                <?php endif; ?>
+                                <a href="<?= $studentUrl ?>" class="student-name-link"><?= htmlspecialchars($student['name']) ?></a>
+                            </div>
+                        </td>
+                        <td><?= submissionBadge(true) ?></td>
+                        <td data-app-cell><span class="cell-value"><?= statusBadge($primary['status']) ?></span></td>
+                        <td data-app-cell><span class="cell-value"><?= htmlspecialchars($rowProgram) ?></span></td>
+                        <td data-app-cell><span class="cell-value"><span class="track-chip"><?= htmlspecialchars($rowTrack) ?></span></span></td>
+                        <td class="app-title-cell" data-app-cell><span class="cell-value"><?= htmlspecialchars($primary['title']) ?></span></td>
+                        <td><?= htmlspecialchars($student['adviser'] !== '' ? $student['adviser'] : '—') ?></td>
+                        <td data-app-cell><span class="cell-value"><?= htmlspecialchars($primary['stage']) ?></span></td>
+                        <td data-app-cell><span class="cell-value"><?= $primary['date'] ? date('M d, Y', strtotime($primary['date'])) : '—' ?></span></td>
+                        <td class="actions">
+                            <a href="<?= url('coordinator/applications/view.php?id=' . (int) $primary['id']) ?>" class="btn btn-sm btn-outline" title="View application"><i class="fas fa-eye"></i></a>
+                            <a href="<?= url('coordinator/applications/process.php?id=' . (int) $primary['id']) ?>" class="btn btn-sm btn-primary" title="Process application"><i class="fas fa-cog"></i></a>
+                            <button type="button" class="btn btn-sm btn-danger" data-archive-open data-application-id="<?= (int) $primary['id'] ?>" data-application-student="<?= htmlspecialchars($student['name']) ?>" data-application-title="<?= htmlspecialchars($primary['title']) ?>" title="Archive"><i class="fas fa-box-archive"></i> Archive</button>
+                        </td>
+                    </tr>
+                    <?php foreach ($children as $child): ?>
+                    <tr class="app-child-row" data-child-of="<?= htmlspecialchars($groupId) ?>" data-submission="submitted" data-appstatus="<?= htmlspecialchars($child['status']) ?>" data-program="<?= htmlspecialchars($child['program'] ?? $rowProgram) ?>" data-track="<?= htmlspecialchars($child['track'] ?? $rowTrack) ?>" data-search="<?= htmlspecialchars(strtolower($student['name'] . ' ' . $child['stage'] . ' ' . $child['title'] . ' ' . $child['status'])) ?>">
                         <td><span class="child-label"><i class="fas fa-level-down" aria-hidden="true"></i> Also submitted</span></td>
-                        <td><?= htmlspecialchars($child['program']) ?></td>
-                        <td><span style="font-size:0.75rem;background:var(--gray-100);padding:2px 8px;border-radius:99px;"><?= htmlspecialchars($track) ?></span></td>
-                        <td><?= htmlspecialchars($child['adviser'] ?? '—') ?></td>
-                        <td><?= htmlspecialchars($child['stage']) ?></td>
-                        <td class="child-title" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= htmlspecialchars($child['title']) ?></td>
-                        <td><?= date('M d, Y', strtotime($child['date'])) ?></td>
+                        <td><?= submissionBadge(true) ?></td>
                         <td><?= statusBadge($child['status']) ?></td>
+                        <td><?= htmlspecialchars($child['program'] ?? $rowProgram) ?></td>
+                        <td><span class="track-chip"><?= htmlspecialchars($child['track'] ?? $rowTrack) ?></span></td>
+                        <td class="child-title app-title-cell"><?= htmlspecialchars($child['title']) ?></td>
+                        <td><?= htmlspecialchars($student['adviser'] !== '' ? $student['adviser'] : '—') ?></td>
+                        <td><?= htmlspecialchars($child['stage']) ?></td>
+                        <td><?= $child['date'] ? date('M d, Y', strtotime($child['date'])) : '—' ?></td>
                         <td class="actions">
-                            <a href="<?= url('coordinator/applications/view.php?id=' . $child['id']) ?>" class="btn btn-sm btn-outline" title="View"><i class="fas fa-eye"></i></a>
-                            <a href="<?= url('coordinator/applications/process.php?id=' . $child['id']) ?>" class="btn btn-sm btn-primary" title="Process"><i class="fas fa-cog"></i></a>
-                            <button type="button" class="btn btn-sm btn-danger" data-archive-open data-application-id="<?= (int) $child['id'] ?>" data-application-student="<?= htmlspecialchars($child['student']) ?>" data-application-title="<?= htmlspecialchars($child['title']) ?>" title="Archive"><i class="fas fa-box-archive"></i> Archive</button>
+                            <a href="<?= url('coordinator/applications/view.php?id=' . (int) $child['id']) ?>" class="btn btn-sm btn-outline" title="View application"><i class="fas fa-eye"></i></a>
+                            <a href="<?= url('coordinator/applications/process.php?id=' . (int) $child['id']) ?>" class="btn btn-sm btn-primary" title="Process application"><i class="fas fa-cog"></i></a>
+                            <button type="button" class="btn btn-sm btn-danger" data-archive-open data-application-id="<?= (int) $child['id'] ?>" data-application-student="<?= htmlspecialchars($student['name']) ?>" data-application-title="<?= htmlspecialchars($child['title']) ?>" title="Archive"><i class="fas fa-box-archive"></i> Archive</button>
                         </td>
                     </tr>
                     <?php endforeach; ?>
+                    <?php endif; ?>
                     <?php endforeach; ?>
-                    <tr data-filter-empty <?= $groupedApplications ? 'hidden' : '' ?>>
-                        <td colspan="9" style="text-align:center;color:var(--gray-400);padding:2rem;">No applications match your search or filters.</td>
+                    <tr data-filter-empty <?= $students ? 'hidden' : '' ?>>
+                        <td colspan="10" style="text-align:center;color:var(--gray-400);padding:2rem;">No students match your search or filters.</td>
                     </tr>
                 </tbody>
             </table>
@@ -287,12 +314,12 @@ document.querySelectorAll('[data-archive-open]').forEach(button => button.addEve
     document.getElementById('archiveApplicationModal').classList.add('active');
 }));
 
-// Expandable student groups + group-aware filter for this table.
+// Group-aware filter for this table.
 //
 // The shared filter in assets/js/script.js hides rows one by one, which would
 // leave a student visible without the applications that belong to them. Here
 // the group is the unit: a group stays visible when any of its applications
-// matches, and its child rows follow the group (visible + expanded).
+// matches, and its child rows follow the group.
 (function () {
     const bar = document.querySelector('[data-apps-filter]');
     const table = document.querySelector(bar?.dataset.appsFilter);
@@ -319,6 +346,7 @@ document.querySelectorAll('[data-archive-open]').forEach(button => button.addEve
 
     function apply() {
         const q = (search?.value || '').trim().toLowerCase();
+        const filtering = !!(q || selects.some(sel => sel.value));
         let visibleGroups = 0;
         let visibleApps = 0;
 
@@ -326,14 +354,16 @@ document.querySelectorAll('[data-archive-open]').forEach(button => button.addEve
             const groupId = row.dataset.group;
             const children = [...table.querySelectorAll('tr[data-child-of="' + groupId + '"]')];
             const toggle = row.querySelector('[data-group-toggle]');
-            const expanded = toggle?.getAttribute('aria-expanded') === 'true';
+            let expanded = toggle?.getAttribute('aria-expanded') === 'true';
 
-            // A group matches when the parent row matches OR any of its
-            // applications matches, so a search on a title that sits in a
-            // child row still surfaces the student.
-            let groupOk = rowMatches(row, q);
+            // A row matches when it passes the search text and the dropdown
+            // filters. Every row carries the program and the track of the
+            // application it shows, so the program filter works per
+            // application and not only per student.
+            const parentMatches = rowMatches(row, q);
             const childMatches = children.map(child => rowMatches(child, q));
-            if (!groupOk && childMatches.some(Boolean)) groupOk = true;
+            const childHit = childMatches.some(Boolean);
+            const groupOk = parentMatches || childHit;
 
             row.hidden = !groupOk;
             row.style.display = groupOk ? '' : 'none';
@@ -347,17 +377,31 @@ document.querySelectorAll('[data-archive-open]').forEach(button => button.addEve
                 return;
             }
 
+            // When a filter or a search matches only an older application of
+            // this student, the group opens so the matching application is
+            // actually visible instead of sitting behind a closed arrow.
+            // Once the coordinator has touched the arrow themselves, their
+            // choice wins and the group stays as they left it.
+            if (filtering && !parentMatches && childHit && toggle && toggle.dataset.manual !== '1') {
+                toggle.setAttribute('aria-expanded', 'true');
+                expanded = true;
+            }
+
+            // The newest application of the group does not pass the filter:
+            // its details are hidden so the table never shows a record the
+            // coordinator filtered out.
+            row.classList.toggle('is-parent-mismatch', groupOk && !parentMatches && filtering);
+
             visibleGroups += 1;
-            // Count the applications that actually match the current filters.
-            visibleApps += rowMatches(row, q) ? 1 : 0;
+            if (parentMatches) visibleApps += 1;
             children.forEach((child, i) => {
                 if (childMatches[i]) visibleApps += 1;
             });
 
-            // Child rows follow the group: shown only when the group is open
-            // and the child itself passes the current filters.
+            // The arrow always decides whether the extra applications of the
+            // student are shown, whether a filter is active or not.
             children.forEach((child, i) => {
-                const show = expanded && childMatches[i];
+                const show = childMatches[i] && expanded;
                 child.classList.toggle('is-shown', show);
                 child.hidden = !show;
                 child.style.display = show ? '' : 'none';
@@ -369,19 +413,22 @@ document.querySelectorAll('[data-archive-open]').forEach(button => button.addEve
             empty.style.display = visibleGroups > 0 ? 'none' : '';
         }
         if (countEl) {
-            countEl.textContent = '(' + visibleApps + ' application' + (visibleApps === 1 ? '' : 's') + ')';
+            countEl.textContent = '(' + visibleGroups + ' student' + (visibleGroups === 1 ? '' : 's') + ')';
         }
         if (clearBtn) {
-            clearBtn.hidden = !(q || selects.some(sel => sel.value));
+            clearBtn.hidden = !filtering;
         }
     }
 
-    // Clicking a student name opens or closes that student's earlier
-    // applications, then the group is re-evaluated against the filters.
+    // Clicking the caret opens or closes that student's earlier applications,
+    // then the group is re-evaluated against the filters. The choice of the
+    // coordinator is remembered, so a filter never overrides the arrow.
     document.querySelectorAll('[data-group-toggle]').forEach(button => {
         button.addEventListener('click', () => {
             const expanded = button.getAttribute('aria-expanded') === 'true';
             button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+            button.setAttribute('title', expanded ? 'Show the other applications of this student' : 'Hide the other applications of this student');
+            button.dataset.manual = '1';
             apply();
         });
     });

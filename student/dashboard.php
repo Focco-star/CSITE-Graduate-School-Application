@@ -25,9 +25,10 @@ $stages      = $workflow['stages'] ?? [];
 
 $progress   = getStudentProgress($user['email'], $track);
 $currentIdx = workflowCurrentIndex($progress, $stages);
+// The stages the student is not allowed to work on yet.
+$lockStates = stageLockStates($stages, $currentIdx);
 
 $activeStage = $progress[$currentIdx] ?? ($progress[0] ?? null);
-$activeLabel = $stages[$currentIdx]['shortLabel'] ?? '—';
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -35,37 +36,6 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="page-header">
     <h2>Welcome, <?= htmlspecialchars($student['first_name'] ?? explode(' ', $userName)[0]) ?>!</h2>
     <p><?= htmlspecialchars($student['program']) ?> — <?= htmlspecialchars($trackLabel) ?> Track</p>
-</div>
-
-<div class="dashstat-grid cols-4 theme-ateneo">
-    <a href="<?= url('student/profile.php') ?>" class="dashstat dashstat-blue">
-        <div class="dashstat-text">
-            <div class="dashstat-textvalue"><?= htmlspecialchars($student['program']) ?></div>
-            <div class="dashstat-label">Program</div>
-        </div>
-        <div class="dashstat-icon"><i class="fas fa-book"></i></div>
-    </a>
-    <a href="#milestone-tracker" class="dashstat dashstat-amber">
-        <div class="dashstat-text">
-            <div class="dashstat-textvalue"><?= htmlspecialchars($activeLabel) ?></div>
-            <div class="dashstat-label">Current Stage</div>
-        </div>
-        <div class="dashstat-icon"><i class="fas fa-flag"></i></div>
-    </a>
-    <a href="<?= url('student/status.php') ?>" class="dashstat dashstat-purple">
-        <div class="dashstat-text">
-            <div class="dashstat-textvalue"><?= statusBadge($activeStage['stageStatus'] ?? 'pending') ?></div>
-            <div class="dashstat-label">Stage Status</div>
-        </div>
-        <div class="dashstat-icon"><i class="fas fa-clock"></i></div>
-    </a>
-    <a href="#milestone-tracker" class="dashstat dashstat-emerald">
-        <div class="dashstat-text">
-            <div class="dashstat-value"><?= count($stages) ?></div>
-            <div class="dashstat-label">Total Stages</div>
-        </div>
-        <div class="dashstat-icon"><i class="fas fa-layer-group"></i></div>
-    </a>
 </div>
 
 <div class="card">
@@ -78,17 +48,26 @@ require_once __DIR__ . '/../includes/header.php';
             <?php foreach ($stages as $idx => $stage):
                 $p = $progress[$idx] ?? null;
                 $st = $p['stageStatus'] ?? 'not_started';
+                $isLocked = $lockStates[$stage['key']]['locked'] ?? false;
                 $isSubmitted = $p && !in_array($st, ['not_started', 'pending', 'draft', ''], true);
                 $isDone = in_array($st, ['completed', 'approved'], true) || $idx < $currentIdx;
                 $isHighlighted = $isSubmitted || $isDone;
                 $isActive = $idx === $currentIdx;
-                $statusLabel = $isSubmitted ? (STATUSES[$st]['label'] ?? 'Submitted') : 'Not Submitted';
-                $statusClass = $isSubmitted ? (STATUSES[$st]['class'] ?? 'status-submitted') : 'status-pending';
+                if ($isLocked) {
+                    $statusLabel = 'Locked';
+                    $statusClass = 'status-locked';
+                } elseif ($isSubmitted) {
+                    $statusLabel = STATUSES[$st]['label'] ?? 'Submitted';
+                    $statusClass = STATUSES[$st]['class'] ?? 'status-submitted';
+                } else {
+                    $statusLabel = 'Not Submitted';
+                    $statusClass = 'status-pending';
+                }
             ?>
-            <div class="stage-stepper-item">
-                <div class="stage-stepper-btn" style="cursor:default;">
+            <div class="stage-stepper-item<?= $isLocked ? ' is-locked' : '' ?>">
+                <div class="stage-stepper-btn" style="cursor:default;" title="<?= htmlspecialchars($lockStates[$stage['key']]['reason'] ?? '') ?>">
                     <span class="stage-stepper-num <?= $isHighlighted ? 'highlighted done' : ($isActive ? 'active' : '') ?>">
-                        <?= $idx + 1 ?>
+                        <?php if ($isLocked): ?><i class="fas fa-lock" aria-hidden="true"></i><?php else: ?><?= $idx + 1 ?><?php endif; ?>
                     </span>
                     <span class="stage-stepper-label <?= $isActive ? 'is-active' : ($isHighlighted ? 'is-done' : '') ?>"><?= htmlspecialchars($stage['shortLabel']) ?></span>
                     <span class="status-badge <?= $statusClass ?>" style="font-size:0.65rem;padding:2px 6px;"><?= htmlspecialchars($statusLabel) ?></span>
@@ -141,6 +120,7 @@ foreach ($stages as $idx => $stage) {
         'stats'     => $stats,
         'isCurrent' => $idx === $currentIdx,
         'isDone'    => in_array($row['stageStatus'] ?? 'not_started', ['completed', 'approved'], true) || $idx < $currentIdx,
+        'isLocked'  => $lockStates[$stage['key']]['locked'] ?? false,
     ];
 }
 $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milestoneTotal) : 0;
@@ -160,19 +140,22 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
             $stats = $block['stats'];
             $stageStatus = $progress[$block['index']]['stageStatus'] ?? 'not_started';
             $stageIsSubmitted = !in_array($stageStatus, ['not_started', 'pending', 'draft', ''], true);
-            $stageStatusLabel = $stageIsSubmitted ? (STATUSES[$stageStatus]['label'] ?? 'Submitted') : 'Not Started';
-            $stageStatusClass = $stageIsSubmitted ? (STATUSES[$stageStatus]['class'] ?? 'status-submitted') : 'status-pending';
+            $stageStatusLabel = $block['isLocked'] ? 'Locked' : ($stageIsSubmitted ? (STATUSES[$stageStatus]['label'] ?? 'Submitted') : 'Not Started');
+            $stageStatusClass = $block['isLocked'] ? 'status-locked' : ($stageIsSubmitted ? (STATUSES[$stageStatus]['class'] ?? 'status-submitted') : 'status-pending');
             $openByDefault = $block['isCurrent'] || $block['isDone'];
         ?>
-        <div class="ms-stage<?= $block['isCurrent'] ? ' is-current' : '' ?><?= $block['isDone'] ? ' is-done' : '' ?><?= $openByDefault ? ' is-open' : '' ?>" data-ms-stage>
+        <div class="ms-stage<?= $block['isCurrent'] ? ' is-current' : '' ?><?= $block['isDone'] ? ' is-done' : '' ?><?= $block['isLocked'] ? ' is-locked' : '' ?><?= $openByDefault ? ' is-open' : '' ?>" data-ms-stage>
             <button type="button" class="ms-stage-head" data-ms-toggle aria-expanded="<?= $openByDefault ? 'true' : 'false' ?>">
-                <span class="ms-stage-num"><?= (int) $block['index'] + 1 ?></span>
+                <span class="ms-stage-num"><?= $block['isLocked'] ? '<i class="fas fa-lock" aria-hidden="true"></i>' : (int) $block['index'] + 1 ?></span>
                 <span class="ms-stage-title"><?= htmlspecialchars($stage['label']) ?></span>
                 <span class="ms-stage-count"><?= (int) $stats['done'] ?> / <?= (int) $stats['total'] ?> milestones</span>
                 <span class="status-badge <?= $stageStatusClass ?>" style="font-size:0.65rem;padding:2px 6px;"><?= htmlspecialchars($stageStatusLabel) ?></span>
                 <i class="fas fa-chevron-down ms-stage-caret" aria-hidden="true"></i>
             </button>
             <div class="ms-stage-body">
+                <?php if ($block['isLocked']): ?>
+                <p class="ms-locked-note"><i class="fas fa-lock" aria-hidden="true"></i> <?= htmlspecialchars($lockStates[$stage['key']]['reason'] ?? 'This stage is locked.') ?></p>
+                <?php endif; ?>
                 <?php foreach ($steps as $si => $step):
                     $state = $step['state']['status'] ?? 'pending';
                     $isDone = $state === 'done';
@@ -200,7 +183,7 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
                     </div>
                     <div class="ms-step-action">
                         <?php if (!$isDone && !$step['coord'] && $si <= $stats['firstPending']): ?>
-                        <a class="btn btn-sm btn-primary" href="<?= url('student/upload.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload</a>
+                        <a class="btn btn-sm btn-primary" href="<?= url('student/application.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload</a>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -252,33 +235,6 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
             <?php endforeach; ?>
         </div>
     </div>
-</div>
-
-<div class="dashstat-grid cols-3 theme-ateneo">
-    <a href="<?= url('student/application.php') ?>" class="dashstat dashstat-blue">
-        <div class="dashstat-text">
-            <div class="dashstat-textvalue">Application &amp; Upload</div>
-            <div class="dashstat-desc">Submit your <?= htmlspecialchars(strtolower($trackLabel)) ?> application and upload required documents.</div>
-            <div class="dashstat-link">Open <i class="fas fa-arrow-right"></i></div>
-        </div>
-        <div class="dashstat-icon"><i class="fas fa-file-alt"></i></div>
-    </a>
-    <a href="#milestone-tracker" class="dashstat dashstat-amber">
-        <div class="dashstat-text">
-            <div class="dashstat-textvalue">Milestone Tracker</div>
-            <div class="dashstat-desc">Follow the step-by-step milestones of your <?= htmlspecialchars(strtolower($trackLabel)) ?> stages below.</div>
-            <div class="dashstat-link">Open <i class="fas fa-arrow-right"></i></div>
-        </div>
-        <div class="dashstat-icon"><i class="fas fa-tasks"></i></div>
-    </a>
-    <a href="<?= url('student/templates.php') ?>" class="dashstat dashstat-emerald">
-        <div class="dashstat-text">
-            <div class="dashstat-textvalue">Templates &amp; Forms</div>
-            <div class="dashstat-desc">Download forms and templates for your program.</div>
-            <div class="dashstat-link">Open <i class="fas fa-arrow-right"></i></div>
-        </div>
-        <div class="dashstat-icon"><i class="fas fa-download"></i></div>
-    </a>
 </div>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

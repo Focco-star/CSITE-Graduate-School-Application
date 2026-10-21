@@ -181,7 +181,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <div class="step-number">4</div>
                 <div class="step-content">
                     <h4>Upload &amp; Submit</h4>
-                    <p>Upload your completed documents in the <a href="<?= url('student/upload.php') ?>">Document Upload</a> section and submit your application.</p>
+                    <p>Upload your completed documents on the <a href="<?= url('student/application.php') ?>">Application</a> page and submit your application.</p>
                 </div>
             </div>
         </div>

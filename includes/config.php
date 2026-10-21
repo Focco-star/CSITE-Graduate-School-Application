@@ -45,14 +45,28 @@ define('STATUSES', [
     'under_review'             => ['label' => 'Under Review',             'class' => 'status-review'],
     'for_payment'              => ['label' => 'For Payment',              'class' => 'status-review'],
     'payment_recorded'         => ['label' => 'Payment Recorded',         'class' => 'status-approved'],
-    'ready_for_presentation'   => ['label' => 'Ready for Presentation',   'class' => 'status-confirmed'],
-    'scheduled'                => ['label' => 'Scheduled',                'class' => 'status-confirmed'],
+    'ready_for_presentation'   => ['label' => 'Ready for Presentation',   'class' => 'status-ready'],
+    'scheduled'                => ['label' => 'Scheduled for Presentation', 'class' => 'status-scheduled'],
     'approved'                 => ['label' => 'Approved',                 'class' => 'status-approved'],
     'confirmed'                => ['label' => 'Confirmed',                'class' => 'status-confirmed'],
     'requires_revision'        => ['label' => 'Requires Revision',        'class' => 'status-revision'],
-    'completed'                => ['label' => 'Completed',                'class' => 'status-completed'],
+    'completed'                => ['label' => 'Presentation Complete',    'class' => 'status-completed'],
     'verified'                 => ['label' => 'Verified',                 'class' => 'status-approved'],
     'incomplete'               => ['label' => 'Incomplete',               'class' => 'status-revision'],
+]);
+
+/**
+ * The application statuses the coordinator may set from the Applications -> Edit
+ * page. These are the states the coordinator works with; the older prototype
+ * states (for_payment, payment_recorded, approved, requires_revision) stay in
+ * the STATUSES map so that records written before the change still render.
+ */
+define('COORDINATOR_STATUSES', [
+    'submitted',
+    'under_review',
+    'ready_for_presentation',
+    'scheduled',
+    'completed',
 ]);
 
 define('PROGRAMS', [
@@ -1603,8 +1617,10 @@ function databaseApplicationIdForStudent(int $userId, string $stageLabel = ''): 
 
 /**
  * Every non-archived application for a user, newest first.
- * Powers the student's "My Application History" table so they can see
- * exactly what title/stage they submitted (spelling included) and edit it.
+ * Returns the title/stage the student submitted (spelling included).
+ * The student's "Application" page no longer lists a history table —
+ * the coordinator reviews submissions from their own side — so this is
+ * kept as a lookup helper for records and reporting.
  */
 function databaseApplicationsForUser(int $userId): array {
     if (!class_exists('DB') || $userId <= 0) {
@@ -2478,7 +2494,7 @@ function databaseSchedules(): array {
 function databaseSchedulePanelMembers(int $applicationId): array {
     if (!class_exists('DB') || $applicationId <= 0) return [];
     try {
-        return DB::query(
+        $rows = DB::query(
                 'SELECT pm.*, spa.panel_role
              FROM schedules sc
              INNER JOIN schedule_panel_assignments spa ON spa.schedule_id = sc.schedule_id
@@ -2486,6 +2502,15 @@ function databaseSchedulePanelMembers(int $applicationId): array {
              WHERE sc.application_id = :application_id
              ORDER BY spa.assignment_id'
         , ['application_id' => $applicationId])->fetchAll();
+        // The same shape as the panel pool, so every consumer finds the name
+        // of a member under the same key.
+        return array_map(static function (array $row): array {
+            $member = normalizePanelMemberRow($row);
+            if (isset($row['panel_role'])) {
+                $member['panel_role'] = (string) $row['panel_role'];
+            }
+            return $member;
+        }, $rows);
     } catch (Throwable $e) {
         return [];
     }
@@ -2682,6 +2707,68 @@ function workflowStageState(array $p, int $idx, int $currentIdx): string {
     return $idx === $currentIdx ? 'active' : 'pending';
 }
 
+/**
+ * The lock state of every stage of a track.
+ *
+ * The stage the student is working on is open. Every stage after it stays
+ * locked until the coordinator approves the progression, and only the stage
+ * that is approved next is unlocked - the ones after it remain locked.
+ *
+ * The order comes from the track itself, so a thesis student walks
+ * Concept Paper -> Thesis Proposal -> Final Thesis, a capstone student
+ * Capstone Proposal -> Final Capstone, and a seminar-paper student
+ * Seminar Paper Proposal -> Final Seminar Paper.
+ *
+ * Returns one entry per stage key:
+ *   locked => whether the stage is still closed to the student
+ *   label  => the badge text
+ *   reason => why it is locked
+ */
+function stageLockStates(array $stages, int $currentIndex): array {
+    $currentLabel = $stages[$currentIndex]['label'] ?? 'the current stage';
+    $states = [];
+    foreach (array_values($stages) as $index => $stage) {
+        $locked = $index > $currentIndex;
+        $states[$stage['key']] = [
+            'locked' => $locked,
+            'label'  => $locked ? 'Locked' : 'Open',
+            'reason' => $locked
+                ? 'Locked until the coordinator approves ' . $currentLabel . '.'
+                : '',
+        ];
+    }
+    return $states;
+}
+
+/**
+ * The stage a student is allowed to work on, and whether a requested stage is
+ * still locked for them.
+ *
+ * Returns ['stageKey' => ..., 'locked' => bool, 'reason' => string]. A locked
+ * stage falls back to the stage the student is really at, so a student can
+ * never reach a future stage before the coordinator approved it.
+ */
+function resolveStudentStageAccess(array $progress, array $stages, int $currentIndex, string $requestedKey): array {
+    $states = stageLockStates($stages, $currentIndex);
+    $requestedKey = (string) $requestedKey;
+    if ($requestedKey !== '' && isset($states[$requestedKey])) {
+        if (!$states[$requestedKey]['locked']) {
+            return ['stageKey' => $requestedKey, 'locked' => false, 'reason' => ''];
+        }
+        return [
+            'stageKey' => $states ? array_key_first($states) : $requestedKey,
+            'locked'   => true,
+            'reason'   => $states[$requestedKey]['reason'],
+        ];
+    }
+    $keys = array_keys($states);
+    return [
+        'stageKey' => $keys[$currentIndex] ?? ($keys[0] ?? ''),
+        'locked'   => false,
+        'reason'   => '',
+    ];
+}
+
 function blankStageProgress(array $stage): array {
     $pending = ['status' => 'pending'];
     return [
@@ -2864,11 +2951,31 @@ function getStudentProgress(string $email, string $track): array {
 /**
  * Return an error when a student tries to submit a stage before its predecessor
  * has been approved or completed.
+ *
+ * A stage the student already finished cannot be applied for again, and a
+ * stage after the one they are working on stays closed until the coordinator
+ * approves the progression.
  */
 function validateApplicationStageSequence(array $progress, array $stages, string $requestedStageKey): ?string {
     $stageKeys = array_keys($stages);
     $requestedIndex = array_search($requestedStageKey, $stageKeys, true);
-    if ($requestedIndex === false || $requestedIndex === 0) {
+    if ($requestedIndex === false) {
+        // A stage that is not part of the track is never open.
+        return 'Select a valid presentation stage.';
+    }
+
+    // A stage the student has already completed is closed for good.
+    foreach ($progress as $stage) {
+        if (($stage['stageKey'] ?? '') !== $requestedStageKey) {
+            continue;
+        }
+        if (in_array(($stage['stageStatus'] ?? ''), ['completed', 'approved'], true)) {
+            $completedLabel = $stages[$requestedStageKey]['label'] ?? 'this stage';
+            return 'You have already completed the ' . $completedLabel . '.';
+        }
+    }
+
+    if ($requestedIndex === 0) {
         return null;
     }
 
@@ -3036,6 +3143,7 @@ function milestoneStepsForStage(array $p, string $track, string $stageKey): arra
 
     return [
         [
+            'key'    => 'paper',
             'label'  => $paperLabel . ' Prepared & Submitted',
             'state'  => $p['paper'] ?? ['status' => 'pending'],
             'coord'  => false,
@@ -3044,6 +3152,7 @@ function milestoneStepsForStage(array $p, string $track, string $stageKey): arra
                 : 'Upload your ' . strtolower($paperLabel) . ' to continue',
         ],
         [
+            'key'    => 'adviser_endorsement',
             'label'  => 'Adviser Endorsement Submitted',
             'state'  => $p['adviserEndorsement'] ?? ['status' => 'pending'],
             'coord'  => false,
@@ -3052,6 +3161,7 @@ function milestoneStepsForStage(array $p, string $track, string $stageKey): arra
                 : 'Obtain your adviser’s signature on the ' . $adviserLabel,
         ],
         [
+            'key'    => 'coord_review',
             'label'  => 'Coordinator Document Review',
             'state'  => $p['coordReview'] ?? ['status' => 'pending'],
             'coord'  => true,
@@ -3060,6 +3170,7 @@ function milestoneStepsForStage(array $p, string $track, string $stageKey): arra
                 : 'Waiting for coordinator')),
         ],
         [
+            'key'    => 'grad_school_endorsement',
             'label'  => $gradLabel,
             'state'  => $p['gradSchoolEndorsement'] ?? ['status' => 'pending'],
             'coord'  => true,
@@ -3068,6 +3179,7 @@ function milestoneStepsForStage(array $p, string $track, string $stageKey): arra
                 : 'Coordinator endorses the student to the Graduate School',
         ],
         [
+            'key'    => 'payment',
             'label'  => 'Official Receipt / Payment Uploaded',
             'state'  => $p['payment'] ?? ['status' => 'pending'],
             'coord'  => false,
@@ -3078,6 +3190,7 @@ function milestoneStepsForStage(array $p, string $track, string $stageKey): arra
                     : 'Submit the official receipt after payment at the Graduate School'),
         ],
         [
+            'key'    => 'ready_for_presentation',
             'label'  => 'Status Set to Ready for Presentation',
             'state'  => $p['readyForPresentation'] ?? ['status' => 'pending'],
             'coord'  => true,
@@ -3086,6 +3199,7 @@ function milestoneStepsForStage(array $p, string $track, string $stageKey): arra
                 : 'Coordinator marks ready after the receipt is verified',
         ],
         [
+            'key'    => 'presentation',
             'label'  => 'Presentation Scheduled',
             'state'  => $p['presentation'] ?? ['status' => 'pending'],
             'coord'  => true,
@@ -3096,6 +3210,7 @@ function milestoneStepsForStage(array $p, string $track, string $stageKey): arra
                 : 'Coordinator schedules the date, time, venue, and panel',
         ],
         [
+            'key'    => 'result',
             'label'  => 'Presentation Conducted & Result Recorded',
             'state'  => $p['result'] ?? ['status' => 'pending'],
             'coord'  => true,
@@ -3126,6 +3241,651 @@ function milestoneProgress(array $steps): array {
         }
     }
     return ['done' => $done, 'total' => count($steps), 'firstPending' => $firstPending];
+}
+
+/**
+ * The milestone steps of one stage as the student sees them.
+ *
+ * The coordinator's Applications -> Edit page calls this too, so both sides
+ * always show the same steps, in the same order, with the same states: the
+ * tracker is computed from the stored applications and documents, never from a
+ * second copy of the rules.
+ */
+function stageMilestoneSteps(string $email, string $track, string $stageKey): array {
+    foreach (getStudentProgress($email, $track) as $row) {
+        if (($row['stageKey'] ?? '') === $stageKey) {
+            return milestoneStepsForStage($row, $track, $stageKey);
+        }
+    }
+
+    // No application for this stage yet: show the empty workflow of the stage.
+    foreach (getWorkflow($track)['stages'] as $stage) {
+        if (($stage['key'] ?? '') === $stageKey) {
+            return milestoneStepsForStage(blankStageProgress($stage), $track, $stageKey);
+        }
+    }
+    return [];
+}
+
+/**
+ * The best upload of a given kind (paper | adviser_endorsement | receipt |
+ * grad_school_endorsement): a verified one wins, otherwise the most recent
+ * upload of that kind.
+ */
+function bestUploadOfKind(array $uploads, string $kind): ?array {
+    $best = null;
+    foreach ($uploads as $upload) {
+        if (classifyUploadDocType((string) ($upload['docType'] ?? '')) !== $kind) {
+            continue;
+        }
+        if ($best === null) {
+            $best = $upload;
+            continue;
+        }
+        $bestVerified = in_array($best['status'] ?? '', ['verified', 'approved'], true);
+        $thisVerified  = in_array($upload['status'] ?? '', ['verified', 'approved'], true);
+        if ($thisVerified && !$bestVerified) {
+            $best = $upload;
+        }
+    }
+    return $best;
+}
+
+/**
+ * The automatic submission indicator of a student in the coordinator's
+ * Applications menu.
+ *
+ * It is deliberately NOT an application status: a student who has not applied
+ * yet has no application at all, so there is nothing for the coordinator to
+ * edit. The badge only says whether the student has submitted something.
+ */
+function submissionBadge(bool $hasApplication): string {
+    if ($hasApplication) {
+        return '<span class="status-badge status-submitted">Submitted</span>';
+    }
+    return '<span class="status-badge status-not-submitted">Not Yet Submitted</span>';
+}
+
+/**
+ * Every registered student together with the applications they have submitted.
+ *
+ * Students who have not applied yet are part of the result, so the coordinator
+ * can see at a glance who is registered but has not submitted an application.
+ * The applications of a student are kept together under the student, newest
+ * first, so one student never appears twice because of several applications.
+ */
+function coordinatorStudentsWithApplications(): array {
+    $students = [];
+    $applicationsByUser = [];
+
+    if (class_exists('DB')) {
+        try {
+            $pdo = DB::getConnection();
+
+            $stmt = $pdo->prepare(
+                'SELECT u.user_id AS userId, u.full_name, u.email, u.created_at AS registeredAt,
+                        s.student_id, s.first_name, s.last_name, s.middle_initial,
+                        s.program, s.track, s.adviser_name, s.enrollment_date
+                 FROM students s
+                 INNER JOIN users u ON u.user_id = s.user_id
+                 WHERE u.role = "student" AND s.archived_at IS NULL
+                 ORDER BY s.last_name, s.first_name, s.middle_initial'
+            );
+            $stmt->execute();
+
+            $appStmt = $pdo->prepare(
+                'SELECT a.application_id AS id, a.user_id, a.presentation_stage AS stage,
+                        a.paper_title AS title, a.status, a.submitted_at AS date,
+                        a.result, a.coordinator_comment AS coordinatorComment,
+                        a.grad_school_endorsed AS gradSchoolEndorsed,
+                        a.payment_recorded AS paymentRecorded,
+                        a.ready_for_presentation AS readyForPresentation,
+                        a.receipt_number AS receiptNumber
+                 FROM applications a
+                 WHERE a.archived_at IS NULL
+                 ORDER BY a.submitted_at DESC, a.application_id DESC'
+            );
+            $appStmt->execute();
+            foreach ($appStmt->fetchAll() as $application) {
+                $applicationsByUser[(int) $application['user_id']][] = $application;
+            }
+
+            foreach ($stmt->fetchAll() as $row) {
+                $userId = (int) $row['userId'];
+                $programCode = programCodeForStudent($row);
+                $rawTrack = (string) ($row['track'] ?? '');
+                if ($rawTrack === '') {
+                    $rawTrack = getTrackForProgram($programCode);
+                }
+                $trackLabel = getTrackLabel($rawTrack);
+                $students[] = [
+                    'userId'       => $userId,
+                    'studentId'    => (string) ($row['student_id'] ?? ''),
+                    'name'         => studentDisplayName($row),
+                    'email'        => (string) ($row['email'] ?? ''),
+                    'program'      => $programCode,
+                    'programName'  => PROGRAMS[$programCode] ?? (string) ($row['program'] ?? ''),
+                    'track'        => $rawTrack,
+                    'trackLabel'   => $trackLabel,
+                    'adviser'      => (string) ($row['adviser_name'] ?? ''),
+                    'enrolled'     => (string) ($row['enrollment_date'] ?? ''),
+                    'registeredAt' => (string) ($row['registeredAt'] ?? ''),
+                    // Every application carries the program and the track of the
+                    // student it belongs to, so the Applications menu can filter
+                    // on the program of a single application row.
+                    'applications' => array_map(static function (array $application) use ($programCode, $trackLabel) {
+                        $application['program'] = $programCode;
+                        $application['track'] = $trackLabel;
+                        return $application;
+                    }, $applicationsByUser[$userId] ?? []),
+                ];
+            }
+        } catch (Throwable $e) {
+            return [];
+        }
+    }
+
+    return $students;
+}
+
+/**
+ * Why a coordinator may not move an application to a status yet, or null when
+ * the move is allowed.
+ *
+ * The status has to agree with what the student has actually done, so a
+ * record cannot claim to be ready, scheduled or finished while the milestone
+ * workflow says otherwise.
+ */
+function applicationStatusBlockedReason(string $status, array $milestoneSteps, string $result = ''): ?string {
+    if ($status === '' || $status === 'submitted' || $status === 'under_review') {
+        return null;
+    }
+
+    $state = [];
+    foreach ($milestoneSteps as $step) {
+        $state[$step['key'] ?? ''] = $step['state']['status'] ?? 'pending';
+    }
+
+    if ($status === 'ready_for_presentation') {
+        if (($state['paper'] ?? 'pending') !== 'done' || ($state['adviser_endorsement'] ?? 'pending') !== 'done') {
+            return 'The student cannot be marked as Ready for Presentation before the paper and the signed adviser endorsement form are uploaded and verified.';
+        }
+        return null;
+    }
+
+    if ($status === 'scheduled') {
+        if (($state['presentation'] ?? 'pending') !== 'done') {
+            return 'The student cannot be marked as Scheduled for Presentation before the presentation has been scheduled.';
+        }
+        return null;
+    }
+
+    if ($status === 'completed') {
+        $recorded = trim($result) !== '' || ($state['result'] ?? 'pending') === 'done';
+        if (!$recorded) {
+            return 'The student cannot be marked as Presentation Complete before the presentation result is recorded.';
+        }
+        return null;
+    }
+
+    return null;
+}
+
+/**
+ * The application draft of a student.
+ *
+ * The Application form is backed by this row so the values the student typed
+ * survive a trip through the Dashboard, a refresh, or a logout and login. One
+ * draft per student, so nothing leaks between students.
+ *
+ * Returns null when the student has no draft.
+ */
+function loadApplicationDraft(int $userId): ?array {
+    if ($userId <= 0 || !class_exists('DB')) {
+        return null;
+    }
+    try {
+        $stmt = DB::getConnection()->prepare(
+            'SELECT title, adviser, abstract, enroll_date, stage_key, doc_type, file_name, updated_at
+             FROM application_drafts
+             WHERE user_id = :user_id
+             LIMIT 1'
+        );
+        $stmt->execute(['user_id' => $userId]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/**
+ * Stores (or refreshes) the application draft of a student.
+ *
+ * An empty draft is removed instead of stored, so a cleared form does not
+ * leave a stale draft behind.
+ */
+function saveApplicationDraft(int $userId, array $values): void {
+    if ($userId <= 0 || !class_exists('DB')) {
+        return;
+    }
+    try {
+        $pdo = DB::getConnection();
+        $title       = trim((string) ($values['title'] ?? ''));
+        $adviser     = trim((string) ($values['adviser'] ?? ''));
+        $abstract    = trim((string) ($values['abstract'] ?? ''));
+        $enrollDate  = trim((string) ($values['enroll_date'] ?? ''));
+        $stageKey    = trim((string) ($values['stage_key'] ?? ''));
+        $docType     = trim((string) ($values['doc_type'] ?? ''));
+        $fileName    = trim((string) ($values['file_name'] ?? ''));
+
+        if ($title === '' && $adviser === '' && $abstract === '' && $enrollDate === '' && $docType === '' && $fileName === '') {
+            clearApplicationDraft($userId);
+            return;
+        }
+
+        $stmt = $pdo->prepare(
+            'INSERT INTO application_drafts (user_id, title, adviser, abstract, enroll_date, stage_key, doc_type, file_name)
+             VALUES (:user_id, :title, :adviser, :abstract, :enroll_date, :stage_key, :doc_type, :file_name)
+             ON DUPLICATE KEY UPDATE
+                title       = VALUES(title),
+                adviser     = VALUES(adviser),
+                abstract    = VALUES(abstract),
+                enroll_date = VALUES(enroll_date),
+                stage_key   = VALUES(stage_key),
+                doc_type    = VALUES(doc_type),
+                file_name   = VALUES(file_name),
+                updated_at  = CURRENT_TIMESTAMP'
+        );
+        $stmt->execute([
+            'user_id'     => $userId,
+            'title'       => $title,
+            'adviser'     => $adviser,
+            'abstract'    => $abstract,
+            'enroll_date' => $enrollDate,
+            'stage_key'   => $stageKey,
+            'doc_type'    => $docType,
+            'file_name'   => $fileName,
+        ]);
+    } catch (Throwable $e) {
+        error_log('CSITE: could not save the application draft — ' . $e->getMessage());
+    }
+}
+
+/**
+ * Clears the four unsent fields of the application draft of a student.
+ *
+ * "Discard Draft" only throws away what the student typed: the research
+ * title, the adviser, the abstract and the enrolment date. Uploaded
+ * documents, submitted applications and the student record are never
+ * touched by this.
+ */
+function discardApplicationDraftFields(int $userId): void {
+    if ($userId <= 0 || !class_exists('DB')) {
+        return;
+    }
+    try {
+        DB::getConnection()->prepare(
+            'UPDATE application_drafts
+             SET title = "", adviser = "", abstract = "", enroll_date = "", updated_at = CURRENT_TIMESTAMP
+             WHERE user_id = :user_id'
+        )->execute(['user_id' => $userId]);
+    } catch (Throwable $e) {
+        error_log('CSITE: could not discard the application draft — ' . $e->getMessage());
+    }
+}
+
+/**
+ * Removes the application draft of a student. Called after a successful
+ * submission and when the student explicitly starts a new application.
+ */
+function clearApplicationDraft(int $userId): void {
+    if ($userId <= 0 || !class_exists('DB')) {
+        return;
+    }
+    try {
+        DB::getConnection()->prepare('DELETE FROM application_drafts WHERE user_id = :user_id')
+            ->execute(['user_id' => $userId]);
+    } catch (Throwable $e) {
+        error_log('CSITE: could not clear the application draft — ' . $e->getMessage());
+    }
+}
+
+/**
+ * The document types a student may pick for a stage of their track.
+ *
+ * The paper and the adviser endorsement come from the stage definition of the
+ * track itself, so a thesis student, a capstone student and a seminar-paper
+ * student each get their own wording. The revision, the receipt and the
+ * Graduate School endorsement are the same for every track.
+ */
+function documentTypesForStage(array $stage, string $track, string $stageKey): array {
+    $paperLabel = $stage['documents'][0]['label'] ?? ($stage['shortLabel'] ?? 'Paper') . ' Paper';
+    $types = [$paperLabel];
+    if (!empty($stage['adviserEndorsementForm']['label'])) {
+        $types[] = $stage['adviserEndorsementForm']['label'];
+    }
+    if (!empty($stage['gradSchoolEndorsementForm']['label'])) {
+        $types[] = $stage['gradSchoolEndorsementForm']['label'];
+    }
+    $types[] = 'Revision';
+    $types[] = 'Official Receipt / Payment Proof';
+    return array_values(array_unique(array_filter($types)));
+}
+
+/**
+ * The requirements a student has to meet to submit an application for a stage.
+ *
+ * The fields are always required. The document that has to be attached is the
+ * paper of the stage, which follows the track: a thesis student attaches the
+ * Thesis Proposal, a capstone student the Capstone Proposal, a seminar-paper
+ * student the Seminar Paper Proposal.
+ *
+ * The adviser endorsement form, the official receipt and the Graduate School
+ * endorsement are required by the track as well, but they belong to the later
+ * steps of the workflow and never block the submission - the coordinator sees
+ * them on the Milestone Tracker.
+ *
+ * Returns ['fields' => [...], 'documents' => [...]] with the labels of what is
+ * still missing.
+ */
+function applicationSubmissionRequirements(array $stage, string $track, string $stageKey, array $values, array $uploads = []): array {
+    $missingFields = [];
+    if (trim((string) ($values['title'] ?? '')) === '') {
+        $missingFields[] = 'Research / Paper Title';
+    }
+    if (trim((string) ($values['adviser'] ?? '')) === '') {
+        $missingFields[] = 'Adviser Name';
+    }
+    if (trim((string) ($values['abstract'] ?? '')) === '') {
+        $missingFields[] = 'Brief Description / Abstract';
+    }
+    if (trim((string) ($values['enroll_date'] ?? '')) === '') {
+        $missingFields[] = 'Enrollment / Start Date';
+    }
+
+    $missingDocuments = [];
+    $paperLabel = $stage['documents'][0]['label'] ?? '';
+    if ($paperLabel !== '') {
+        $uploadedKinds = [];
+        foreach ($uploads as $upload) {
+            $uploadedKinds[] = classifyUploadDocType((string) ($upload['docType'] ?? ''));
+        }
+        if (!in_array('paper', $uploadedKinds, true)) {
+            $missingDocuments[] = $paperLabel;
+        }
+    }
+
+    return ['fields' => $missingFields, 'documents' => $missingDocuments];
+}
+
+/**
+ * The status badge of a document or requirement.
+ *
+ * The labels and the colours follow the Requirements Checklist the coordinator
+ * has always seen:
+ *   Pending      - the student has not uploaded it yet
+ *   Submitted    - the student uploaded it, the coordinator still has to review it
+ *   Under Review - it waits for the coordinator's own action
+ *   Approved     - the coordinator accepted it
+ *   Rejected     - it needs corrections or a resubmission
+ *
+ * Returns ['label' => ..., 'class' => ...].
+ */
+function documentStatusBadge(?array $upload): array {
+    if (!$upload) {
+        return ['label' => 'Pending', 'class' => 'status-pending'];
+    }
+    $status = (string) ($upload['status'] ?? 'submitted');
+    if (in_array($status, ['verified', 'approved'], true)) {
+        return ['label' => 'Approved', 'class' => 'status-approved'];
+    }
+    if ($status === 'incomplete') {
+        return ['label' => 'Rejected', 'class' => 'status-revision'];
+    }
+    return ['label' => 'Submitted', 'class' => 'status-submitted'];
+}
+
+/**
+ * The status badge of a requirement, taking the items the coordinator issues
+ * or records himself into account.
+ */
+function requirementStatusBadge(array $requirement, ?array $upload, array $app = []): array {
+    if (($requirement['kind'] ?? '') === 'grad_school_endorsement') {
+        // Issued by the coordinator, so it waits for the coordinator.
+        return !empty($app['gradSchoolEndorsed'])
+            ? ['label' => 'Approved', 'class' => 'status-approved']
+            : ['label' => 'Under Review', 'class' => 'status-confirmed'];
+    }
+    if (($requirement['kind'] ?? '') === 'receipt' && empty($upload)) {
+        // The payment can also be recorded without a receipt upload.
+        return (!empty($app['paymentRecorded']) || trim((string) ($app['receiptNumber'] ?? '')) !== '')
+            ? ['label' => 'Approved', 'class' => 'status-approved']
+            : ['label' => 'Pending', 'class' => 'status-pending'];
+    }
+    return documentStatusBadge($upload);
+}
+
+/**
+ * The documents and requirements of a stage in one list.
+ *
+ * Every requirement of the track comes first; the ones the student already
+ * uploaded carry the upload (file name, date, review status), the ones that
+ * are still missing are listed as Pending. Uploads that are not one of the
+ * requirements - a revision, for instance - are listed after them, so nothing
+ * is hidden and nothing is listed twice.
+ *
+ * Returns a list of ['requirement' => array|null, 'upload' => array|null].
+ */
+function documentsAndRequirements(array $requiredDocs, array $uploads, array $app = []): array {
+    $rows = [];
+    $matchedIds = [];
+
+    foreach ($requiredDocs as $requirement) {
+        $matched = null;
+        // Prefer an exact document-type match, then fall back to the kind so a
+        // slightly different label still matches.
+        foreach ($uploads as $doc) {
+            if ($requirement['docType'] !== '' && strcasecmp((string) ($doc['docType'] ?? ''), $requirement['docType']) === 0) {
+                $matched = $doc;
+                break;
+            }
+        }
+        if (!$matched) {
+            foreach ($uploads as $doc) {
+                if (classifyUploadDocType((string) ($doc['docType'] ?? '')) === $requirement['kind']) {
+                    $matched = $doc;
+                    break;
+                }
+            }
+        }
+        if ($matched) {
+            $matchedIds[(string) $matched['id']] = true;
+        }
+        $rows[] = ['requirement' => $requirement, 'upload' => $matched];
+    }
+
+    // Uploads that are not one of the requirements of this stage.
+    foreach ($uploads as $doc) {
+        if (!isset($matchedIds[(string) $doc['id']])) {
+            $rows[] = ['requirement' => null, 'upload' => $doc];
+        }
+    }
+
+    return $rows;
+}
+
+/**
+ * One application with everything the coordinator needs to work on it.
+ *
+ * Returns null when the application does not exist or has been archived.
+ */
+function applicationById(int $id): ?array {
+    if ($id <= 0 || !class_exists('DB')) {
+        return null;
+    }
+    try {
+        $stmt = DB::getConnection()->prepare(
+            "SELECT
+                a.application_id AS id,
+                u.email AS studentEmail,
+                COALESCE(NULLIF(TRIM(CONCAT(s.last_name, ', ', s.first_name, IF(s.middle_initial IS NULL OR TRIM(REPLACE(s.middle_initial, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(s.middle_initial, '.', '')))))), ''), u.full_name) AS student,
+                CASE
+                    WHEN s.program LIKE '%Computer Science%' THEN 'MSCS'
+                    WHEN s.program LIKE '%Information Technology%' THEN 'MIT'
+                    WHEN s.program LIKE '%Mathematics%' THEN 'MATH'
+                    ELSE s.program
+                END AS program,
+                s.track,
+                s.adviser_name AS adviser,
+                a.presentation_stage AS stage,
+                a.paper_title AS title,
+                a.status,
+                a.coordinator_comment AS coordinatorComment,
+                a.grad_school_endorsed AS gradSchoolEndorsed,
+                a.payment_recorded AS paymentRecorded,
+                a.receipt_number AS receiptNumber,
+                a.payment_date AS paymentDate,
+                a.payment_amount AS paymentAmount,
+                a.ready_for_presentation AS readyForPresentation,
+                a.workflow_state AS workflowState,
+                a.result AS result,
+                a.submitted_at AS date
+             FROM applications a
+             INNER JOIN users u ON u.user_id = a.user_id
+             LEFT JOIN students s ON s.user_id = u.user_id
+             WHERE a.application_id = :id AND a.archived_at IS NULL
+             LIMIT 1"
+        );
+        $stmt->execute(['id' => $id]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            return null;
+        }
+        $row['stageKey'] = stageKeyFromLabel((string) $row['stage']);
+        $row['workflowState'] = json_decode((string) ($row['workflowState'] ?? '[]'), true) ?: [];
+        return $row;
+    } catch (Throwable $e) {
+        return null;
+    }
+}
+
+/**
+ * Every non-archived application of a student, newest first.
+ */
+function applicationsForStudent(string $email): array {
+    if ($email === '' || !class_exists('DB')) {
+        return [];
+    }
+    try {
+        $stmt = DB::getConnection()->prepare(
+            'SELECT a.application_id AS id, a.user_id, a.presentation_stage AS stage, a.paper_title AS title,
+                    a.status, a.submitted_at AS date, a.result,
+                    a.coordinator_comment AS coordinatorComment,
+                    a.grad_school_endorsed AS gradSchoolEndorsed,
+                    a.payment_recorded AS paymentRecorded,
+                    a.receipt_number AS receiptNumber,
+                    a.payment_date AS paymentDate,
+                    a.payment_amount AS paymentAmount,
+                    a.ready_for_presentation AS readyForPresentation,
+                    a.workflow_state AS workflowState
+             FROM applications a
+             INNER JOIN users u ON u.user_id = a.user_id
+             WHERE u.email = :email AND a.archived_at IS NULL
+             ORDER BY a.submitted_at DESC, a.application_id DESC'
+        );
+        $stmt->execute(['email' => $email]);
+        $rows = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $row['id'] = (int) $row['id'];
+            $row['stageKey'] = stageKeyFromLabel((string) $row['stage']);
+            $row['workflowState'] = json_decode((string) ($row['workflowState'] ?? '[]'), true) ?: [];
+            $rows[] = $row;
+        }
+        return $rows;
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
+ * The application a student already has for a stage, if any.
+ */
+function applicationForStage(string $email, string $stageKey): ?array {
+    foreach (applicationsForStudent($email) as $application) {
+        if (($application['stageKey'] ?? '') === $stageKey) {
+            return $application;
+        }
+    }
+    return null;
+}
+
+/**
+ * What a student still has to hand over before a presentation may be
+ * scheduled.
+ *
+ * The list follows the track (seminar paper, capstone or thesis) and the stage
+ * the application is currently on, and it follows the same milestone workflow
+ * the student sees: the paper and the adviser endorsement have to be uploaded
+ * and verified, the coordinator has to issue the Graduate School endorsement
+ * and mark the student ready, and the official receipt has to be recorded.
+ *
+ * An empty array means every requirement is met and the presentation may be
+ * scheduled.
+ */
+function applicationMissingRequirements(string $track, string $stageKey, array $uploads, array $app = []): array {
+    $missing = [];
+
+    foreach (requiredDocumentsForStage($track, $stageKey) as $requirement) {
+        // The Graduate School endorsement is issued by the coordinator and the
+        // receipt can also be recorded by the coordinator, so both are checked
+        // separately below instead of as an upload.
+        if ($requirement['kind'] === 'grad_school_endorsement' || $requirement['kind'] === 'receipt') {
+            continue;
+        }
+        $document = bestUploadOfKind($uploads, $requirement['kind']);
+        $verified = $document && in_array($document['status'] ?? '', ['verified', 'approved'], true);
+        if (!$verified) {
+            $missing[] = [
+                'label' => $requirement['label'],
+                'kind'  => $requirement['kind'],
+                'why'   => $document
+                    ? 'Uploaded but not yet verified by the coordinator'
+                    : 'Not submitted by the student',
+            ];
+        }
+    }
+
+    if (empty($app['gradSchoolEndorsed'])) {
+        $missing[] = [
+            'label' => 'Endorsement to Graduate School',
+            'kind'  => 'grad_school_endorsement',
+            'why'   => 'Not yet issued by the coordinator',
+        ];
+    }
+
+    // The official receipt is satisfied either by a verified receipt upload or
+    // by the payment the coordinator recorded against the application.
+    $receiptDocument = bestUploadOfKind($uploads, 'receipt');
+    $receiptVerified = $receiptDocument && in_array($receiptDocument['status'] ?? '', ['verified', 'approved'], true);
+    $paymentRecorded = !empty($app['paymentRecorded']) || trim((string) ($app['receiptNumber'] ?? '')) !== '';
+    if (!$receiptVerified && !$paymentRecorded) {
+        $missing[] = [
+            'label' => 'Official Payment / Receipt',
+            'kind'  => 'receipt',
+            'why'   => 'Payment not recorded and receipt not verified',
+        ];
+    }
+
+    if (empty($app['readyForPresentation'])) {
+        $missing[] = [
+            'label' => 'Ready for Presentation',
+            'kind'  => 'ready_for_presentation',
+            'why'   => 'The coordinator has not yet marked the student ready',
+        ];
+    }
+
+    return $missing;
 }
 
 initPrototypeStore();

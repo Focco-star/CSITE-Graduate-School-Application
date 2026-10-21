@@ -52,16 +52,30 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="card-header"><h3><?= htmlspecialchars(getTrackLabel($track)) ?> Stage Progress</h3></div>
     <div class="card-body">
         <div class="progress-timeline">
-            <?php foreach ($stages as $idx => $stage):
+            <?php
+            $currentIndex = workflowCurrentIndex($progress, $stages);
+            $lockStates = stageLockStates($stages, $currentIndex);
+            foreach ($stages as $idx => $stage):
                 $p = $progress[$idx] ?? ['stageStatus' => 'pending'];
                 $st = $p['stageStatus'];
+                $isLocked = $lockStates[$stage['key']]['locked'] ?? false;
                 $class = in_array($st, ['completed', 'approved'], true) ? 'completed' : ($st !== 'not_started' && $st !== 'pending' ? 'active' : 'pending');
+                if ($isLocked) {
+                    $class = 'locked';
+                }
             ?>
             <div class="timeline-item <?= $class ?>">
                 <div class="timeline-dot"></div>
                 <div class="timeline-content">
-                    <h4><?= htmlspecialchars($stage['label']) ?> <?= statusBadge($st) ?></h4>
-                    <p><?= htmlspecialchars($p['coordinatorComments'] ?: (STATUSES[$st]['label'] ?? $st)) ?></p>
+                    <h4>
+                        <?= htmlspecialchars($stage['label']) ?>
+                        <?php if ($isLocked): ?>
+                            <span class="status-badge status-locked"><i class="fas fa-lock" aria-hidden="true"></i> Locked</span>
+                        <?php else: ?>
+                            <?= statusBadge($st) ?>
+                        <?php endif; ?>
+                    </h4>
+                    <p><?= htmlspecialchars($isLocked ? ($lockStates[$stage['key']]['reason'] ?? 'Locked until the coordinator approves the progression.') : ($p['coordinatorComments'] ?: (STATUSES[$st]['label'] ?? $st))) ?></p>
                     <?php if (!empty($p['presentation']['date'])): ?>
                     <p style="font-size:0.75rem;color:var(--gray-400);margin-top:0.25rem;">
                         <i class="fas fa-calendar"></i> <?= htmlspecialchars($p['presentation']['date']) ?>

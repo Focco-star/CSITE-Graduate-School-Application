@@ -8,54 +8,8 @@ $currentPage = 'applications';
 $userName    = $mockCoordinator['name'];
 
 $appId = (int) ($_GET['id'] ?? 0);
-$app = null;
-$isDatabaseApplication = false;
-
-if ($appId > 0) {
-    try {
-        $stmt = DB::getConnection()->prepare(
-            "SELECT
-                a.application_id AS id,
-                u.email AS studentEmail,
-                COALESCE(NULLIF(TRIM(CONCAT(s.last_name, ', ', s.first_name, IF(s.middle_initial IS NULL OR TRIM(REPLACE(s.middle_initial, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(s.middle_initial, '.', '')))))), ''), u.full_name) AS student,
-                CASE
-                    WHEN s.program LIKE '%Computer Science%' THEN 'MSCS'
-                    WHEN s.program LIKE '%Information Technology%' THEN 'MIT'
-                    WHEN s.program LIKE '%Mathematics%' THEN 'MATH'
-                    ELSE s.program
-                END AS program,
-                s.track,
-                s.adviser_name AS adviser,
-                a.presentation_stage AS stage,
-                a.paper_title AS title,
-                a.status,
-                a.coordinator_comment AS coordinatorComment,
-                a.grad_school_endorsed AS gradSchoolEndorsed,
-                a.payment_recorded AS paymentRecorded,
-                a.receipt_number AS receiptNumber,
-                a.payment_date AS paymentDate,
-                a.payment_amount AS paymentAmount,
-                a.ready_for_presentation AS readyForPresentation,
-                a.workflow_state AS workflowState,
-                a.result AS result,
-                a.submitted_at AS date
-             FROM applications a
-             INNER JOIN users u ON u.user_id = a.user_id
-             LEFT JOIN students s ON s.user_id = u.user_id
-             WHERE a.application_id = :id AND a.archived_at IS NULL
-             LIMIT 1"
-        );
-        $stmt->execute(['id' => $appId]);
-        $app = $stmt->fetch() ?: null;
-        if ($app) {
-            $app['stageKey'] = stageKeyFromLabel($app['stage']);
-            $app['workflowState'] = json_decode((string) ($app['workflowState'] ?? '[]'), true) ?: [];
-            $isDatabaseApplication = true;
-        }
-    } catch (PDOException $e) {
-        $app = null;
-    }
-}
+$app = $appId > 0 ? applicationById($appId) : null;
+$isDatabaseApplication = $app !== null;
 
 if (!$app) {
     $app = findApplication($appId) ?? (storeGet('applications')[0] ?? null);
@@ -63,18 +17,89 @@ if (!$app) {
 $processSuccess = '';
 $processError = '';
 
+/* ------------------------------------------------------------------
+ * The track of the student and the stages of that track
+ * ------------------------------------------------------------------ */
+$track      = $app ? ($app['track'] ?? getTrackForProgram($app['program'])) : 'thesis';
+// The stages of the student's track: $stageList keeps the order of the
+// workflow, $stages is the same list keyed by stage key.
+$stageList = getWorkflow($track)['stages'];
+$stages = [];
+foreach ($stageList as $stageDefinition) {
+    $stages[$stageDefinition['key']] = $stageDefinition;
+}
+$stageKeys  = array_keys($stages);
+$trackLabel = getTrackLabel($track);
+$email      = (string) ($app['studentEmail'] ?? '');
+
+/* ------------------------------------------------------------------
+ * POST: Save Process
+ *
+ * Everything the coordinator changed on the selected stage is saved here:
+ * the application status, the comment, the milestones, the document review
+ * statuses, the workflow records, the presentation result and the stage
+ * approvals.
+ * ------------------------------------------------------------------ */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
-    $status = $_POST['status'] ?? '';
-    $stageKey = $_POST['stage'] ?? ($app['stageKey'] ?? 'proposal');
-    $comment = trim($_POST['comment'] ?? '');
-    $advance = ($_POST['advance'] ?? 'no') === 'yes';
-    $allowed = ['submitted', 'under_review', 'for_payment', 'payment_recorded', 'ready_for_presentation', 'scheduled', 'approved', 'requires_revision', 'completed'];
+    $selectedStage = trim((string) ($_POST['selected_stage'] ?? ($app['stageKey'] ?? '')));
+    if (!isset($stages[$selectedStage])) {
+        $selectedStage = (string) ($app['stageKey'] ?? ($stageKeys[0] ?? ''));
+    }
+
+    // The stage the coordinator was looking at decides which application row
+    // is saved. Everything else on the page follows that stage.
+    $postedAppIds = $_POST['stage_app_id'] ?? [];
+    $targetAppId  = (int) ($postedAppIds[$selectedStage] ?? 0);
+    if ($targetAppId > 0 && $targetAppId !== (int) ($app['id'] ?? 0)) {
+        $target = applicationById($targetAppId);
+        if ($target) {
+            $app = $target;
+            $isDatabaseApplication = true;
+        }
+    }
+
+    // Everything the coordinator edits for the selected stage. The field names
+    // are scoped per stage, so a stage never mixes its values up with another
+    // one when the page is saved.
+    $stagePosted = $_POST['stage_data'][$selectedStage] ?? [];
+    if (!is_array($stagePosted)) {
+        $stagePosted = [];
+    }
+
+    $status = (string) ($stagePosted['status'] ?? '');
+    $stageKey = (string) ($stagePosted['stage'] ?? ($app['stageKey'] ?? 'proposal'));
+    $comment = trim((string) ($stagePosted['comment'] ?? ''));
+    // Approving or revoking the progression to the next stage.
+    $approveStage   = trim((string) ($_POST['approve_stage'] ?? ''));
+    $disapproveStage = trim((string) ($_POST['disapprove_stage'] ?? ''));
+    $allowed = COORDINATOR_STATUSES;
+    // A record written before the status list changed keeps its own status
+    // until the coordinator picks one of the current ones.
+    if (!empty($app['status']) && $app['status'] === $status && !in_array($status, $allowed, true)) {
+        $allowed[] = $app['status'];
+    }
     if (!in_array($status, $allowed, true)) {
         $processError = 'Select a valid application status.';
     } else {
         $track = $app['track'] ?? getTrackForProgram($app['program']);
-        $stages = getStagesForTrack($track);
+        // The label of every stage of the track (the stage definitions
+        // themselves stay in $stages, which is built further down).
+        $stageLabels = getStagesForTrack($track);
         $workflowState = $app['workflowState'] ?? [];
+
+        /*
+         * The status has to agree with what the student has actually done, so
+         * a record cannot claim to be ready, scheduled or finished while the
+         * milestone workflow says otherwise. The milestones come from the same
+         * helper the student's tracker uses.
+         */
+        $currentStageKey = (string) ($app['stageKey'] ?? stageKeyFromLabel((string) ($app['stage'] ?? '')));
+        $statusMilestones = stageMilestoneSteps((string) ($app['studentEmail'] ?? ''), $track, $currentStageKey);
+        $postedResult = trim((string) ($stagePosted['result'] ?? ''));
+        $blockedReason = applicationStatusBlockedReason($status, $statusMilestones, $postedResult);
+        if ($blockedReason !== null) {
+            $processError = $blockedReason;
+        } else {
         foreach (($_POST['upload_status'] ?? []) as $uploadId => $uploadStatus) {
             if (!in_array($uploadStatus, ['submitted', 'verified', 'incomplete'], true)) continue;
             $upload = findUpload((string) $uploadId);
@@ -105,36 +130,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         $postedStatuses = $_POST['upload_status'] ?? [];
         foreach (uploadsForApplication((int) $app['id']) as $doc) {
             $kind = classifyUploadDocType((string) ($doc['docType'] ?? ''));
-            $posted = $postedStatuses[(string) $doc['id']] ?? null;
-            $docStatusByKind[$kind] = $posted !== null ? $posted : (string) ($doc['status'] ?? 'submitted');
+            // The review status the coordinator picked for this document.
+            $postedDocStatus = $postedStatuses[(string) $doc['id']] ?? null;
+            $docStatusByKind[$kind] = $postedDocStatus !== null ? $postedDocStatus : (string) ($doc['status'] ?? 'submitted');
         }
-        $receiptNumberInput = trim($_POST['receiptNumber'] ?? '');
-        $paperVerified = ($docStatusByKind['paper'] ?? '') === 'verified';
-        $adviserVerified = ($docStatusByKind['adviser_endorsement'] ?? '') === 'verified';
+        $receiptNumberInput = trim((string) ($stagePosted['receiptNumber'] ?? ''));
         $receiptVerified = ($docStatusByKind['receipt'] ?? '') === 'verified';
-        $gradEndorsed = isset($_POST['gradSchoolEndorsed']);
+
+        /*
+         * The milestones the coordinator ticks in the tracker are saved exactly
+         * as they are left. Each checkbox posts an explicit value: a hidden
+         * companion field sends "0" when the box is cleared, so clearing it is
+         * saved as well. Nothing restores the tick afterwards.
+         */
+        $gradEndorsed = array_key_exists('gradSchoolEndorsed', $stagePosted)
+            ? ($stagePosted['gradSchoolEndorsed'] === '1')
+            : !empty($app['gradSchoolEndorsed']);
         $paymentRecorded = $receiptVerified || $receiptNumberInput !== '';
-        $readyForPresentation = $paperVerified && $adviserVerified;
-        if ($advance && $status === 'approved') {
-            $keys = array_keys($stages);
-            $idx = array_search($stageKey, $keys, true);
-            if ($idx !== false && isset($keys[$idx + 1])) {
-                $stageKey = $keys[$idx + 1];
-            }
-        }
+        $readyForPresentation = array_key_exists('readyForPresentation', $stagePosted)
+            ? ($stagePosted['readyForPresentation'] === '1')
+            : !empty($app['readyForPresentation']);
+
         $updatedFields = [
             'status' => $status,
             'stageKey' => $stageKey,
-            'stage' => $stages[$stageKey] ?? $app['stage'],
+            'stage' => $stageLabels[$stageKey] ?? $app['stage'],
             'coordinatorComment' => $comment,
             'workflowState' => $workflowState,
             'gradSchoolEndorsed' => $gradEndorsed,
             'paymentRecorded' => $paymentRecorded,
             'receiptNumber' => $receiptNumberInput,
-            'paymentDate' => trim($_POST['paymentDate'] ?? ''),
-            'paymentAmount' => trim($_POST['paymentAmount'] ?? ''),
+            'paymentDate' => trim((string) ($stagePosted['paymentDate'] ?? '')),
+            'paymentAmount' => trim((string) ($stagePosted['paymentAmount'] ?? '')),
             'readyForPresentation' => $readyForPresentation,
-            'result' => trim($_POST['result'] ?? ''),
+            'result' => trim((string) ($stagePosted['result'] ?? '')),
         ];
 
         try {
@@ -185,28 +214,164 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             }
 
             $app = array_merge($app, $updatedFields);
-            $processSuccess = 'Application status updated and saved to the database.';
+            $processSuccess = 'Application progress has been saved successfully.';
         } catch (Throwable $e) {
-            $processError = 'Unable to save the application status. Please try again.';
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $processError = 'Unable to save application progress. Please try again.';
+        }
+
+        /*
+         * Approving (or revoking) the progression to the next stage.
+         *
+         * The approval is only applied here, when the coordinator presses Save
+         * Process. Approving marks the stage complete, which is what unlocks
+         * the next stage for the student; revoking takes that away again.
+         * Documents and workflow history are never touched.
+         */
+        if ($processError === '' && ($approveStage !== '' || $disapproveStage !== '')) {
+            $actionStage   = $approveStage !== '' ? $approveStage : $disapproveStage;
+            $actionAppId  = (int) ($postedAppIds[$actionStage] ?? 0);
+            $actionApp    = $actionAppId > 0 ? applicationById($actionAppId) : null;
+            if (!$actionApp) {
+                $processError = 'The student has no application for that stage, so the progression cannot be approved.';
+            } elseif ($approveStage !== '') {
+                $actionUploads = uploadsForApplication($actionAppId);
+                $actionMissing = applicationMissingRequirements($track, $actionStage, $actionUploads, $actionApp);
+                $actionResult  = trim((string) ($stagePosted['result'] ?? '')) !== '' ? trim((string) ($stagePosted['result'] ?? '')) : (string) ($actionApp['result'] ?? '');
+                if ($actionMissing) {
+                    $processError = 'This stage cannot be approved yet. Please complete the required items first.';
+                } elseif ($actionResult === '') {
+                    $processError = 'Record the presentation result before approving the next stage.';
+                } else {
+                    updateApplicationRecord($actionAppId, ['status' => 'completed', 'result' => $actionResult]);
+                    $processSuccess = 'Application progress has been saved successfully.';
+                }
+            } else {
+                updateApplicationRecord($actionAppId, ['status' => 'ready_for_presentation']);
+                $processSuccess = 'Application progress has been saved successfully.';
+            }
+        }
+
+        /*
+         * Read the application back, so the page shows exactly what is stored:
+         * the approval action may have changed the status after the form was
+         * written, and the stages of the track are built from the database.
+         */
+        if ($isDatabaseApplication && (int) ($app['id'] ?? 0) > 0) {
+            $fresh = applicationById((int) $app['id']);
+            if ($fresh) {
+                $app = $fresh;
+            }
+        }
         }
     }
 }
 
-$track = $app ? ($app['track'] ?? getTrackForProgram($app['program'])) : 'thesis';
-$stages = getStagesForTrack($track);
-$uploads = $app ? uploadsForApplication((int) $app['id']) : [];
-$trackLabel = getTrackLabel($track);
-// The stage the application is currently on — it decides which documents are required.
-$stageKey = $app ? (string) ($app['stageKey'] ?? stageKeyFromLabel((string) ($app['stage'] ?? ''))) : 'proposal';
-$requiredDocs = requiredDocumentsForStage($track, $stageKey);
+/* ------------------------------------------------------------------
+ * The stages of the student, each with everything that belongs to it
+ * ------------------------------------------------------------------ */
+$studentApps  = $email !== '' ? applicationsForStudent($email) : [];
+$schedules    = $email !== '' ? schedulesForEmail($email) : [];
+$progress     = $email !== '' ? getStudentProgress($email, $track) : [];
+$currentIdx   = workflowCurrentIndex($progress, $stageList);
+$currentStageKey = $stageKeys[$currentIdx] ?? '';
+$lockStates   = stageLockStates($stageList, $currentIdx);
+
+$panels = [];
+foreach ($stages as $key => $stage) {
+    // The application the student has for this stage (the one being edited
+    // always wins for its own stage).
+    $stageApp = null;
+    foreach ($studentApps as $candidate) {
+        if (($candidate['stageKey'] ?? '') === $key) {
+            $stageApp = $candidate;
+            break;
+        }
+    }
+    if ((string) ($app['stageKey'] ?? '') === $key && $app) {
+        $stageApp = array_merge($stageApp ?? [], $app);
+    }
+
+    $stageUploads   = $stageApp ? uploadsForApplication((int) $stageApp['id']) : [];
+    $required       = requiredDocumentsForStage($track, $key);
+    $documentRows   = documentsAndRequirements($required, $stageUploads, $stageApp ?? []);
+    $milestoneSteps = stageMilestoneSteps($email, $track, $key);
+    $milestoneStats = milestoneProgress($milestoneSteps);
+    $missing        = applicationMissingRequirements($track, $key, $stageUploads, $stageApp ?? []);
+
+    // The presentation scheduled for this stage.
+    $stageSchedule = null;
+    foreach ($schedules as $schedule) {
+        if ((int) ($schedule['applicationId'] ?? 0) === (int) ($stageApp['id'] ?? 0)) {
+            $stageSchedule = $schedule;
+            break;
+        }
+        if (stageKeyFromLabel((string) ($schedule['stage'] ?? '')) === $key) {
+            $stageSchedule = $schedule;
+            break;
+        }
+    }
+
+    $requirementsComplete = true;
+    foreach ($milestoneSteps as $step) {
+        if (in_array($step['key'] ?? '', ['paper', 'adviser_endorsement', 'coord_review', 'grad_school_endorsement', 'payment', 'ready_for_presentation'], true)) {
+            if (($step['state']['status'] ?? 'pending') !== 'done') {
+                $requirementsComplete = false;
+                break;
+            }
+        }
+    }
+
+    $panels[$key] = [
+        'key'        => $key,
+        'stage'      => $stage,
+        'app'        => $stageApp,
+        'appId'      => (int) ($stageApp['id'] ?? 0),
+        'status'     => (string) ($stageApp['status'] ?? ''),
+        'title'      => (string) ($stageApp['title'] ?? ''),
+        'date'       => (string) ($stageApp['date'] ?? ''),
+        'result'     => (string) ($stageApp['result'] ?? ''),
+        'uploads'    => $stageUploads,
+        'required'   => $required,
+        'documents'  => $documentRows,
+        'milestones' => $milestoneSteps,
+        'stats'      => $milestoneStats,
+        'missing'    => $missing,
+        'schedule'   => $stageSchedule,
+        'locked'     => $lockStates[$key]['locked'] ?? false,
+        'requirementsComplete' => $requirementsComplete,
+        'unlocked'   => $missing === [],
+    ];
+}
+
+/* The stage the coordinator is looking at. */
+$selectedStage = trim((string) ($_GET['stage'] ?? ($_POST['selected_stage'] ?? ($app['stageKey'] ?? ($stageKeys[0] ?? '')))));
+if (!isset($panels[$selectedStage])) {
+    $selectedStage = (string) ($app['stageKey'] ?? ($stageKeys[0] ?? ''));
+}
+if (!isset($panels[$selectedStage])) {
+    $selectedStage = (string) ($stageKeys[0] ?? '');
+}
+
+// The progress over the whole track.
+$overallDone = 0;
+$overallTotal = 0;
+foreach ($panels as $panel) {
+    $overallDone += (int) $panel['stats']['done'];
+    $overallTotal += (int) $panel['stats']['total'];
+}
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 
 <div class="page-header">
     <h2>Process Application</h2>
-    <p>Update application status and record progression<?= $app ? ' for ' . htmlspecialchars($app['student']) : '' ?>.</p>
+    <p>Review the student's progress, documents and workflow for <?= $app ? htmlspecialchars($app['student']) : 'this student' ?>.</p>
 </div>
+
+<div class="page-notifications" id="pageNotifications" aria-live="polite"></div>
 
 <?php if ($processSuccess): ?>
 <div class="alert alert-success" data-auto-dismiss><i class="fas fa-check-circle"></i> <?= htmlspecialchars($processSuccess) ?></div>
@@ -218,127 +383,315 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php if (!$app): ?>
 <div class="alert alert-warning"><i class="fas fa-info-circle"></i> No application selected.</div>
 <?php else: ?>
-<div class="card">
-    <div class="card-header"><h3>Current Application</h3></div>
-    <div class="card-body">
-        <div class="detail-grid">
-            <div class="detail-item"><label>Student</label><span><?= htmlspecialchars($app['student']) ?></span></div>
-            <div class="detail-item"><label>Program</label><span><?= htmlspecialchars($app['program']) ?></span></div>
-            <div class="detail-item"><label>Current Stage</label><span><?= htmlspecialchars($app['stage']) ?></span></div>
-            <div class="detail-item"><label>Current Status</label><span><?= statusBadge($app['status']) ?></span></div>
+
+<?php /* ---------------- the sliding progress tracker ---------------- */ ?>
+<div class="stage-slider" id="stageSlider">
+    <button type="button" class="stage-slider-nav" id="stageSliderPrev" aria-label="Previous stage"><i class="fas fa-chevron-left"></i></button>
+    <div class="stage-slider-viewport">
+        <div class="stage-slider-track" id="stageSliderTrack">
+            <?php foreach ($panels as $key => $panel):
+                $stageStatus = $panel['status'];
+                $isCompleted = in_array($stageStatus, ['completed', 'approved'], true);
+                $isLocked    = $panel['locked'];
+                $isCurrent   = ($key === $currentStageKey);
+                $isNext      = !$isCompleted && !$isLocked && !$isCurrent;
+                if ($isCompleted) {
+                    $sliderClass = 'is-completed';
+                    $sliderLabel = 'Completed';
+                    $sliderBadge = 'status-approved';
+                } elseif ($isLocked) {
+                    $sliderClass = 'is-locked';
+                    $sliderLabel = 'Locked';
+                    $sliderBadge = 'status-not-submitted';
+                } elseif ($isCurrent) {
+                    $sliderClass = 'is-active';
+                    $sliderLabel = 'In Progress';
+                    $sliderBadge = 'status-confirmed';
+                } else {
+                    $sliderClass = 'is-approved';
+                    $sliderLabel = 'Approved';
+                    $sliderBadge = 'status-submitted';
+                }
+                $stageNumber = array_search($key, $stageKeys, true);
+            ?>
+            <button type="button" class="stage-slider-card <?= $sliderClass ?><?= $key === $selectedStage ? ' is-selected' : '' ?>"
+                    data-stage="<?= htmlspecialchars($key) ?>"
+                    aria-pressed="<?= $key === $selectedStage ? 'true' : 'false' ?>">
+                <span class="stage-slider-num">
+                    <?php if ($isLocked): ?><i class="fas fa-lock" aria-hidden="true"></i><?php else: ?><?= (int) $stageNumber + 1 ?><?php endif; ?>
+                </span>
+                <span class="stage-slider-text">
+                    <span class="stage-slider-label"><?= htmlspecialchars($panel['stage']['label']) ?></span>
+                    <span class="status-badge <?= $sliderBadge ?> stage-slider-badge"><?= htmlspecialchars($sliderLabel) ?></span>
+                </span>
+            </button>
+            <?php endforeach; ?>
         </div>
     </div>
+    <button type="button" class="stage-slider-nav" id="stageSliderNext" aria-label="Next stage"><i class="fas fa-chevron-right"></i></button>
 </div>
 
-<form method="post" action="<?= url('coordinator/applications/process.php?id=' . $app['id']) ?>" data-validate>
-    <div class="card">
-        <div class="card-header"><h3>Update Status</h3></div>
-        <div class="card-body">
-            <div class="form-row">
-                <div class="form-field">
-                    <label>Application Status <span class="required">*</span></label>
-                    <select name="status" required>
-                        <option value="">Select status</option>
-                        <?php foreach (['submitted','under_review','for_payment','payment_recorded','ready_for_presentation','scheduled','approved','requires_revision','completed'] as $key): ?>
-                        <option value="<?= $key ?>" <?= $app['status'] === $key ? 'selected' : '' ?>><?= htmlspecialchars(STATUSES[$key]['label']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+<div class="stage-slider-summary">
+    <span><i class="fas fa-map-marker-alt" style="margin-right:5px;"></i>Current stage:
+        <strong><?= htmlspecialchars($stageList[$currentIdx]['label'] ?? '—') ?></strong></span>
+    <span><i class="fas fa-route" style="margin-right:5px;"></i>Track:
+        <strong><?= htmlspecialchars($trackLabel) ?></strong></span>
+    <span><i class="fas fa-graduation-cap" style="margin-right:5px;"></i>Overall progress:
+        <strong><?= (int) $overallDone ?> / <?= (int) $overallTotal ?> milestones</strong></span>
+</div>
+
+<form method="post" action="<?= url('coordinator/applications/process.php?id=' . $app['id']) ?>" id="processForm" data-validate>
+    <input type="hidden" name="selected_stage" id="selectedStageField" value="<?= htmlspecialchars($selectedStage) ?>">
+    <input type="hidden" name="approve_stage" id="approveStageField" value="">
+    <input type="hidden" name="disapprove_stage" id="disapproveStageField" value="">
+    <?php foreach ($panels as $key => $panel): ?>
+    <input type="hidden" name="stage_app_id[<?= htmlspecialchars($key) ?>]" value="<?= (int) $panel['appId'] ?>">
+    <?php endforeach; ?>
+
+    <?php /* ---------------- one panel per stage ---------------- */ ?>
+    <?php foreach ($panels as $key => $panel):
+        $stageApp  = $panel['app'];
+        $stageName = $panel['stage']['label'];
+        $isSelected = $key === $selectedStage;
+    ?>
+    <section class="stage-panel" data-stage="<?= htmlspecialchars($key) ?>" data-saved-approved="<?= in_array($panel['status'], ['completed', 'approved'], true) ? '1' : '0' ?>"<?= $isSelected ? '' : ' hidden' ?>>
+
+        <div class="card">
+            <div class="card-header"><h3>Current Application</h3></div>
+            <div class="card-body">
+                <?php if (!$stageApp): ?>
+                <div class="alert alert-info" style="margin:0;">
+                    <i class="fas fa-info-circle"></i>
+                    <div>The student has no application for <strong><?= htmlspecialchars($stageName) ?></strong> yet.</div>
                 </div>
-                <div class="form-field">
-                    <label>Presentation Stage</label>
-                    <select name="stage">
-                        <?php foreach ($stages as $key => $label): ?>
-                        <option value="<?= $key ?>" <?= ($app['stageKey'] ?? '') === $key ? 'selected' : '' ?>><?= htmlspecialchars($label) ?></option>
-                        <?php endforeach; ?>
-                    </select>
+                <?php else: ?>
+                <div class="detail-grid">
+                    <div class="detail-item"><label>Student</label><span><?= htmlspecialchars($stageApp['student'] ?? '') ?></span></div>
+                    <div class="detail-item"><label>Program</label><span><?= htmlspecialchars($stageApp['program'] ?? '') ?></span></div>
+                    <div class="detail-item"><label>Track</label><span><?= htmlspecialchars($trackLabel) ?></span></div>
+                    <div class="detail-item"><label>Adviser</label><span><?= htmlspecialchars($stageApp['adviser'] ?? '—') ?></span></div>
+                    <div class="detail-item"><label>Current Stage</label><span><?= htmlspecialchars($stageName) ?></span></div>
+                    <div class="detail-item"><label>Current Status</label><span><?= statusBadge($panel['status']) ?></span></div>
+                    <div class="detail-item" style="grid-column:1/-1;"><label>Research / Paper Title</label><span><?= htmlspecialchars($panel['title']) ?></span></div>
+                    <div class="detail-item"><label>Submitted</label><span><?= $panel['date'] ? htmlspecialchars(date('M d, Y', strtotime($panel['date']))) : '—' ?></span></div>
                 </div>
-            </div>
-            <div class="form-field">
-                <label>Recommendations / Comments</label>
-                <textarea name="comment" placeholder="Enter recommendations or revision notes for the student..."><?= htmlspecialchars($app['coordinatorComment'] ?? '') ?></textarea>
-            </div>
-            <div class="form-field">
-                <label>Advance to Next Stage?</label>
-                <select name="advance">
-                    <option value="no">No – keep at current stage</option>
-                    <option value="yes">Yes – advance to next presentation stage</option>
-                </select>
-                <p class="field-hint">Upon approval, the student can proceed to the next stage in the presentation workflow.</p>
+                <?php endif; ?>
             </div>
         </div>
-    </div>
 
-    <div class="card">
-        <div class="card-header"><h3>Submitted Documents</h3></div>
-        <div class="card-body">
-            <?php if ($requiredDocs): ?>
-            <p class="field-hint" style="margin-bottom:0.75rem;">Required documents for the <strong><?= htmlspecialchars($trackLabel) ?></strong> track — <?= htmlspecialchars($stages[$stageKey] ?? $app['stage']) ?>.</p>
-            <?php endif; ?>
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead><tr><th>Document</th><th>Review Status</th><th>Action</th></tr></thead>
-                    <tbody>
-                        <?php if (!$uploads): ?>
-                        <tr><td colspan="3" style="color:var(--gray-400);">No documents uploaded.</td></tr>
-                        <?php endif; ?>
-                        <?php foreach ($uploads as $doc): ?>
-                        <tr>
-                            <td><?= htmlspecialchars($doc['fileName']) ?></td>
-                            <td><select name="upload_status[<?= htmlspecialchars($doc['id']) ?>]" style="padding:3px 8px;"><option value="submitted" <?= $doc['status'] === 'submitted' ? 'selected' : '' ?>>Submitted</option><option value="verified" <?= $doc['status'] === 'verified' || $doc['status'] === 'approved' ? 'selected' : '' ?>>Verified</option><option value="incomplete" <?= $doc['status'] === 'incomplete' ? 'selected' : '' ?>>Incomplete</option></select></td>
-                            <td><?php if (uploadStoragePath($doc)): ?><a class="btn btn-sm btn-outline" href="<?= url('coordinator/download.php?id=' . urlencode($doc['id'])) ?>"><i class="fas fa-download"></i> Download</a><?php else: ?><span style="color:var(--gray-400);font-size:.8rem;">Unavailable</span><?php endif; ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+        <div class="card">
+            <div class="card-header"><h3>Update Status</h3></div>
+            <div class="card-body">
+                <?php if (!$stageApp): ?>
+                <p class="field-hint" style="margin:0;">The student submits an application for this stage first — then the status can be updated here.</p>
+                <?php else: ?>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label>Application Status <span class="required">*</span></label>
+                        <select name="stage_data[<?= htmlspecialchars($key) ?>][status]" required>
+                            <option value="">Select status</option>
+                            <?php foreach (COORDINATOR_STATUSES as $statusKey): ?>
+                            <option value="<?= $statusKey ?>" <?= $panel['status'] === $statusKey ? 'selected' : '' ?>><?= htmlspecialchars(STATUSES[$statusKey]['label']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label>Presentation Stage</label>
+                        <select name="stage_data[<?= htmlspecialchars($key) ?>][stage]">
+                            <?php foreach ($panels as $stageOptionKey => $stageOption): ?>
+                            <option value="<?= htmlspecialchars($stageOptionKey) ?>" <?= $key === $stageOptionKey ? 'selected' : '' ?>><?= htmlspecialchars($stageOption['stage']['label']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <p class="field-hint">The stage this application belongs to.</p>
+                    </div>
+                </div>
+                <div class="form-field">
+                    <label>Recommendations / Comments</label>
+                    <textarea name="stage_data[<?= htmlspecialchars($key) ?>][comment]" placeholder="Enter recommendations or revision notes for the student..."><?= htmlspecialchars($stageApp['coordinatorComment'] ?? '') ?></textarea>
+                </div>
+                <?php endif; ?>
             </div>
+        </div>
 
-            <?php if ($requiredDocs): ?>
-            <div class="req-checklist">
-                <h4>Requirements Checklist</h4>
+        <div class="card milestone-card" id="milestone-tracker-<?= htmlspecialchars($key) ?>">
+            <div class="card-header">
+                <h3><i class="fas fa-tasks"></i> Milestone Tracker — <?= htmlspecialchars($stageName) ?></h3>
+                <div class="ms-overview">
+                    <span class="ms-overview-text"><?= (int) $panel['stats']['done'] ?> of <?= (int) $panel['stats']['total'] ?> milestones complete</span>
+                    <span class="ms-overview-bar"><span class="ms-overview-fill" style="width:<?= (int) $panel['stats']['total'] > 0 ? (int) round($panel['stats']['done'] * 100 / $panel['stats']['total']) : 0 ?>%;"></span></span>
+                </div>
+            </div>
+            <div class="card-body">
+                <?php if (!$panel['milestones']): ?>
+                <p class="ms-empty">No milestones are defined for this stage.</p>
+                <?php else: ?>
+                <div class="ms-stage is-current is-open" data-ms-stage>
+                    <div class="ms-stage-body" style="border-top:none;">
+                        <?php foreach ($panel['milestones'] as $si => $step):
+                            $state = $step['state']['status'] ?? 'pending';
+                            $isDone = $state === 'done';
+                            $isFlagged = $state === 'flagged';
+                            $isActive = !$isDone && !$isFlagged && $si === $panel['stats']['firstPending'];
+                            $iconState = $isFlagged ? 'flagged' : ($isDone ? 'done' : ($isActive ? 'active' : 'pending'));
+                            $rowClass = $isFlagged ? 'is-flagged' : ($isDone ? 'is-done' : ($isActive ? 'is-active' : 'is-pending'));
+                            $stepKey = $step['key'] ?? '';
+                        ?>
+                        <div class="ms-step <?= $rowClass ?>">
+                            <div class="ms-step-col">
+                                <?= stepIconHtml($iconState) ?>
+                                <?php if ($si < count($panel['milestones']) - 1): ?>
+                                <span class="ms-step-line<?= $isDone ? ' done' : '' ?>"></span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="ms-step-body">
+                                <div class="ms-step-label">
+                                    <span><?= htmlspecialchars($step['label']) ?></span>
+                                    <?php if ($step['coord']): ?><span class="coord-chip">Coordinator</span><?php endif; ?>
+                                    <?php if ($isActive): ?><span class="ms-step-tag active">Next</span><?php endif; ?>
+                                    <?php if ($isDone): ?><span class="ms-step-tag done">Done</span><?php endif; ?>
+                                    <?php if ($isFlagged): ?><span class="ms-step-tag flagged">Action needed</span><?php endif; ?>
+                                </div>
+                                <p class="ms-step-detail"><?= htmlspecialchars($step['detail']) ?></p>
+                            </div>
+                            <div class="ms-step-action">
+                                <?php if ($stepKey === 'grad_school_endorsement' && $stageApp): ?>
+                                    <label style="display:inline-flex;align-items:center;gap:.45rem;font-size:.78rem;cursor:pointer;white-space:nowrap;">
+                                        <input type="hidden" name="stage_data[<?= htmlspecialchars($key) ?>][gradSchoolEndorsed]" value="0">
+                                        <input type="checkbox" name="stage_data[<?= htmlspecialchars($key) ?>][gradSchoolEndorsed]" value="1" style="width:auto;" <?= !empty($stageApp['gradSchoolEndorsed']) ? 'checked' : '' ?>>
+                                        <span><?= !empty($stageApp['gradSchoolEndorsed']) ? 'Issued' : 'Issue Endorsement' ?></span>
+                                    </label>
+                                <?php elseif ($stepKey === 'ready_for_presentation' && $stageApp): ?>
+                                    <label style="display:inline-flex;align-items:center;gap:.45rem;font-size:.78rem;cursor:pointer;white-space:nowrap;">
+                                        <input type="hidden" name="stage_data[<?= htmlspecialchars($key) ?>][readyForPresentation]" value="0">
+                                        <input type="checkbox" name="stage_data[<?= htmlspecialchars($key) ?>][readyForPresentation]" value="1" style="width:auto;" <?= !empty($stageApp['readyForPresentation']) ? 'checked' : '' ?>>
+                                        <span><?= !empty($stageApp['readyForPresentation']) ? 'Ready' : 'Mark Ready' ?></span>
+                                    </label>
+                                <?php elseif ($stepKey === 'result'): ?>
+                                    <span class="ms-step-detail" style="margin:0;"><?= htmlspecialchars($panel['result'] === 'approved' ? 'Approved' : ($panel['result'] === 'requires_revision' ? 'Requires revision' : 'Not recorded')) ?></span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <div class="stage-approval">
+                    <?php $stageIndex = array_search($key, $stageKeys, true); $nextStageKey = ($stageIndex !== false && isset($stageKeys[$stageIndex + 1])) ? $stageKeys[$stageIndex + 1] : ''; ?>
+                    <?php $stageApproved = in_array($panel['status'], ['completed', 'approved'], true); ?>
+                    <?php $canDecide = $nextStageKey !== '' && !$panel['locked']; ?>
+                    <?php if ($nextStageKey !== ''): ?>
+                        <?php if ($canDecide): ?>
+                        <?php
+                        // The stage can be approved when the student submitted
+                        // it, its milestones are complete and the result was
+                        // recorded. Both options always stay visible so the
+                        // coordinator can see what can be done here.
+                        $approveReady = $panel['requirementsComplete'] && $panel['result'] !== '' && (bool) $stageApp;
+                        $nextLabel = $panels[$nextStageKey]['stage']['label'];
+                        ?>
+                        <span class="stage-approval-label"><i class="fas fa-forward" aria-hidden="true"></i> Stage progression</span>
+                        <button type="button" class="btn btn-primary" data-approve-stage="<?= htmlspecialchars($key) ?>"
+                                data-stage-label="<?= htmlspecialchars($stageName) ?>"
+                                data-next-label="<?= htmlspecialchars($nextLabel) ?>"
+                                data-ready="<?= $approveReady ? '1' : '0' ?>"
+                                <?= $approveReady ? '' : 'disabled' ?>
+                                title="<?= $approveReady
+                                    ? 'Approve ' . htmlspecialchars($stageName) . ' and unlock ' . htmlspecialchars($nextLabel) . ' for the student'
+                                    : 'This stage cannot be approved yet. Please complete the required items first.' ?>">
+                            <i class="fas fa-check"></i> Approve Next Stage
+                        </button>
+                        <button type="button" class="btn btn-outline" data-disapprove-stage="<?= htmlspecialchars($key) ?>"
+                                data-stage-label="<?= htmlspecialchars($stageName) ?>"
+                                data-next-label="<?= htmlspecialchars($nextLabel) ?>"
+                                <?= $stageApproved ? '' : 'disabled' ?>
+                                title="<?= $stageApproved
+                                    ? 'Revoke the approval of ' . htmlspecialchars($stageName) . ' and lock ' . htmlspecialchars($nextLabel) . ' again'
+                                    : htmlspecialchars($stageName) . ' is not approved yet' ?>">
+                            <i class="fas fa-undo"></i> Disapprove Next Stage
+                        </button>
+                        <span class="stage-approval-hint">
+                            <?php if ($stageApproved): ?>
+                                <strong><?= htmlspecialchars($nextLabel) ?></strong> is unlocked for the student.
+                            <?php else: ?>
+                                Approving <strong><?= htmlspecialchars($stageName) ?></strong> unlocks <strong><?= htmlspecialchars($nextLabel) ?></strong> for the student.
+                            <?php endif; ?>
+                        </span>
+                        <?php else: ?>
+                        <span class="stage-approval-hint">
+                            <i class="fas fa-lock" aria-hidden="true"></i>
+                            <?= $stageApp
+                                ? 'This stage is locked — the coordinator cannot approve the progression from here.'
+                                : 'The student has no application for this stage yet.' ?>
+                        </span>
+                        <?php endif; ?>
+                    <?php else: ?>
+                    <span class="stage-approval-hint"><i class="fas fa-flag-checkered" aria-hidden="true"></i>This is the last stage of the <?= htmlspecialchars($trackLabel) ?> track — there is no next stage to approve.</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="documentsSection-<?= htmlspecialchars($key) ?>">
+            <div class="card-header"><h3>Documents and Requirements</h3></div>
+            <div class="card-body">
+                <?php if ($panel['required']): ?>
+                <p class="field-hint" style="margin-bottom:0.75rem;">
+                    The documents the <strong><?= htmlspecialchars($trackLabel) ?></strong> track requires for
+                    <strong><?= htmlspecialchars($stageName) ?></strong>, together with everything the student uploaded.
+                </p>
+                <?php endif; ?>
                 <div class="table-responsive">
                     <table class="data-table">
-                        <thead><tr><th>Required Document</th><th>Status</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Document / Requirement</th>
+                                <th>Status</th>
+                                <th>Submitted</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
                         <tbody>
-                            <?php foreach ($requiredDocs as $req):
-                                $kind = $req['kind'];
-                                $matched = null;
-                                // Prefer an exact document-type match, then fall back
-                                // to the kind so a slightly different label still matches.
-                                foreach ($uploads as $doc) {
-                                    if ($req['docType'] !== '' && strcasecmp((string) ($doc['docType'] ?? ''), $req['docType']) === 0) {
-                                        $matched = $doc;
-                                        break;
-                                    }
-                                }
-                                if (!$matched) {
-                                    foreach ($uploads as $doc) {
-                                        if (classifyUploadDocType((string) ($doc['docType'] ?? '')) === $kind) {
-                                            $matched = $doc;
-                                            break;
-                                        }
-                                    }
-                                }
-                                $isDone = $matched && in_array($matched['status'] ?? '', ['verified', 'approved'], true);
-                                $isMissing = !$matched;
-                                $isFlagged = $matched && ($matched['status'] ?? '') === 'incomplete';
+                            <?php if (!$panel['documents']): ?>
+                            <tr><td colspan="4" style="color:var(--gray-400);">No documents or requirements for this stage yet.</td></tr>
+                            <?php endif; ?>
+                            <?php foreach ($panel['documents'] as $documentRow):
+                                $requirement = $documentRow['requirement'];
+                                $document    = $documentRow['upload'];
+                                $badge = $requirement
+                                    ? requirementStatusBadge($requirement, $document, $stageApp ?? [])
+                                    : documentStatusBadge($document);
+                                $label = $document ? $document['fileName'] : ($requirement['label'] ?? 'Document');
+                                $type = $document['docType'] ?? ($requirement['label'] ?? '');
+                                $submittedDate = $document && !empty($document['date']) ? date('M d, Y', strtotime($document['date'])) : '';
                             ?>
                             <tr>
-                                <td><?= htmlspecialchars($req['label']) ?></td>
                                 <td>
-                                    <?php if ($kind === 'grad_school_endorsement'): ?>
-                                        <?php // Issued by the coordinator, so it is not an upload. ?>
-                                        <label style="display:inline-flex;align-items:center;gap:.45rem;font-size:.8rem;cursor:pointer;">
-                                            <input type="checkbox" name="gradSchoolEndorsed" value="1" style="width:auto;" <?= !empty($app['gradSchoolEndorsed']) ? 'checked' : '' ?>>
-                                            <span><?= !empty($app['gradSchoolEndorsed']) ? 'Issued' : 'Not yet issued' ?></span>
-                                        </label>
-                                    <?php elseif ($isDone): ?>
-                                        <span class="status-badge status-approved">Verified</span>
-                                    <?php elseif ($isFlagged): ?>
-                                        <span class="status-badge status-revision">Incomplete</span>
-                                    <?php elseif ($isMissing): ?>
-                                        <span class="status-badge status-pending">Not Submitted</span>
+                                    <strong><?= htmlspecialchars($label) ?></strong>
+                                    <?php if ($type !== '' && $type !== $label): ?>
+                                    <div style="font-size:0.75rem;color:var(--gray-500);"><?= htmlspecialchars($type) ?></div>
+                                    <?php endif; ?>
+                                </td>
+                                <td><span class="status-badge <?= $badge['class'] ?>"><?= htmlspecialchars($badge['label']) ?></span></td>
+                                <td><?= $submittedDate !== '' ? htmlspecialchars($submittedDate) : '<span style="color:var(--gray-400);">—</span>' ?></td>
+                                <td class="actions">
+                                    <?php if ($document): ?>
+                                        <?php if (uploadStoragePath($document)): ?>
+                                        <a class="btn btn-sm btn-outline" href="<?= url('coordinator/download.php?id=' . urlencode($document['id'])) ?>"><i class="fas fa-download"></i> Download</a>
+                                        <?php else: ?>
+                                        <span style="color:var(--gray-400);font-size:.8rem;">Unavailable</span>
+                                        <?php endif; ?>
+                                        <select name="upload_status[<?= htmlspecialchars($document['id']) ?>]" style="padding:3px 8px;margin-left:.4rem;" title="Review status">
+                                            <option value="submitted" <?= $document['status'] === 'submitted' ? 'selected' : '' ?>>Submitted</option>
+                                            <option value="verified" <?= $document['status'] === 'verified' || $document['status'] === 'approved' ? 'selected' : '' ?>>Verified</option>
+                                            <option value="incomplete" <?= $document['status'] === 'incomplete' ? 'selected' : '' ?>>Incomplete</option>
+                                        </select>
+                                    <?php elseif ($requirement && ($requirement['kind'] ?? '') === 'grad_school_endorsement'): ?>
+                                        <span style="color:var(--gray-400);font-size:.8rem;">Issued by the coordinator</span>
+                                    <?php elseif ($requirement && ($requirement['kind'] ?? '') === 'receipt'): ?>
+                                        <span style="color:var(--gray-400);font-size:.8rem;">Recorded by the coordinator</span>
                                     <?php else: ?>
-                                        <span class="status-badge status-submitted">Submitted</span>
+                                        <span class="status-badge status-pending">Not Submitted</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -347,39 +700,346 @@ require_once __DIR__ . '/../../includes/header.php';
                     </table>
                 </div>
             </div>
-            <?php endif; ?>
         </div>
-    </div>
 
-    <div class="card">
-        <div class="card-header"><h3>Workflow Records</h3></div>
-        <div class="card-body">
-            <div class="form-row">
-                <div class="form-field"><label>Receipt Number</label><input type="text" name="receiptNumber" value="<?= htmlspecialchars($app['receiptNumber'] ?? '') ?>" placeholder="Receipt number"></div>
-                <div class="form-field"><label>Payment Date</label><input type="date" name="paymentDate" value="<?= htmlspecialchars($app['paymentDate'] ?? '') ?>"></div>
-            </div>
-            <div class="form-row">
-                <div class="form-field"><label>Amount</label><input type="text" name="paymentAmount" value="<?= htmlspecialchars($app['paymentAmount'] ?? '') ?>" placeholder="e.g. 1500.00"></div>
-                <div class="form-field">
-                    <label>Presentation Result</label>
-                    <select name="result">
-                        <option value="" <?= empty($app['result']) ? 'selected' : '' ?>>Not yet presented</option>
-                        <option value="approved" <?= ($app['result'] ?? '') === 'approved' ? 'selected' : '' ?>>Approved — advance to next stage</option>
-                        <option value="requires_revision" <?= ($app['result'] ?? '') === 'requires_revision' ? 'selected' : '' ?>>Requires Revision</option>
-                    </select>
-                    <p class="field-hint">Recorded after the presentation is conducted; this is reflected on the student Process Tracker.</p>
+        <div class="card">
+            <div class="card-header"><h3>Workflow Records — <?= htmlspecialchars($stageName) ?></h3></div>
+            <div class="card-body">
+                <div class="form-row">
+                    <div class="form-field"><label>Receipt Number</label><input type="text" name="stage_data[<?= htmlspecialchars($key) ?>][receiptNumber]" value="<?= htmlspecialchars($stageApp['receiptNumber'] ?? '') ?>" placeholder="Receipt number"></div>
+                    <div class="form-field"><label>Payment Date</label><input type="date" name="stage_data[<?= htmlspecialchars($key) ?>][paymentDate]" value="<?= htmlspecialchars($stageApp['paymentDate'] ?? '') ?>"></div>
                 </div>
+                <div class="form-row">
+                    <div class="form-field"><label>Amount</label><input type="text" name="stage_data[<?= htmlspecialchars($key) ?>][paymentAmount]" value="<?= htmlspecialchars($stageApp['paymentAmount'] ?? '') ?>" placeholder="e.g. 1500.00"></div>
+                    <div class="form-field">
+                        <label>Presentation</label>
+                        <?php if ($panel['schedule']): ?>
+                        <p style="margin:0;font-size:.82rem;color:var(--gray-700);">
+                            <?= htmlspecialchars(date('M d, Y', strtotime((string) $panel['schedule']['date']))) ?>
+                            <?= htmlspecialchars((string) ($panel['schedule']['time'] ?? '')) ?>
+                            <?php if (!empty($panel['schedule']['venue'])): ?> — <?= htmlspecialchars($panel['schedule']['venue']) ?><?php endif; ?>
+                        </p>
+                        <?php else: ?>
+                        <p style="margin:0;font-size:.82rem;color:var(--gray-400);">Not scheduled yet.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <p class="field-hint" style="margin-top:.75rem;">
+                    The Graduate School endorsement, the payment record, the readiness mark and the presentation
+                    result are handled in the <strong>Milestone Tracker</strong> and the
+                    <strong>Schedule Presentation</strong> section of this stage.
+                </p>
             </div>
         </div>
-    </div>
 
-    <div class="form-actions">
-        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save &amp; Process</button>
-        <a href="<?= url('coordinator/applications/endorsement.php?id=' . $app['id']) ?>" class="btn btn-secondary"><i class="fas fa-file-signature"></i> Generate Endorsement</a>
-        <a href="<?= url('coordinator/schedule/add.php?app=' . $app['id']) ?>" class="btn btn-outline"><i class="fas fa-calendar-plus"></i> Schedule Presentation</a>
-        <a href="<?= url('coordinator/applications/manage.php') ?>" class="btn btn-outline">Cancel</a>
+        <div class="card" id="scheduleSection-<?= htmlspecialchars($key) ?>">
+            <div class="card-header"><h3><i class="fas fa-calendar-plus"></i> Schedule Presentation — <?= htmlspecialchars($stageName) ?></h3></div>
+            <div class="card-body">
+                <?php if ($panel['unlocked']): ?>
+                <div class="alert alert-success" style="margin-bottom:1rem;">
+                    <i class="fas fa-unlock"></i>
+                    <div>All required documents and requirements are complete — <strong><?= htmlspecialchars($app['student'] ?? '') ?></strong> can proceed to have the presentation scheduled.</div>
+                </div>
+                <div class="req-checklist" id="scheduleNoticePanel-<?= htmlspecialchars($key) ?>" hidden>
+                    <h4>Ready to Schedule</h4>
+                    <p style="margin:0;font-size:.83rem;color:var(--gray-700);">
+                        Every requirement of the <strong><?= htmlspecialchars($trackLabel) ?></strong> track for
+                        <strong><?= htmlspecialchars($stageName) ?></strong> is complete.
+                    </p>
+                </div>
+                <?php else: ?>
+                <div class="alert alert-warning" style="margin-bottom:1rem;">
+                    <i class="fas fa-lock"></i>
+                    <div>Scheduling is locked. <strong><?= count($panel['missing']) ?></strong> requirement<?= count($panel['missing']) === 1 ? ' is' : 's are' ?>
+                    still missing for the <strong><?= htmlspecialchars($trackLabel) ?></strong> track.</div>
+                </div>
+                <div class="req-checklist" id="missingPanel-<?= htmlspecialchars($key) ?>" hidden>
+                    <h4>Missing Documents and Requirements</h4>
+                    <ul style="margin:0;padding-left:1.1rem;font-size:.83rem;color:var(--gray-700);">
+                        <?php foreach ($panel['missing'] as $missingItem): ?>
+                        <li style="margin-bottom:.35rem;">
+                            <strong><?= htmlspecialchars($missingItem['label']) ?></strong>
+                            <span style="color:var(--gray-500);"> — <?= htmlspecialchars($missingItem['why']) ?></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="form-actions stage-panel-actions">
+            <?php $endorsementReady = $stageApp && $panel['requirementsComplete']; ?>
+            <?php if ($stageApp): ?>
+            <a href="<?= url('coordinator/applications/endorsement.php?id=' . (int) $stageApp['id']) ?>" class="btn btn-secondary"
+               <?= $endorsementReady ? '' : 'disabled' ?>
+               title="<?= $endorsementReady ? 'Generate the endorsement for this stage' : 'Verify the paper and the adviser endorsement form first' ?>">
+                <i class="fas fa-file-signature"></i> Generate Endorsement
+            </a>
+            <?php else: ?>
+            <button type="button" class="btn btn-secondary" disabled title="The student has no application for this stage yet"><i class="fas fa-file-signature"></i> Generate Endorsement</button>
+            <?php endif; ?>
+
+            <?php if ($panel['unlocked'] && $stageApp): ?>
+            <a href="<?= url('coordinator/schedule/add.php?app=' . (int) $stageApp['id']) ?>" class="btn btn-outline" id="schedulePresentationBtn-<?= htmlspecialchars($key) ?>"><i class="fas fa-calendar-plus"></i> Schedule Presentation</a>
+            <?php else: ?>
+            <button type="button" class="btn btn-outline" disabled title="Complete the missing requirements before scheduling the presentation"><i class="fas fa-calendar-plus"></i> Schedule Presentation</button>
+            <?php endif; ?>
+
+            <button type="button" class="btn btn-outline" id="scheduleLockBtn-<?= htmlspecialchars($key) ?>" aria-expanded="false"
+                    aria-controls="<?= $panel['unlocked'] ? 'scheduleNoticePanel-' . htmlspecialchars($key) : 'missingPanel-' . htmlspecialchars($key) ?>">
+                <i class="fas <?= $panel['unlocked'] ? 'fa-unlock' : 'fa-lock' ?>"></i> <?= $panel['unlocked'] ? 'Unlocked' : 'Locked' ?>
+            </button>
+
+            <div class="form-field" style="margin:0;min-width:230px;">
+                <label>Presentation Result</label>
+                <select name="stage_data[<?= htmlspecialchars($key) ?>][result]" <?= $panel['schedule'] ? '' : 'disabled' ?> title="<?= $panel['schedule'] ? 'Record the result of the presentation' : 'Schedule the presentation first' ?>">
+                    <option value="" <?= empty($panel['result']) ? 'selected' : '' ?>>Not yet presented</option>
+                    <option value="approved" <?= $panel['result'] === 'approved' ? 'selected' : '' ?>>Approved</option>
+                    <option value="requires_revision" <?= $panel['result'] === 'requires_revision' ? 'selected' : '' ?>>Requires Revision</option>
+                </select>
+            </div>
+        </div>
+    </section>
+    <?php endforeach; ?>
+
+    <div class="form-actions no-print">
+        <button type="submit" class="btn btn-primary" id="saveProcessBtn"><i class="fas fa-save"></i> Save Process</button>
+        <a href="<?= url('coordinator/applications/manage.php') ?>" class="btn btn-outline" id="cancelProcessBtn">Cancel</a>
     </div>
 </form>
+
 <?php endif; ?>
+
+<script>
+(function () {
+    const form = document.getElementById('processForm');
+    if (!form) return;
+
+    const slider = document.getElementById('stageSlider');
+    const track = document.getElementById('stageSliderTrack');
+    const cards = [...document.querySelectorAll('.stage-slider-card')];
+    const panels = [...document.querySelectorAll('.stage-panel')];
+    const selectedField = document.getElementById('selectedStageField');
+    const approveField = document.getElementById('approveStageField');
+    const disapproveField = document.getElementById('disapproveStageField');
+    const noticeBox = document.getElementById('pageNotifications');
+    let current = <?= (int) array_search($selectedStage, $stageKeys, true) ?> >= 0 ? <?= (int) array_search($selectedStage, $stageKeys, true) ?> : 0;
+
+    /* ------------------------------------------------------------------
+     * In-system notifications
+     *
+     * A short message inside the page, never a browser pop-up. Temporary
+     * notices dismiss themselves; a notice with actions stays until the
+     * coordinator answers.
+     * ------------------------------------------------------------------ */
+    function notify(message, type, options) {
+        if (!noticeBox) return null;
+        const settings = options || {};
+        const notice = document.createElement('div');
+        notice.className = 'page-notice is-' + (type || 'info');
+        const text = document.createElement('span');
+        text.className = 'page-notice-text';
+        text.textContent = message;
+        notice.appendChild(text);
+
+        if (settings.actions && settings.actions.length) {
+            const actions = document.createElement('div');
+            actions.className = 'page-notice-actions';
+            settings.actions.forEach(function (action) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn ' + (action.variant || 'btn-outline');
+                button.textContent = action.label;
+                button.addEventListener('click', action.onClick);
+                actions.appendChild(button);
+            });
+            notice.appendChild(actions);
+        } else {
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.className = 'btn btn-outline';
+            close.setAttribute('aria-label', 'Dismiss');
+            close.innerHTML = '&times;';
+            close.addEventListener('click', function () { notice.remove(); });
+            notice.appendChild(close);
+        }
+
+        noticeBox.appendChild(notice);
+        if (!settings.sticky) {
+            setTimeout(function () { notice.remove(); }, 6000);
+        }
+        return notice;
+    }
+
+    /* ------------------------------------------------------------------
+     * The approval buttons follow the saved state and the pending decision:
+     * a stage that is not approved yet can be approved, a stage that is
+     * approved can be revoked, and a pending decision can still be changed.
+     * ------------------------------------------------------------------ */
+    function refreshApprovalButtons() {
+        document.querySelectorAll('.stage-panel').forEach(function (panel) {
+            const stageKey = panel.dataset.stage;
+            const savedApproved = panel.dataset.savedApproved === '1';
+            const pending = approveField && approveField.value === stageKey
+                ? 'approve'
+                : (disapproveField && disapproveField.value === stageKey ? 'disapprove' : '');
+            const approveBtn = panel.querySelector('[data-approve-stage]');
+            const disapproveBtn = panel.querySelector('[data-disapprove-stage]');
+            if (approveBtn) {
+                const ready = approveBtn.dataset.ready === '1';
+                // Approved already: there is nothing left to approve. Otherwise
+                // the stage has to be complete before it can be approved.
+                approveBtn.disabled = savedApproved || !ready;
+                approveBtn.classList.toggle('is-pending', pending === 'approve');
+            }
+            if (disapproveBtn) {
+                disapproveBtn.disabled = !savedApproved && pending !== 'disapprove';
+                disapproveBtn.classList.toggle('is-pending', pending === 'disapprove');
+            }
+        });
+    }
+
+    // Both decisions are recorded as pending and are applied by Save Process.
+    function recordDecision(stageKey, decision) {
+        if (approveField) approveField.value = decision === 'approve' ? stageKey : '';
+        if (disapproveField) disapproveField.value = decision === 'disapprove' ? stageKey : '';
+
+        const index = cards.findIndex(function (c) { return c.dataset.stage === stageKey; });
+        const nextCard = index >= 0 ? cards[index + 1] : null;
+        if (nextCard) {
+            const badge = nextCard.querySelector('.stage-slider-badge');
+            if (badge) {
+                badge.textContent = decision === 'approve' ? 'Pending Approval' : 'Pending Revoke';
+                badge.className = 'status-badge ' + (decision === 'approve' ? 'status-review' : 'status-revision') + ' stage-slider-badge';
+            }
+            nextCard.classList.toggle('is-locked', decision === 'disapprove');
+            nextCard.classList.toggle('is-approved', decision === 'approve');
+        }
+        refreshApprovalButtons();
+
+        notify(
+            decision === 'approve'
+                ? 'Stage approval is pending. Click Save Process to apply your changes.'
+                : 'Stage disapproval is pending. Click Save Process to apply your changes.',
+            'info',
+            { actions: [
+                { label: 'Undo', variant: 'btn-outline', onClick: function () {
+                    if (approveField) approveField.value = '';
+                    if (disapproveField) disapproveField.value = '';
+                    const card = document.querySelector('.stage-slider-card[data-stage="' + stageKey + '"]');
+                    const badge = card ? card.querySelector('.stage-slider-badge') : null;
+                    if (badge) {
+                        badge.textContent = card.classList.contains('is-locked') ? 'Locked' : 'Approved';
+                        badge.className = 'status-badge ' + (card.classList.contains('is-locked') ? 'status-not-submitted' : 'status-submitted') + ' stage-slider-badge';
+                    }
+                    refreshApprovalButtons();
+                    notice.remove();
+                } }
+            ] }
+        );
+    }
+
+    document.querySelectorAll('[data-approve-stage]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            if (button.dataset.ready !== '1') {
+                notify('This stage cannot be approved yet. Please complete the required items first.', 'warning');
+                return;
+            }
+            recordDecision(button.dataset.approveStage, 'approve');
+        });
+    });
+
+    document.querySelectorAll('[data-disapprove-stage]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            recordDecision(button.dataset.disapproveStage, 'disapprove');
+        });
+    });
+
+    // Remember the original disabled state of every control so a panel can be
+    // shown again without re-enabling something that was disabled on purpose.
+    panels.forEach(function (panel) {
+        panel.querySelectorAll('input, select, textarea, button').forEach(function (control) {
+            control.dataset.origDisabled = control.disabled ? '1' : '0';
+        });
+    });
+
+    function slideTo(index) {
+        if (!cards.length) return;
+        current = Math.max(0, Math.min(cards.length - 1, index));
+        const card = cards[current];
+        const stageKey = card.dataset.stage;
+
+        // The track is centred when everything fits; when it is wider than the
+        // window it slides so the selected stage stays in view.
+        const viewport = document.querySelector('.stage-slider-viewport');
+        if (track && viewport) {
+            const maxOffset = Math.max(0, track.scrollWidth - viewport.clientWidth);
+            const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+            let offset = cardCenter - (viewport.clientWidth / 2);
+            offset = Math.max(-maxOffset, Math.min(0, offset));
+            track.style.transform = 'translateX(' + offset + 'px)';
+        }
+        cards.forEach(function (c, i) {
+            c.classList.toggle('is-selected', i === current);
+            c.setAttribute('aria-pressed', i === current ? 'true' : 'false');
+        });
+        panels.forEach(function (panel) {
+            const active = panel.dataset.stage === stageKey;
+            panel.hidden = !active;
+            panel.querySelectorAll('input, select, textarea, button').forEach(function (control) {
+                control.disabled = !active || control.dataset.origDisabled === '1';
+            });
+        });
+        if (selectedField) selectedField.value = stageKey;
+
+        const prevBtn = document.getElementById('stageSliderPrev');
+        const nextBtn = document.getElementById('stageSliderNext');
+        if (prevBtn) prevBtn.disabled = current === 0;
+        if (nextBtn) nextBtn.disabled = current === cards.length - 1;
+    }
+
+    cards.forEach(function (card, index) {
+        card.addEventListener('click', function () { slideTo(index); });
+    });
+    document.getElementById('stageSliderPrev')?.addEventListener('click', function () { slideTo(current - 1); });
+    document.getElementById('stageSliderNext')?.addEventListener('click', function () { slideTo(current + 1); });
+
+    // The locked / unlocked button of a stage shows what is still missing.
+    document.querySelectorAll('[id^="scheduleLockBtn-"]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            const panelId = button.getAttribute('aria-controls');
+            const panel = panelId ? document.getElementById(panelId) : null;
+            if (!panel) return;
+            const open = button.getAttribute('aria-expanded') === 'true';
+            if (open) {
+                panel.setAttribute('hidden', '');
+            } else {
+                panel.removeAttribute('hidden');
+            }
+            button.setAttribute('aria-expanded', open ? 'false' : 'true');
+        });
+    });
+
+    slideTo(current);
+    refreshApprovalButtons();
+
+    /* ------------------------------------------------------------------
+     * Save Process
+     *
+     * One button saves every pending change of the page. It is guarded
+     * against a double click so the same change is never sent twice.
+     * ------------------------------------------------------------------ */
+    const saveBtn = document.getElementById('saveProcessBtn');
+    if (saveBtn) {
+        form.addEventListener('submit', function () {
+            if (form.dataset.saving === '1') return;
+            form.dataset.saving = '1';
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        });
+    }
+})();
+</script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>

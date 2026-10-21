@@ -13,9 +13,17 @@ $trackLabel  = getTrackLabel($track);
 $workflow    = getWorkflow($track);
 $stages      = $workflow['stages'];
 $progress    = getStudentProgress($mockStudent['email'], $track);
-$openKey     = $_GET['stage'] ?? '';
+$currentIndex = workflowCurrentIndex($progress, $stages);
+// The stages the student is not allowed to work on yet.
+$lockStates = stageLockStates($stages, $currentIndex);
+
+// A student may only open the stage they are working on. A future stage is
+// locked until the coordinator approves the progression.
+$access = resolveStudentStageAccess($progress, $stages, $currentIndex, (string) ($_GET['stage'] ?? ''));
+$openKey = $access['stageKey'];
+$lockedNotice = $access['locked'] ? $access['reason'] : '';
 if ($openKey === '') {
-    $openKey = ($stages[workflowCurrentIndex($progress, $stages)]['key'] ?? '');
+    $openKey = ($stages[$currentIndex]['key'] ?? '');
     $openKey = $openKey ?: ($stages[0]['key'] ?? 'proposal');
 }
 
@@ -33,14 +41,30 @@ require_once __DIR__ . '/../includes/header.php';
             <?php foreach ($stages as $idx => $stage):
                 $p = $progress[$idx] ?? null;
                 $st = $p['stageStatus'] ?? 'not_started';
+                $isLocked = $lockStates[$stage['key']]['locked'] ?? false;
                 $isSubmitted = $p && !in_array($st, ['not_started', 'pending', 'draft', ''], true);
-                $isDone = in_array($st, ['completed', 'approved'], true) || $idx < workflowCurrentIndex($progress, $stages);
+                $isDone = in_array($st, ['completed', 'approved'], true) || $idx < $currentIndex;
                 $isHighlighted = $isSubmitted || $isDone;
                 $isActive = $stage['key'] === $openKey;
-                $statusLabel = $isSubmitted ? (STATUSES[$st]['label'] ?? 'Submitted') : 'Not Submitted';
-                $statusClass = $isSubmitted ? (STATUSES[$st]['class'] ?? 'status-submitted') : 'status-pending';
+                if ($isLocked) {
+                    $statusLabel = 'Locked';
+                    $statusClass = 'status-locked';
+                } elseif ($isSubmitted) {
+                    $statusLabel = STATUSES[$st]['label'] ?? 'Submitted';
+                    $statusClass = STATUSES[$st]['class'] ?? 'status-submitted';
+                } else {
+                    $statusLabel = 'Not Submitted';
+                    $statusClass = 'status-pending';
+                }
             ?>
-            <div class="stage-stepper-item">
+            <div class="stage-stepper-item<?= $isLocked ? ' is-locked' : '' ?>">
+                <?php if ($isLocked): ?>
+                <div class="stage-stepper-btn" style="cursor:not-allowed;" title="<?= htmlspecialchars($lockStates[$stage['key']]['reason'] ?? '') ?>">
+                    <span class="stage-stepper-num"><i class="fas fa-lock" aria-hidden="true"></i></span>
+                    <span class="stage-stepper-label"><?= htmlspecialchars($stage['shortLabel']) ?></span>
+                    <span class="status-badge <?= $statusClass ?>" style="font-size:0.65rem;padding:2px 6px;"><?= htmlspecialchars($statusLabel) ?></span>
+                </div>
+                <?php else: ?>
                 <a href="<?= url('student/requirements.php?stage=' . urlencode($stage['key'])) ?>" class="stage-stepper-btn">
                     <span class="stage-stepper-num <?= $isHighlighted ? 'highlighted done' : '' ?>">
                         <?= $idx + 1 ?>
@@ -48,6 +72,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <span class="stage-stepper-label <?= $isActive ? 'is-active' : ($isHighlighted ? 'is-done' : '') ?>"><?= htmlspecialchars($stage['shortLabel']) ?></span>
                     <span class="status-badge <?= $statusClass ?>" style="font-size:0.65rem;padding:2px 6px;"><?= htmlspecialchars($statusLabel) ?></span>
                 </a>
+                <?php endif; ?>
                 <?php if ($idx < count($stages) - 1): ?>
                 <div class="stage-stepper-line <?= $isHighlighted ? 'done' : '' ?>"></div>
                 <?php endif; ?>
@@ -56,6 +81,13 @@ require_once __DIR__ . '/../includes/header.php';
         </div>
     </div>
 </div>
+
+<?php if ($lockedNotice): ?>
+<div class="alert alert-warning">
+    <i class="fas fa-lock"></i>
+    <div><?= htmlspecialchars($lockedNotice) ?> You are now viewing the stage you are currently working on.</div>
+</div>
+<?php endif; ?>
 
 <?php foreach ($stages as $idx => $stage):
     if ($stage['key'] !== $openKey) {
@@ -103,7 +135,7 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
                 <div>
                     <?php if ($st === 'pending' && !$step['coord'] && $si <= $firstPending): ?>
-                    <a class="btn btn-sm btn-primary" href="<?= url('student/upload.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload</a>
+                    <a class="btn btn-sm btn-primary" href="<?= url('student/application.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload</a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -140,7 +172,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <span style="font-weight:700;font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-600);">Payment Proof Required</span>
             </div>
             <p style="font-size:0.83rem;color:var(--gray-700);margin-bottom:0.75rem;"><?= htmlspecialchars($doc['label']) ?></p>
-            <a class="btn btn-primary btn-sm" href="<?= url('student/upload.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload Receipt</a>
+            <a class="btn btn-primary btn-sm" href="<?= url('student/application.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload Receipt</a>
         </div>
         <?php endforeach; ?>
     </div>
