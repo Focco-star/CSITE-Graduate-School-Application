@@ -9,136 +9,119 @@ $userName    = $mockCoordinator['name'];
 
 $templates = databaseTemplateRows();
 $templates = $templates ?: getPaperLibraryRows();
-$stages    = array_values(array_unique(array_column($templates, 'stage')));
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>
 
 <div class="page-header">
-    <h2>Template &amp; Forms Library</h2>
-    <p>All documents organized by course type, program, stage, and document type.</p>
+    <h2>Templates &amp; Forms</h2>
+    <p>Manage the forms and templates available for students to download.</p>
 </div>
 
-<div class="form-actions" style="border:none;padding:0;margin-bottom:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
-    <a href="<?= url('coordinator/templates/add.php') ?>" class="btn btn-primary"><i class="fas fa-plus"></i> Add Document</a>
-    <div style="position:relative;flex:1 1 220px;">
-        <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gray-400);font-size:0.85rem;"></i>
-        <input type="search" id="tplSearch" placeholder="Search by name, file, program, track, stage, type..."
-            style="width:100%;padding:0.45rem 0.75rem 0.45rem 2.2rem;border:1px solid var(--gray-300);border-radius:var(--radius);font-size:0.85rem;">
+<div class="filter-bar" data-filter-table="#coordinatorTplGrid" style="margin-bottom:1rem;">
+    <a href="<?= url('coordinator/templates/add.php') ?>" class="btn btn-primary btn-sm">
+        <i class="fas fa-plus"></i> Add Document
+    </a>
+    <div class="filter-search">
+        <i class="fas fa-search"></i>
+        <input type="search" data-filter-q placeholder="Search templates, forms, stages..." style="max-width:520px;">
     </div>
-    <button type="button" class="btn btn-sm btn-outline" id="tplClear" hidden>Clear</button>
-</div>
-
-<div style="margin-bottom:1.5rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
-    <select id="tplCourse" style="padding:0.4rem 0.75rem;border:1px solid var(--gray-300);border-radius:var(--radius);font-size:0.85rem;">
-        <option value="">All</option>
-        <option>Thesis</option>
-        <option>Capstone</option>
-        <option>Seminar Paper</option>
+    <button type="button" class="btn btn-sm btn-outline" data-filter-clear hidden>Clear</button>
+    <select data-filter="course">
+        <option value="">All course types</option>
+        <option value="Thesis">Thesis</option>
+        <option value="Capstone">Capstone</option>
+        <option value="Seminar Paper">Seminar Paper</option>
     </select>
-    <select id="tplProgram" style="padding:0.4rem 0.75rem;border:1px solid var(--gray-300);border-radius:var(--radius);font-size:0.85rem;">
-        <option value="">All</option>
-        <?php foreach (array_keys(PROGRAMS) as $code): ?>
-        <option><?= htmlspecialchars($code) ?></option>
+    <select data-filter="program">
+        <option value="">All programs</option>
+        <?php foreach (array_keys(PROGRAMS) as $program): ?>
+        <option value="<?= htmlspecialchars($program) ?>"><?= htmlspecialchars($program) ?></option>
         <?php endforeach; ?>
     </select>
-    <select id="tplStage" style="padding:0.4rem 0.75rem;border:1px solid var(--gray-300);border-radius:var(--radius);font-size:0.85rem;">
-        <option value="">All</option>
-        <?php foreach ($stages as $stage): ?>
-        <option><?= htmlspecialchars($stage) ?></option>
+    <select data-filter="stage">
+        <option value="">All stages</option>
+        <?php
+        $stages = array_values(array_unique(array_filter(array_map(
+            static fn ($template) => trim((string) ($template['stage'] ?? '')),
+            $templates
+        ))));
+        foreach ($stages as $stage):
+        ?>
+        <option value="<?= htmlspecialchars($stage) ?>"><?= htmlspecialchars($stage) ?></option>
         <?php endforeach; ?>
     </select>
-    <select id="tplType" style="padding:0.4rem 0.75rem;border:1px solid var(--gray-300);border-radius:var(--radius);font-size:0.85rem;">
-        <option value="">All</option>
-        <option>Template</option>
-        <option>Form</option>
-        <option>Reference</option>
+    <select data-filter="type">
+        <option value="">All types</option>
+        <option value="Form">Form</option>
+        <option value="Template">Template</option>
+        <option value="Reference">Reference</option>
     </select>
-    <span id="tplCount" style="font-size:0.82rem;color:var(--gray-500);margin-left:auto;"></span>
+    <span class="filter-count" data-filter-count></span>
 </div>
 
-<div class="card">
-    <div class="card-body" style="padding:0;">
-        <div class="table-responsive">
-            <table class="data-table" id="tplTable">
-                <thead>
-                    <tr>
-                        <th>Document / File Name</th>
-                        <th>Course Type</th>
-                        <th>Program</th>
-                        <th>Stage</th>
-                        <th>Type</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($templates as $i => $tpl): ?>
-                    <tr data-course="<?= htmlspecialchars($tpl['courseType']) ?>"
-                        data-program="<?= htmlspecialchars($tpl['programs']) ?>"
-                        data-stage="<?= htmlspecialchars($tpl['stage']) ?>"
-                        data-type="<?= htmlspecialchars($tpl['docType']) ?>"
-                        data-search="<?= htmlspecialchars(strtolower($tpl['label'] . ' ' . $tpl['file'] . ' ' . $tpl['programs'] . ' ' . $tpl['courseType'] . ' ' . $tpl['stage'] . ' ' . $tpl['docType'])) ?>">
-                        <td>
-                            <div style="display:flex;align-items:center;gap:0.5rem;">
-                                <i class="fas fa-file-word" style="color:#2b579a;"></i>
-                                <div>
-                                    <strong style="display:block;font-size:0.85rem;"><?= htmlspecialchars($tpl['label']) ?></strong>
-                                    <span style="font-size:0.73rem;color:var(--gray-400);"><?= htmlspecialchars($tpl['file']) ?></span>
-                                </div>
-                            </div>
-                        </td>
-                        <td><?= htmlspecialchars($tpl['courseType']) ?></td>
-                        <td><?= htmlspecialchars($tpl['programs']) ?></td>
-                        <td><?= htmlspecialchars($tpl['stage']) ?></td>
-                        <td><?= htmlspecialchars($tpl['docType']) ?></td>
-                        <td class="actions">
-                            <a href="<?= htmlspecialchars($tpl['url']) ?>" class="btn btn-sm btn-primary" download title="Download"><i class="fas fa-download"></i></a>
-                            <a href="<?= url('coordinator/templates/edit.php?id=' . urlencode((string) ($tpl['id'] ?? ($i + 1)))) ?>" class="btn btn-sm btn-outline" title="Edit"><i class="fas fa-edit"></i></a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                    <tr id="tplEmpty" hidden>
-                        <td colspan="6" style="text-align:center;color:var(--gray-400);padding:2rem;">No documents match the selected filters.</td>
-                    </tr>
-                </tbody>
-            </table>
+<div id="coordinatorTplGrid">
+    <?php
+    $templateGroups = [];
+    foreach ($templates as $i => $template) {
+        $stage = trim((string) ($template['stage'] ?? '')) ?: 'Reference Documents';
+        $courseType = (string) ($template['courseType'] ?? '');
+        $groupKey = $courseType . '|' . $stage;
+        $templateGroups[$groupKey]['courseType'] = $courseType;
+        $templateGroups[$groupKey]['stage'] = $stage;
+        $templateGroups[$groupKey]['items'][] = [$i, $template];
+    }
+    ?>
+    <?php foreach ($templateGroups as $group): ?>
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-layer-group"></i> <?= htmlspecialchars($group['stage']) ?><?= $group['courseType'] !== '' ? ' <span style="font-weight:400;color:var(--gray-500);">(' . htmlspecialchars($group['courseType']) . ')</span>' : '' ?></h3>
+        </div>
+        <div class="card-body">
+            <div class="template-grid">
+                <?php foreach ($group['items'] as [$i, $template]):
+                    $type = ucfirst(strtolower(trim((string) ($template['docType'] ?? ''))));
+                    if (!in_array($type, ['Form', 'Template', 'Reference'], true)) {
+                        $type = 'Template';
+                    }
+                    $programs = (string) ($template['programs'] ?? '');
+                    $search = strtolower(trim(implode(' ', [
+                        $template['label'] ?? '',
+                        $template['file'] ?? '',
+                        $template['description'] ?? '',
+                        $group['courseType'],
+                        $programs,
+                        $group['stage'],
+                        $type,
+                    ])));
+                    $icon = $type === 'Form' ? 'fa-file-signature' : ($type === 'Reference' ? 'fa-book-open' : 'fa-file-word');
+                ?>
+                <div class="template-item" data-course="<?= htmlspecialchars($group['courseType']) ?>" data-program="<?= htmlspecialchars($programs) ?>" data-stage="<?= htmlspecialchars($group['stage']) ?>" data-type="<?= htmlspecialchars($type) ?>" data-search="<?= htmlspecialchars($search) ?>">
+                    <div class="template-icon"><i class="fas <?= $icon ?>"></i></div>
+                    <h4><?= htmlspecialchars($template['label'] ?? $template['file'] ?? 'Untitled document') ?></h4>
+                    <p><?= htmlspecialchars($template['description'] ?? '') ?></p>
+                    <span class="template-meta"><i class="fas fa-tag"></i> <?= htmlspecialchars($type) ?></span>
+                    <span class="template-meta"><i class="fas fa-graduation-cap"></i> <?= htmlspecialchars($programs !== '' ? $programs : $group['courseType']) ?></span>
+                    <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:auto;">
+                        <a class="btn btn-primary btn-sm" href="<?= htmlspecialchars($template['url']) ?>" download>
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                        <a class="btn btn-outline btn-sm" href="<?= url('coordinator/templates/edit.php?id=' . urlencode((string) ($template['id'] ?? ($i + 1)))) ?>">
+                            <i class="fas fa-edit"></i> Edit
+                        </a>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
         </div>
     </div>
+    <?php endforeach; ?>
+
+    <div class="card empty-state" data-filter-empty hidden style="text-align:center;padding:3rem 1.5rem;color:var(--gray-400);">
+        <i class="fas fa-folder-open" style="font-size:2.5rem;margin-bottom:1rem;color:var(--gray-300);"></i>
+        <h4 style="font-size:1.1rem;color:var(--gray-600);margin-bottom:0.35rem;">No templates found</h4>
+        <p style="font-size:0.875rem;">No forms or templates match your search or filter criteria.</p>
+    </div>
 </div>
-
-<script>
-(function () {
-    const rows = [...document.querySelectorAll('#tplTable tbody tr[data-search]')];
-    const empty = document.getElementById('tplEmpty');
-    const count = document.getElementById('tplCount');
-    const search = document.getElementById('tplSearch');
-    const clearBtn = document.getElementById('tplClear');
-    const filters = ['tplCourse', 'tplProgram', 'tplStage', 'tplType'].map(id => document.getElementById(id));
-
-    function apply() {
-        const q = search.value.trim().toLowerCase();
-        const [course, program, stage, type] = filters.map(el => el.value);
-        let visible = 0;
-        rows.forEach(row => {
-            const ok = (!course || row.dataset.course === course)
-                && (!program || row.dataset.program.includes(program))
-                && (!stage || row.dataset.stage === stage)
-                && (!type || row.dataset.type === type)
-                && (!q || row.dataset.search.includes(q));
-            row.hidden = !ok;
-            if (ok) visible += 1;
-        });
-        empty.hidden = visible > 0;
-        count.textContent = visible + ' document' + (visible === 1 ? '' : 's');
-        clearBtn.hidden = !q;
-    }
-
-    search.addEventListener('input', apply);
-    search.addEventListener('keydown', e => { if (e.key === 'Escape') { search.value = ''; apply(); } });
-    clearBtn.addEventListener('click', () => { search.value = ''; apply(); });
-    filters.forEach(el => el.addEventListener('change', apply));
-    apply();
-})();
-</script>
 
 <?php require_once __DIR__ . '/../../includes/footer.php'; ?>
