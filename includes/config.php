@@ -310,7 +310,7 @@ function getWorkflow(string $track): array {
                     ['id' => 'sf_receipt', 'label' => 'Official Receipt / Payment Proof', 'file' => '', 'folder' => '', 'type' => 'receipt', 'description' => 'Scanned copy of official receipt from Graduate School'],
                 ],
                 'adviserEndorsementForm' => ['id' => 'sf_adviser', 'label' => 'Final Seminar Paper Adviser Endorsement Form', 'file' => '3 FINAL SEMINAR PAPER ADVISER ENDORSEMENT FORM - PROPOSAL.docx', 'folder' => $S, 'type' => 'form', 'description' => 'Signed by your research adviser'],
-                'gradSchoolEndorsementForm' => ['id' => 'sf_gradschool', 'label' => '', 'file' => '', 'folder' => '', 'type' => 'form', 'description' => ''],
+                'gradSchoolEndorsementForm' => ['id' => 'sf_gradschool', 'label' => 'Final Seminar Paper Endorsement to Graduate School', 'file' => '2 SEMINAR PAPER PROPOSAL ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $S, 'type' => 'form', 'description' => 'Issued by the coordinator to the Graduate School'],
             ],
         ],
         'refs' => [
@@ -1465,20 +1465,304 @@ function saveApplicationPayment(int $applicationId, string $receiptNumber, strin
 function databaseTemplateRows(string $trackCode = ''): array {
     if (!class_exists('DB')) return [];
     try {
+        // The Drive columns carry the "last updated" text, so the schema has
+        // to be in place before the query runs.
+        if (function_exists('ensureTemplateSyncSchema')) {
+            ensureTemplateSyncSchema();
+        }
         $rows = DB::query(
             'SELECT t.template_id AS id, t.template_name AS label, t.file_name AS file,
                     t.document_type AS docType, t.file_path AS filePath,
-                    tr.track_name AS courseType, ws.stage_label AS stage,
-                    t.description, p.program_code AS programs
+                    t.drive_file_id AS driveFileId, t.drive_modified_at AS driveModifiedAt,
+                    t.updated_at AS updatedAt, t.needs_review AS needsReview,
+                    tr.track_id AS trackId, tr.track_code AS trackCode, tr.track_name AS trackName,
+                    t.stage_id AS stageId, ws.stage_key AS stageKey, ws.stage_label AS stage,
+                    t.description
              FROM templates t
              INNER JOIN tracks tr ON tr.track_id = t.track_id
              LEFT JOIN workflow_stages ws ON ws.stage_id = t.stage_id
-             LEFT JOIN programs p ON p.track_id = tr.track_id
                WHERE t.is_active = 1 AND (:track_code_filter = "" OR tr.track_code = :track_code)
-             ORDER BY tr.track_name, ws.stage_order, t.template_name'
+             ORDER BY tr.track_id, ws.stage_order, t.template_name'
            , ['track_code_filter' => strtolower($trackCode), 'track_code' => strtolower($trackCode)])->fetchAll();
         foreach ($rows as &$row) {
-            $row['url'] = asset((string) $row['filePath']);
+            $row['url'] = templateFileUrl((string) $row['filePath']);
+            $row['modifiedLabel'] = '';
+            $row['modifiedAgo']   = '';
+            $stamp = trim((string) ($row['driveModifiedAt'] ?? ''));
+            if ($stamp === '') {
+                $stamp = trim((string) ($row['updatedAt'] ?? ''));
+            }
+            if ($stamp !== '') {
+                $time = strtotime($stamp);
+                if ($time) {
+                    $row['modifiedLabel'] = date('M j, Y', $time);
+                    $row['modifiedShort'] = date('M j', $time);
+                    $row['modifiedAgo']   = templateTimeAgo($time);
+                }
+            }
+            $row['needsReview'] = !empty($row['needsReview']);
+            $row['typeLabel'] = ucfirst(strtolower(trim((string) ($row['docType'] ?? 'template'))));
+            if (!in_array($row['typeLabel'], ['Form', 'Template', 'Reference'], true)) {
+                $row['typeLabel'] = 'Template';
+            }
+        }
+        unset($row);
+        return $rows;
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
+ * The workflow stages of every track, in the order the students work through
+ * them.
+ *
+ * @return array<string, array<int, array{key:string,label:string,order:int}>>
+ */
+function templateWorkflowStages(): array {
+    $stages = [];
+
+    if (class_exists('DB')) {
+        try {
+            $rows = DB::query(
+                'SELECT t.track_code, w.stage_key, w.stage_label, w.stage_order
+                   FROM workflow_stages w
+                   INNER JOIN tracks t ON t.track_id = w.track_id
+                  ORDER BY t.track_id, w.stage_order, w.stage_id'
+            )->fetchAll();
+            foreach ($rows as $row) {
+                $track = strtolower(trim((string) $row['track_code']));
+                $stages[$track][] = [
+                    'key'   => (string) $row['stage_key'],
+                    'label' => (string) $row['stage_label'],
+                    'order' => (int) $row['stage_order'],
+                ];
+            }
+        } catch (Throwable $e) {
+            $stages = [];
+        }
+    }
+
+    // The workflow of the application is the fallback when the tables are
+    // not available.
+    if (!$stages) {
+        foreach (['thesis', 'capstone', 'seminar'] as $track) {
+            foreach (getWorkflow($track)['stages'] as $index => $stage) {
+                $stages[$track][] = [
+                    'key'   => (string) ($stage['key'] ?? ''),
+                    'label' => (string) ($stage['label'] ?? ''),
+                    'order' => $index + 1,
+                ];
+            }
+        }
+    }
+
+    return $stages;
+}
+
+/**
+ * The graduate programs of every track.
+ *
+ * The programs table holds the courses of the system; the PROGRAMS list in
+ * this file holds the same courses with the track they follow. Both are read
+ * so that a course is never left out.
+ *
+ * @return array<string, array<int, array{code:string,name:string}>>
+ */
+function templateCoursesByTrack(): array {
+    $courses = ['thesis' => [], 'capstone' => [], 'seminar' => []];
+    $seen    = [];
+
+    if (class_exists('DB')) {
+        try {
+            $rows = DB::query(
+                'SELECT p.program_code, p.program_name, t.track_code
+                   FROM programs p
+                   INNER JOIN tracks t ON t.track_id = p.track_id
+                  WHERE p.is_active = 1
+                  ORDER BY p.program_code'
+            )->fetchAll();
+            foreach ($rows as $row) {
+                $code  = trim((string) $row['program_code']);
+                $track = strtolower(trim((string) $row['track_code']));
+                if ($code === '' || !isset($courses[$track])) {
+                    continue;
+                }
+                $seen[$code] = true;
+                $courses[$track][] = ['code' => $code, 'name' => trim((string) $row['program_name'])];
+            }
+        } catch (Throwable $e) {
+            $courses = ['thesis' => [], 'capstone' => [], 'seminar' => []];
+        }
+    }
+
+    foreach (PROGRAMS as $code => $label) {
+        if (isset($seen[$code])) {
+            continue;
+        }
+        $track = getTrackForProgram($code);
+        if (!isset($courses[$track])) {
+            continue;
+        }
+        $name = trim((string) preg_replace('/\s*\([^)]*\)\s*$/', '', $label));
+        $seen[$code] = true;
+        $courses[$track][] = ['code' => $code, 'name' => $name !== '' ? $name : $code];
+    }
+
+    return $courses;
+}
+
+/**
+ * The whole template library, grouped the way both portals show it.
+ *
+ * Every track holds its courses, its workflow stages and its reference
+ * documents. A template that belongs to a stage is shown with that stage; a
+ * template that belongs to the track itself (the paper format of the track)
+ * is shown at every stage, because it is used at every stage.
+ *
+ * @param  string $trackCode only this track, or every track when empty
+ * @return array<int, array<string, mixed>>
+ */
+function templateLibrary(string $trackCode = ''): array {
+    $rows      = databaseTemplateRows($trackCode);
+    $stages    = templateWorkflowStages();
+    $courses   = templateCoursesByTrack();
+    $trackMeta = [];
+
+    if (class_exists('DB')) {
+        try {
+            foreach (DB::query('SELECT track_id, track_code, track_name FROM tracks ORDER BY track_id')->fetchAll() as $track) {
+                $trackMeta[strtolower((string) $track['track_code'])] = [
+                    'id'   => (int) $track['track_id'],
+                    'code' => strtolower((string) $track['track_code']),
+                    'name' => (string) $track['track_name'],
+                ];
+            }
+        } catch (Throwable $e) {
+            $trackMeta = [];
+        }
+    }
+
+    if (!$trackMeta) {
+        foreach (['thesis' => 'Thesis', 'capstone' => 'Capstone', 'seminar' => 'Seminar Paper'] as $code => $name) {
+            $trackMeta[$code] = ['id' => 0, 'code' => $code, 'name' => $name];
+        }
+    }
+
+    // Sort the templates into their track, their stage and the track itself.
+    $byTrack = [];
+    foreach ($rows as $row) {
+        $code = strtolower((string) ($row['trackCode'] ?? ''));
+        if ($code === '') {
+            continue;
+        }
+        $hasStage  = ($row['stageId'] !== null && (int) $row['stageId'] > 0);
+        $isTrackWide = (!$hasStage && $row['typeLabel'] === 'Template');
+        $isReference = (!$hasStage && $row['typeLabel'] !== 'Template');
+
+        if (!$hasStage && $row['typeLabel'] === 'Form') {
+            // A form without a stage cannot be filed, so it is flagged for
+            // the coordinator instead of being put in the wrong place.
+            $row['needsReview'] = true;
+        }
+
+        $bucket = $isReference ? 'references' : ($isTrackWide ? 'trackWide' : 'staged');
+        $byTrack[$code][$bucket][$hasStage ? (int) $row['stageId'] : 0][] = $row;
+    }
+
+    $library = [];
+
+    foreach ($trackMeta as $code => $meta) {
+        if ($trackCode !== '' && $code !== strtolower($trackCode)) {
+            continue;
+        }
+
+        $group      = $byTrack[$code] ?? [];
+        $trackWide  = $group['trackWide'][0] ?? [];
+        $references = $group['references'][0] ?? [];
+        $staged     = $group['staged'] ?? [];
+
+        $stageList = [];
+        foreach (($stages[$code] ?? []) as $stage) {
+            $items = [];
+            foreach ($staged as $stageId => $bucket) {
+                foreach ($bucket as $item) {
+                    if ((string) ($item['stageKey'] ?? '') === $stage['key']) {
+                        $items[] = $item;
+                    }
+                }
+            }
+            // The templates of the track itself are used at every stage.
+            foreach ($trackWide as $item) {
+                $items[] = $item;
+            }
+
+            $stageList[] = [
+                'key'       => $stage['key'],
+                'label'     => $stage['label'],
+                'order'     => $stage['order'],
+                'templates' => $items,
+            ];
+        }
+
+        $allOfTrack = array_merge($trackWide, $references);
+        foreach ($staged as $bucket) {
+            $allOfTrack = array_merge($allOfTrack, $bucket);
+        }
+
+        $review = array_values(array_filter(
+            $allOfTrack,
+            static fn($item) => !empty($item['needsReview'])
+        ));
+
+        // Templates that are put aside because their file is not there yet
+        // are listed as well, so the gap is not silent.
+        foreach (templateMissingTemplates($code) as $missing) {
+            $missing['reason'] = 'missing';
+            $review[] = $missing;
+        }
+
+        $library[] = [
+            'trackCode'   => $code,
+            'trackName'   => $meta['name'],
+            'trackId'     => $meta['id'],
+            'courses'     => $courses[$code] ?? [],
+            'stages'      => $stageList,
+            'references'  => $references,
+            'trackWide'   => $trackWide,
+            'needsReview' => $review,
+        ];
+    }
+
+    return $library;
+}
+
+/**
+ * The templates of a track whose file is not available yet.
+ *
+ * They are kept in the table so nothing is lost, but they are not part of
+ * the library until the file is there.
+ */
+function templateMissingTemplates(string $trackCode): array {
+    if (!class_exists('DB')) {
+        return [];
+    }
+    try {
+        $rows = DB::query(
+            'SELECT t.template_id AS id, t.template_name AS label, t.file_name AS file,
+                    t.description, t.needs_review AS needsReview,
+                    tr.track_id AS trackId, tr.track_code AS trackCode, tr.track_name AS trackName,
+                    t.stage_id AS stageId, ws.stage_key AS stageKey, ws.stage_label AS stage
+               FROM templates t
+               INNER JOIN tracks tr ON tr.track_id = t.track_id
+               LEFT JOIN workflow_stages ws ON ws.stage_id = t.stage_id
+              WHERE t.is_active = 0 AND t.needs_review = 1 AND tr.track_code = :code
+              ORDER BY t.template_name'
+            , ['code' => strtolower($trackCode)]
+        )->fetchAll();
+        foreach ($rows as &$row) {
+            $row['needsReview'] = true;
+            $row['typeLabel']   = 'Template';
         }
         unset($row);
         return $rows;
@@ -1507,7 +1791,20 @@ function createTemplateRecord(array $data, array $file): array {
     $track = DB::find('tracks', ['track_code' => strtolower((string) $data['program_track'])]);
     if (!$track) throw new RuntimeException('The selected track is not configured.');
     $stage = DB::find('workflow_stages', ['track_id' => (int) $track['track_id'], 'stage_label' => $data['stage_label']]);
-    $row = DB::insert('templates', [
+    // The coordinator picked the track and the stage, so nothing is left to
+    // review. A form without a stage is flagged instead of being filed.
+    $needsReview = (($data['document_type'] ?? '') === 'form' && empty($stage['stage_id']));
+
+    $pdo = DB::getConnection();
+    $stmt = $pdo->prepare(
+        'INSERT INTO `templates`
+            (`track_id`, `stage_id`, `template_name`, `description`, `document_type`,
+             `file_name`, `file_path`, `mime_type`, `is_active`, `needs_review`, `managed_by_user_id`)
+         VALUES
+            (:track_id, :stage_id, :template_name, :description, :document_type,
+             :file_name, :file_path, :mime_type, 1, :needs_review, :managed_by_user_id)'
+    );
+    $stmt->execute([
         'track_id' => (int) $track['track_id'],
         'stage_id' => $stage['stage_id'] ?? null,
         'template_name' => trim($data['template_name']),
@@ -1516,11 +1813,12 @@ function createTemplateRecord(array $data, array $file): array {
         'file_name' => $original,
         'file_path' => 'storage/templates/' . $stored,
         'mime_type' => (string) ($file['type'] ?? '') ?: null,
-        'managed_by_user_id' => databaseCoordinatorUserId(),
+        'needs_review' => $needsReview ? 1 : 0,
+        'managed_by_user_id' => databaseCoordinatorUserId() ?: 1,
     ]);
-    return $row;
-}
 
+    return DB::find('templates', ['template_id' => (int) $pdo->lastInsertId()]);
+}
 function findTemplateRecord(string $id): ?array {
     if (!class_exists('DB') || !ctype_digit($id)) return null;
     $stmt = DB::getConnection()->prepare('SELECT t.*, tr.track_code, ws.stage_label FROM templates t INNER JOIN tracks tr ON tr.track_id = t.track_id LEFT JOIN workflow_stages ws ON ws.stage_id = t.stage_id WHERE t.template_id = :id LIMIT 1');
@@ -3966,3 +4264,8 @@ function applicationMissingRequirements(string $track, string $stageKey, array $
 
 initPrototypeStore();
 $mockStudent = currentStudentProfile($mockStudent);
+
+// Google Drive template sync and the update notifications it feeds.
+// Loaded last so the helpers above are already available to them.
+require_once __DIR__ . '/gdrive.php';
+require_once __DIR__ . '/template_sync.php';

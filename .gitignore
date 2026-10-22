@@ -1,0 +1,5 @@
+# Runtime artefacts of the Google Drive template sync.
+# The marker remembers that the database already has the sync tables, and the
+# lock keeps two syncs from running at the same time. Neither belongs in git.
+storage/.template-schema.v1
+storage/.template-sync.lock
