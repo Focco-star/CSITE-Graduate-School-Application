@@ -2275,11 +2275,59 @@ function deleteApplicationRecord(int $id): void {
 
 function deleteScheduleRecord(string $id): void {
     if (class_exists('DB') && ctype_digit($id)) {
+        $pdo = DB::getConnection();
+        $pdo->beginTransaction();
         try {
-            $stmt = DB::getConnection()->prepare('DELETE FROM schedules WHERE schedule_id = :id');
+            $lookup = $pdo->prepare('SELECT application_id FROM schedules WHERE schedule_id = :id LIMIT 1');
+            $lookup->execute(['id' => (int) $id]);
+            $applicationId = (int) ($lookup->fetchColumn() ?: 0);
+
+            $stmt = $pdo->prepare('DELETE FROM schedules WHERE schedule_id = :id');
             $stmt->execute(['id' => (int) $id]);
-            return;
+
+            if ($applicationId > 0) {
+                $applicationStmt = $pdo->prepare(
+                    'SELECT status, workflow_state FROM applications WHERE application_id = :id LIMIT 1'
+                );
+                $applicationStmt->execute(['id' => $applicationId]);
+                $application = $applicationStmt->fetch();
+
+                if ($application && $application['status'] === 'scheduled') {
+                    $workflow = json_decode((string) ($application['workflow_state'] ?? ''), true);
+                    if (is_array($workflow)) {
+                        unset(
+                            $workflow['presentation_date'],
+                            $workflow['presentation_time'],
+                            $workflow['presentation_venue'],
+                            $workflow['presentation_panel']
+                        );
+                        $update = $pdo->prepare(
+                            'UPDATE applications
+                             SET status = :status, workflow_state = :workflow_state
+                             WHERE application_id = :id'
+                        );
+                        $update->execute([
+                            'status' => 'ready_for_presentation',
+                            'workflow_state' => json_encode($workflow, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                            'id' => $applicationId,
+                        ]);
+                    } else {
+                        $pdo->prepare(
+                            "UPDATE applications SET status = 'ready_for_presentation' WHERE application_id = :id"
+                        )->execute(['id' => $applicationId]);
+                    }
+                }
+            }
+
+            $pdo->commit();
+            if ($stmt->rowCount() > 0) {
+                return;
+            }
         } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
     }
     storeSet('schedules', array_values(array_filter(storeGet('schedules'), static function ($s) use ($id) {
@@ -2482,8 +2530,10 @@ function databaseSchedules(): array {
              LEFT JOIN advisor_pool ap ON ap.adviser_id = sc.adviser_id
              LEFT JOIN schedule_panel_assignments spa ON spa.schedule_id = sc.schedule_id
              LEFT JOIN panel_members pm ON pm.panel_member_id = spa.panel_member_id
+             WHERE sc.status <> :cancelled
              GROUP BY sc.schedule_id
              ORDER BY sc.presentation_date, sc.start_time'
+            , ['cancelled' => 'cancelled']
         )->fetchAll();
         return $rows;
     } catch (Throwable $e) {
@@ -2582,10 +2632,36 @@ function addScheduleRecord(array $s): array {
                     $assignmentStmt->execute(['schedule_id' => $scheduleId, 'panel_member_id' => $documentorId, 'panel_role' => 'documentor']);
                 }
             }
+
+            $workflowStmt = $pdo->prepare(
+                'SELECT workflow_state FROM applications WHERE application_id = :id FOR UPDATE'
+            );
+            $workflowStmt->execute(['id' => (int) $s['applicationId']]);
+            $workflow = json_decode((string) ($workflowStmt->fetchColumn() ?: '[]'), true);
+            if (!is_array($workflow)) {
+                $workflow = [];
+            }
+            $workflow['presentation_date'] = $date;
+            $workflow['presentation_time'] = $time;
+            $workflow['presentation_venue'] = trim((string) ($s['venue'] ?? ''));
+            $workflow['presentation_panel'] = $panelText ?: 'TBD';
+            $applicationUpdate = $pdo->prepare(
+                'UPDATE applications
+                 SET status = :status, workflow_state = :workflow_state
+                 WHERE application_id = :id'
+            );
+            $applicationUpdate->execute([
+                'status' => 'scheduled',
+                'workflow_state' => json_encode($workflow, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'id' => (int) $s['applicationId'],
+            ]);
+
             $pdo->commit();
             return findSchedule((string) $scheduleId) ?: array_merge($s, ['id' => (string) $scheduleId]);
         } catch (Throwable $e) {
-            $pdo->rollBack();
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             throw $e;
         }
     }

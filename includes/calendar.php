@@ -11,14 +11,8 @@
  * The browser never talks to the database. It calls
  * coordinator/schedule/calendar_data.php, which calls scheduleCalendarFetch().
  *
- * Data sources (no new tables):
- *   1. `schedules`      - the primary source (date, start/end time, venue, status),
- *                         joined to `applications` (paper title, stage) and to
- *                         `users` / `students` (student name).
- *   2. applications.workflow_state - fallback for applications that are
- *                         'scheduled' but have no `schedules` row yet. This is
- *                         the same fallback dashboard.php / manage.php already
- *                         use for the "Upcoming Presentations" count.
+ * The `schedules` table is the source of truth, joined to `applications`
+ * (paper title and stage) and `users` / `students` (student name).
  *
  * Timezone: dates are interpreted in SCHEDULE_CALENDAR_TIMEZONE. Define it in
  * includes/config.php before this file loads to override the default.
@@ -121,25 +115,6 @@ if (!function_exists('scheduleCalendarParseTime')) {
     }
 }
 
-/** Normalises 'Oct 10, 2026', '2026-10-10', '10/10/2026' ... to 'Y-m-d', or null. */
-if (!function_exists('scheduleCalendarParseDate')) {
-    function scheduleCalendarParseDate($raw, DateTimeZone $tz): ?string
-    {
-        $raw = trim((string) $raw);
-        if ($raw === '') {
-            return null;
-        }
-        foreach (['Y-m-d', 'M j, Y', 'F j, Y', 'n/j/Y', 'j M Y', 'j F Y'] as $format) {
-            $dt = DateTimeImmutable::createFromFormat('!' . $format, $raw, $tz);
-            if (scheduleCalendarCleanParse($dt)) {
-                $year = (int) $dt->format('Y');
-                return ($year >= 2000 && $year <= 2100) ? $dt->format('Y-m-d') : null;
-            }
-        }
-        return null;
-    }
-}
-
 /** '14:00' -> '2:00 PM' */
 if (!function_exists('scheduleCalendarTimeLabel')) {
     function scheduleCalendarTimeLabel(?string $hhmm): ?string
@@ -208,8 +183,6 @@ if (!function_exists('scheduleCalendarEvent')) {
 if (!function_exists('scheduleCalendarFetch')) {
     function scheduleCalendarFetch(PDO $pdo, string $start, string $end): array
     {
-        $tz = scheduleCalendarTimezone();
-
         // Same 'Last, First MI' name format used across the coordinator pages.
         $nameSql = "COALESCE(
                         NULLIF(TRIM(CONCAT(s.last_name, ', ', s.first_name, IF(s.middle_initial IS NULL OR TRIM(REPLACE(s.middle_initial, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(s.middle_initial, '.', '')))))), ''),
@@ -260,47 +233,6 @@ if (!function_exists('scheduleCalendarFetch')) {
                 (string) $row['schedule_status'],
                 scheduleCalendarParseTime($row['start_time']),
                 scheduleCalendarParseTime($row['end_time'])
-            ));
-        }
-
-        // 2) Fallback: 'scheduled' applications that have no schedules row at all.
-        $covered = [];
-        foreach (scheduleCalendarQuery($pdo, "SELECT DISTINCT application_id FROM schedules") as $row) {
-            $covered[(int) $row['application_id']] = true;
-        }
-        $fallback = scheduleCalendarQuery(
-            $pdo,
-            "SELECT a.application_id, a.paper_title, a.presentation_stage, a.workflow_state,
-                    {$nameSql} AS student_name
-             FROM applications a
-             JOIN users u ON u.user_id = a.user_id
-             LEFT JOIN students s ON s.user_id = u.user_id
-             WHERE a.archived_at IS NULL AND a.status = 'scheduled'
-             ORDER BY a.application_id ASC"
-        );
-        foreach ($fallback as $row) {
-            $applicationId = (int) $row['application_id'];
-            if (isset($covered[$applicationId])) {
-                continue;
-            }
-            $workflow = json_decode((string) ($row['workflow_state'] ?? ''), true);
-            if (!is_array($workflow)) {
-                continue;
-            }
-            $date = scheduleCalendarParseDate($workflow['presentation_date'] ?? '', $tz);
-            if ($date === null || $date < $start || $date > $end) {
-                continue;
-            }
-            $add($date, scheduleCalendarEvent(
-                'app_' . $applicationId,
-                $applicationId,
-                $row['student_name'],
-                $row['paper_title'],
-                $row['presentation_stage'],
-                $workflow['presentation_venue'] ?? '',
-                'scheduled',
-                scheduleCalendarParseTime($workflow['presentation_time'] ?? ''),
-                null
             ));
         }
 
