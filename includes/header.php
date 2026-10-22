@@ -48,15 +48,8 @@ if (empty($userName) && !empty($_SESSION['user'])) {
             </div>
             <div class="topbar-user">
                 <?php if ($userName): ?>
-                <?php
-                $displayUserName = trim((string) $userName);
-                if ($role === 'coordinator' && strpos($displayUserName, ',') !== false) {
-                    [$lastName, $firstName] = array_map('trim', explode(',', $displayUserName, 2));
-                    $displayUserName = trim($firstName . ' ' . $lastName);
-                }
-                ?>
                 <?php if ($role === 'student'): ?><a href="<?= url('student/profile.php') ?>" class="user-name-btn" title="Edit your profile"><?php else: ?><span class="user-name"><?php endif; ?>
-                    <i class="fas fa-user-circle"></i> Welcome<?= $role === 'coordinator' ? ' Coordinator,' : ',' ?> <?= htmlspecialchars($displayUserName) ?>
+                    <i class="fas fa-user-circle"></i> <?= htmlspecialchars($userName) ?>
                     <?php if ($role === 'student'): ?>
                     <i class="fas fa-pencil-alt" style="font-size:0.7rem;opacity:0.6;margin-left:2px;"></i>
                     <?php endif; ?>
