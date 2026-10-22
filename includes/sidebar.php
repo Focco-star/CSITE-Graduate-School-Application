@@ -67,14 +67,6 @@ $coordinatorLinks = [
     ['key' => 'reports',   'label' => 'Reports',                'icon' => 'fa-chart-column',  'href' => url('coordinator/reports/dashboard.php')],
 ];
 
-$socialLinks = [
-    ['label' => 'Facebook',   'icon' => 'fa-facebook-f', 'href' => 'https://www.facebook.com/ateneodezamboangauniversity'],
-    ['label' => 'Twitter / X','icon' => 'fa-x-twitter',  'href' => 'https://x.com/AdZUOfficial'],
-    ['label' => 'Instagram',  'icon' => 'fa-instagram',  'href' => 'https://www.instagram.com/adzuofficial/'],
-    ['label' => 'TikTok',     'icon' => 'fa-tiktok',     'href' => 'https://www.tiktok.com/@adzuofficial'],
-    ['label' => 'YouTube',    'icon' => 'fa-youtube',    'href' => 'https://www.youtube.com/@ateneodezamboangauniversity'],
-];
-
 /** Collect every key inside a link tree (parent + children). */
 $collectKeys = static function (array $links) use (&$collectKeys): array {
     $keys = [];
@@ -409,24 +401,6 @@ $showCoordinatorSection = $isCoordinator;
         </li>
       </ul>
     <?php endif; ?>
-
-    <!-- 4. ADZU SOCIALS FOOTER LINKS -->
-    <div class="myadzu-socials">
-      <div class="myadzu-section-label">Adzu Socials</div>
-      <ul>
-        <?php foreach ($socialLinks as $social): ?>
-          <li>
-            <a class="myadzu-social-link"
-               href="<?= htmlspecialchars($social['href']) ?>"
-               target="_blank" rel="noopener noreferrer">
-              <i class="fab <?= htmlspecialchars($social['icon']) ?>" aria-hidden="true"></i>
-              <span><?= htmlspecialchars($social['label']) ?></span>
-            </a>
-          </li>
-        <?php endforeach; ?>
-      </ul>
-      <div class="myadzu-empty" data-menu-empty hidden>No menu items match your search.</div>
-    </div>
 
   </nav>
 </aside>
