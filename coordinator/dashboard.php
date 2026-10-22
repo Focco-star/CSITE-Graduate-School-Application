@@ -2,7 +2,6 @@
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/program_chart.php';
-require_once __DIR__ . '/../includes/calendar.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -217,8 +216,6 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="dashstat-icon"><i class="fas fa-chart-bar"></i></div>
     </a>
 </div>
-
-<?php renderScheduleCalendar(); ?>
 
 <?php renderProgramPopulationChart($pdo ?? null); ?>
 

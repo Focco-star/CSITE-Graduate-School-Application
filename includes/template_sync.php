@@ -273,12 +273,42 @@ function templateDriveLocalPath(string $track, string $fileName): string {
     return 'assets/papers/' . $folder . '/' . $safe;
 }
 
+/**
+ * The current time of the database.
+ *
+ * The times of the template records are written by the database, so they are
+ * compared with the clock of the database and not with the clock of the web
+ * server, which can sit in another time zone.
+ */
+function templateDatabaseNow(): string {
+    static $now = null;
+    if ($now !== null) {
+        return $now;
+    }
+    $now = '';
+    if (class_exists('DB')) {
+        try {
+            $now = (string) (DB::query('SELECT NOW() AS n')->fetch()['n'] ?? '');
+        } catch (Throwable $e) {
+            $now = '';
+        }
+    }
+    if ($now === '') {
+        $now = date('Y-m-d H:i:s');
+    }
+    return $now;
+}
+
 /** "3 minutes ago" style text for a timestamp. */
 function templateTimeAgo(?int $timestamp): string {
     if (!$timestamp) {
         return 'never';
     }
-    $diff = max(0, time() - $timestamp);
+    $now = strtotime(templateDatabaseNow());
+    if ($now === false) {
+        $now = time();
+    }
+    $diff = max(0, $now - $timestamp);
     if ($diff < 60) {
         return 'just now';
     }
@@ -1054,12 +1084,13 @@ function templateSeenColumn(string $role): string {
  * How many template updates this user has not looked at yet.
  *
  * A student only counts the updates of their own track; the coordinator
- * counts all of them.
+ * counts all of them. A file that was changed more than once counts once, so
+ * the number of files is not the number of changes.
  */
 function templateNotificationsUnreadCount(string $role, string $trackCode = ''): int {
     try {
         $seen = templateSeenColumn($role);
-        $sql = 'SELECT COUNT(*) AS c FROM `template_notifications` WHERE `' . $seen . '` IS NULL';
+        $sql = 'SELECT COUNT(DISTINCT COALESCE(`drive_file_id`, `file_name`)) AS c FROM `template_notifications` WHERE `' . $seen . '` IS NULL';
         $params = [];
         if ($role !== 'coordinator' && $trackCode !== '') {
             $sql .= " AND (`track_code` = :t OR `track_code` IS NULL OR `track_code` = '')";
@@ -1074,8 +1105,17 @@ function templateNotificationsUnreadCount(string $role, string $trackCode = ''):
 
 /**
  * The template updates, newest first.
+ *
+ * A file that was changed more than once is listed once, with its last
+ * change, so the history stays short and the same file is not shown again and
+ * again.
+ *
+ * @param  string $role       'coordinator' or 'student'
+ * @param  string $trackCode  only this track, or every track when empty
+ * @param  int    $limit      how many files at most
+ * @param  string $mode       'all', 'unseen' (not looked at yet) or 'seen'
  */
-function templateNotificationsList(string $role, string $trackCode = '', int $limit = 25): array {
+function templateNotificationsList(string $role, string $trackCode = '', int $limit = 25, string $mode = 'all'): array {
     try {
         $seen = templateSeenColumn($role);
         $sql = 'SELECT n.*, t.template_name, t.file_path, t.stage_id, t.track_id
@@ -1083,22 +1123,65 @@ function templateNotificationsList(string $role, string $trackCode = '', int $li
                   LEFT JOIN `templates` t ON t.template_id = n.template_id
                  WHERE 1 = 1';
         $params = [];
+        if ($mode === 'unseen') {
+            $sql .= ' AND n.`' . $seen . '` IS NULL';
+        } elseif ($mode === 'seen') {
+            $sql .= ' AND n.`' . $seen . '` IS NOT NULL';
+        }
         if ($role !== 'coordinator' && $trackCode !== '') {
             $sql .= " AND (n.`track_code` = :t OR n.`track_code` IS NULL OR n.`track_code` = '')";
             $params['t'] = $trackCode;
         }
-        $sql .= ' ORDER BY n.`changed_at` DESC, n.`notification_id` DESC LIMIT ' . max(1, min(100, (int) $limit));
+        $sql .= ' ORDER BY n.`changed_at` DESC, n.`notification_id` DESC LIMIT ' . max(1, min(200, (int) $limit));
 
         $rows = DB::query($sql, $params)->fetchAll();
-        foreach ($rows as &$row) {
+
+        /*
+         * One file is one entry. The rows come newest first, so the first
+         * row of a file is its last change and the older ones are left out.
+         */
+        $listed = [];
+        $seenFiles = [];
+        foreach ($rows as $row) {
+            $fileKey = trim((string) ($row['drive_file_id'] ?? ''));
+            if ($fileKey === '') {
+                $fileKey = strtolower(trim((string) ($row['file_name'] ?? '')));
+            }
+            if ($fileKey !== '' && isset($seenFiles[$fileKey])) {
+                continue;
+            }
+            if ($fileKey !== '') {
+                $seenFiles[$fileKey] = true;
+            }
             $row['isNew'] = empty($row[$seen]);
             $row['changedLabel'] = date('M j, Y g:i A', strtotime((string) $row['changed_at']));
             $row['ago'] = templateTimeAgo(strtotime((string) $row['changed_at']) ?: null);
+            $listed[] = $row;
+            if (count($listed) >= max(1, (int) $limit)) {
+                break;
+            }
         }
-        unset($row);
-        return $rows;
+        return $listed;
     } catch (Throwable $e) {
         return [];
+    }
+}
+
+/**
+ * Take the update entries of the last day off the table.
+ *
+ * The history is there to show what changed recently, so an entry that is
+ * older than a day is removed instead of piling up.
+ */
+function templatePruneNotifications(int $hours = 24): int {
+    try {
+        // The clock of the database is used, because it is the clock that
+        // wrote the times of the entries.
+        return DB::query(
+            'DELETE FROM `template_notifications` WHERE `changed_at` < (NOW() - INTERVAL ' . max(1, (int) $hours) . ' HOUR)'
+        )->rowCount();
+    } catch (Throwable $e) {
+        return 0;
     }
 }
 

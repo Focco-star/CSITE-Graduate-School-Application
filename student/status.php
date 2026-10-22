@@ -101,10 +101,11 @@ require_once __DIR__ . '/../includes/header.php';
                     <tr><td colspan="4" style="text-align:center;color:var(--gray-400);padding:1.5rem;">No documents uploaded yet for this <?= htmlspecialchars(strtolower(getTrackLabel($track))) ?> track.</td></tr>
                     <?php endif; ?>
                     <?php foreach ($uploads as $doc): ?>
+                    <?php $docBadge = documentStatusBadge($doc); ?>
                     <tr>
                         <td><?= htmlspecialchars($doc['fileName']) ?></td>
                         <td><?= htmlspecialchars($doc['stage']) ?></td>
-                        <td><?= statusBadge($doc['status']) ?></td>
+                        <td><span class="status-badge <?= $docBadge['class'] ?>"><?= htmlspecialchars($docBadge['label']) ?></span></td>
                         <td><?= date('M d, Y', strtotime($doc['date'])) ?></td>
                     </tr>
                     <?php endforeach; ?>

@@ -72,7 +72,12 @@ foreach ($templateLibrary as $libraryTrack) {
 
 // The updates that are waiting to be read. They are collected before the
 // "seen" mark is written, so the list still shows which ones were new.
-$templateUpdates = templateNotificationsList('coordinator');
+//
+// The history only keeps what happened in the last day, and a file that was
+// changed more than once is listed once.
+templatePruneNotifications(24);
+$latestSynced   = templateNotificationsList('coordinator', '', 12, 'unseen');
+$templateUpdates = templateNotificationsList('coordinator', '', 40, 'seen');
 markTemplateNotificationsSeen('coordinator');
 
 $lastSyncAt = templateLastSyncAt();
@@ -85,14 +90,43 @@ $lastSyncAt = templateLastSyncAt();
 </div>
 <?php endif; ?>
 
-<?php if (!empty($templateUpdates)): ?>
-<div class="card tpl-updates-card">
+<?php if (!empty($latestSynced)): ?>
+<div class="card tpl-latest-card">
     <div class="card-header">
-        <h3><i class="fas fa-bell"></i> Template Updates</h3>
-        <span class="tpl-update-count"><?= count($templateUpdates) ?> update<?= count($templateUpdates) === 1 ? '' : 's' ?></span>
+        <h3><i class="fas fa-cloud-arrow-down"></i> Latest Synced Files</h3>
+        <span class="tpl-update-count"><?= count($latestSynced) ?> file<?= count($latestSynced) === 1 ? '' : 's' ?></span>
     </div>
     <div class="card-body">
-        <p class="tpl-update-hint">Files the teacher added or replaced in the Google Drive template folder. They are already live for the students.</p>
+        <p class="tpl-update-hint">These files were taken from the Google Drive template folder and are already live for the students.</p>
+        <ul class="tpl-update-list">
+            <?php foreach ($latestSynced as $update): ?>
+            <li class="tpl-update-item is-new">
+                <i class="fas <?= $update['change_type'] === 'added' ? 'fa-file-circle-plus' : 'fa-file-circle-check' ?>" aria-hidden="true"></i>
+                <div class="tpl-update-body">
+                    <strong class="tpl-update-name"><?= htmlspecialchars($update['file_name']) ?></strong>
+                    <span class="tpl-update-meta">
+                        <?= $update['change_type'] === 'added' ? 'New template added' : 'Template updated' ?>
+                        &middot; Last updated <?= htmlspecialchars($update['changedLabel']) ?>
+                        (<?= htmlspecialchars($update['ago']) ?>)
+                    </span>
+                </div>
+                <span class="tpl-update-new">New</span>
+            </li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($templateUpdates)): ?>
+<div class="card tpl-updates-card">
+    <button type="button" class="card-header tpl-updates-toggle" id="tplUpdatesToggle" aria-expanded="false" aria-controls="tplUpdatesBody">
+        <h3><i class="fas fa-bell"></i> Template Updates</h3>
+        <span class="tpl-update-count"><?= count($templateUpdates) ?> update<?= count($templateUpdates) === 1 ? '' : 's' ?></span>
+        <i class="fas fa-chevron-down tpl-updates-caret" aria-hidden="true"></i>
+    </button>
+    <div class="card-body" id="tplUpdatesBody" hidden>
+        <p class="tpl-update-hint">The files the teacher added or replaced in the Google Drive template folder during the last day. They are already live for the students.</p>
         <ul class="tpl-update-list">
             <?php foreach ($templateUpdates as $update): ?>
             <li class="tpl-update-item<?= !empty($update['isNew']) ? ' is-new' : '' ?>">
@@ -111,7 +145,32 @@ $lastSyncAt = templateLastSyncAt();
         </ul>
     </div>
 </div>
+<?php elseif (empty($latestSynced)): ?>
+<div class="card tpl-updates-card">
+    <button type="button" class="card-header tpl-updates-toggle" id="tplUpdatesToggle" aria-expanded="false" aria-controls="tplUpdatesBody">
+        <h3><i class="fas fa-bell"></i> Template Updates</h3>
+        <span class="tpl-update-count">0 updates</span>
+        <i class="fas fa-chevron-down tpl-updates-caret" aria-hidden="true"></i>
+    </button>
+    <div class="card-body" id="tplUpdatesBody" hidden>
+        <p class="tpl-update-hint">Nothing changed in the Google Drive template folder during the last day.</p>
+    </div>
+</div>
 <?php endif; ?>
+<script>
+(function () {
+    // "Template Updates" opens the history.
+    var toggle = document.getElementById('tplUpdatesToggle');
+    var body = document.getElementById('tplUpdatesBody');
+    if (!toggle || !body) return;
+    toggle.addEventListener('click', function () {
+        var open = body.hidden;
+        body.hidden = !open;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        toggle.classList.toggle('is-open', open);
+    });
+})();
+</script>
 
 <div class="form-actions" style="border:none;padding:0;margin-bottom:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
     <a href="<?= url('coordinator/templates/add.php') ?>" class="btn btn-primary"><i class="fas fa-plus"></i> Add Document</a>

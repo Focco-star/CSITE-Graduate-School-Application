@@ -134,6 +134,20 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
         </div>
     </div>
     <div class="card-body">
+        <?php
+        // The next step of the student, in the order of their workflow. It
+        // changes as soon as the coordinator verifies a document.
+        $nextStep = nextMilestoneStep($milestoneBlocks[0]['steps'] ?? []);
+        ?>
+        <?php if ($nextStep): ?>
+        <div class="tpl-next-step<?= $nextStep['coord'] ? ' is-coord' : '' ?>">
+            <i class="fas <?= $nextStep['coord'] ? 'fa-user-tie' : 'fa-arrow-right' ?>" aria-hidden="true"></i>
+            <div>
+                <strong>Next step: <?= htmlspecialchars($nextStep['label']) ?></strong>
+                <span><?= htmlspecialchars($nextStep['detail']) ?></span>
+            </div>
+        </div>
+        <?php endif; ?>
         <?php foreach ($milestoneBlocks as $block):
             $stage = $block['stage'];
             $steps = $block['steps'];
@@ -143,6 +157,10 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
             $stageStatusLabel = $block['isLocked'] ? 'Locked' : ($stageIsSubmitted ? (STATUSES[$stageStatus]['label'] ?? 'Submitted') : 'Not Started');
             $stageStatusClass = $block['isLocked'] ? 'status-locked' : ($stageIsSubmitted ? (STATUSES[$stageStatus]['class'] ?? 'status-submitted') : 'status-pending');
             $openByDefault = $block['isCurrent'] || $block['isDone'];
+            // The document types the student may upload now. The same rule
+            // decides the Document Type list of the Application page. A stage
+            // that is locked has no open document type at all.
+            $openTypes = $block['isLocked'] ? [] : openDocumentTypes($steps);
         ?>
         <div class="ms-stage<?= $block['isCurrent'] ? ' is-current' : '' ?><?= $block['isDone'] ? ' is-done' : '' ?><?= $block['isLocked'] ? ' is-locked' : '' ?><?= $openByDefault ? ' is-open' : '' ?>" data-ms-stage>
             <button type="button" class="ms-stage-head" data-ms-toggle aria-expanded="<?= $openByDefault ? 'true' : 'false' ?>">
@@ -160,9 +178,10 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
                     $state = $step['state']['status'] ?? 'pending';
                     $isDone = $state === 'done';
                     $isFlagged = $state === 'flagged';
-                    $isActive = !$isDone && !$isFlagged && $si === $stats['firstPending'];
-                    $iconState = $isFlagged ? 'flagged' : ($isDone ? 'done' : ($isActive ? 'active' : 'pending'));
-                    $rowClass = $isFlagged ? 'is-flagged' : ($isDone ? 'is-done' : ($isActive ? 'is-active' : 'is-pending'));
+                    $isSubmitted = $state === 'submitted';
+                    $isActive = !$block['isLocked'] && !$isDone && !$isFlagged && !$isSubmitted && $si === $stats['firstPending'];
+                    $iconState = $isFlagged ? 'flagged' : ($isDone ? 'done' : ($isSubmitted ? 'submitted' : ($isActive ? 'active' : 'pending')));
+                    $rowClass = $isFlagged ? 'is-flagged' : ($isDone ? 'is-done' : ($isSubmitted ? 'is-submitted' : ($isActive ? 'is-active' : 'is-pending')));
                 ?>
                 <div class="ms-step <?= $rowClass ?>">
                     <div class="ms-step-col">
@@ -176,14 +195,21 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
                             <span><?= htmlspecialchars($step['label']) ?></span>
                             <?php if ($step['coord']): ?><span class="coord-chip">Coordinator</span><?php endif; ?>
                             <?php if ($isActive): ?><span class="ms-step-tag active">Next</span><?php endif; ?>
-                            <?php if ($isDone): ?><span class="ms-step-tag done">Done</span><?php endif; ?>
+                            <?php if ($isDone): ?><span class="ms-step-tag done">Verified</span><?php endif; ?>
+                            <?php if ($isSubmitted): ?><span class="ms-step-tag submitted">Submitted</span><?php endif; ?>
                             <?php if ($isFlagged): ?><span class="ms-step-tag flagged">Action needed</span><?php endif; ?>
                         </div>
                         <p class="ms-step-detail"><?= htmlspecialchars($step['detail']) ?></p>
                     </div>
                     <div class="ms-step-action">
-                        <?php if (!$isDone && !$step['coord'] && $si <= $stats['firstPending']): ?>
-                        <a class="btn btn-sm btn-primary" href="<?= url('student/application.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload</a>
+                        <?php
+                        // The Upload button follows the same rule as the Document
+                        // Type list of the Application page: the document of
+                        // the milestone the student is working on.
+                        $stepDocType = (string) ($step['docType'] ?? '');
+                        if ($stepDocType !== '' && in_array($stepDocType, $openTypes, true)):
+                        ?>
+                        <a class="btn btn-sm btn-primary" href="<?= url('student/application.php?stage=' . urlencode($stage['key']) . '&docType=' . urlencode($stepDocType)) ?>"><i class="fas fa-upload"></i> Upload</a>
                         <?php endif; ?>
                     </div>
                 </div>

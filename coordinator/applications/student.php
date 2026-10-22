@@ -157,7 +157,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <div class="detail-item"><label>Submission Date</label><span><?= $selected['date'] ? date('F d, Y', strtotime($selected['date'])) : '—' ?></span></div>
             <div class="detail-item"><label>Presentation Result</label><span><?= $selected['result'] ? htmlspecialchars($selected['result'] === 'approved' ? 'Approved' : 'Requires Revision') : '—' ?></span></div>
             <div class="detail-item"><label>Graduate School Endorsement</label><span><?= !empty($selected['gradSchoolEndorsed']) ? 'Issued' : 'Not yet issued' ?></span></div>
-            <div class="detail-item"><label>Payment Recorded</label><span><?= !empty($selected['paymentRecorded']) ? 'Yes' . (!empty($selected['receiptNumber']) ? ' (' . htmlspecialchars($selected['receiptNumber']) . ')' : '') : 'No' ?></span></div>
+            <div class="detail-item"><label>Payment Recorded</label><span><?= paymentIsRecorded($selected, $uploads) ? 'Yes' . (!empty($selected['receiptNumber']) ? ' (' . htmlspecialchars($selected['receiptNumber']) . ')' : '') : 'No' ?></span></div>
             <div class="detail-item"><label>Ready for Presentation</label><span><?= !empty($selected['readyForPresentation']) ? 'Yes' : 'No' ?></span></div>
             <?php if (!empty($selected['coordinatorComment'])): ?>
             <div class="detail-item" style="grid-column:1/-1;"><label>Coordinator Comment</label><span><?= htmlspecialchars($selected['coordinatorComment']) ?></span></div>

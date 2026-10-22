@@ -95,13 +95,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
          */
         $currentStageKey = (string) ($app['stageKey'] ?? stageKeyFromLabel((string) ($app['stage'] ?? '')));
         $statusMilestones = stageMilestoneSteps((string) ($app['studentEmail'] ?? ''), $track, $currentStageKey);
-        $postedResult = trim((string) ($stagePosted['result'] ?? ''));
-        $blockedReason = applicationStatusBlockedReason($status, $statusMilestones, $postedResult);
+
+        /*
+         * The milestones above come from the database, so they still show the
+         * state the documents had before this save. The actions the coordinator
+         * is picking right now are put on top of them, so a document that is
+         * verified in this very save counts as verified right away. Without
+         * this a coordinator could not verify a document again after it had
+         * been sent back to the student.
+         */
+        $postedDocumentActions = [];
+        foreach (($_POST['upload_status'] ?? []) as $uploadId => $uploadStatus) {
+            if (!in_array($uploadStatus, ['submitted', 'verified', 'incomplete', 'revision'], true)) {
+                continue;
+            }
+            $actionUpload = findUpload((string) $uploadId);
+            if (!$actionUpload) {
+                continue;
+            }
+            $postedDocumentActions[(string) $uploadId] = $uploadStatus;
+        }
+        $statusMilestones = applyDocumentActionsToMilestones($statusMilestones, $postedDocumentActions);
+
+        // The presentation result the coordinator picked. A stage without an
+        // application has no field to pick from, so the result that is already
+        // saved is kept instead of being cleared by the save.
+        $resultWasPosted = array_key_exists('result', $stagePosted);
+        $postedResult    = $resultWasPosted ? trim((string) $stagePosted['result']) : '';
+        $effectiveResult = $resultWasPosted ? $postedResult : (string) ($app['result'] ?? '');
+
+        // The coordinator is only moving the student to another status when
+        // the status itself is different. Changing a document is a different
+        // kind of work, and it may not be blocked by the requirements of a
+        // status the student is not being moved to.
+        $statusChanged = ($status !== (string) ($app['status'] ?? ''));
+
+        $blockedReason = applicationStatusBlockedReason($status, $statusMilestones, $effectiveResult, $statusChanged);
         if ($blockedReason !== null) {
             $processError = $blockedReason;
         } else {
         foreach (($_POST['upload_status'] ?? []) as $uploadId => $uploadStatus) {
-            if (!in_array($uploadStatus, ['submitted', 'verified', 'incomplete'], true)) continue;
+            if (!in_array($uploadStatus, ['submitted', 'verified', 'incomplete', 'revision'], true)) continue;
             $upload = findUpload((string) $uploadId);
             if (!$upload) continue;
 
@@ -128,13 +162,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
          */
         $docStatusByKind = [];
         $postedStatuses = $_POST['upload_status'] ?? [];
+        $storedStatuses = [];
+        foreach (uploadsForApplication((int) $app['id']) as $doc) {
+            $storedStatuses[(string) $doc['id']] = (string) ($doc['status'] ?? 'submitted');
+        }
+        /*
+         * The status of the newest file of every kind. A student may send the
+         * same kind of document more than once, and the file that was sent
+         * last is the one that is reviewed, so it is the one that counts.
+         * The action the coordinator is picking now wins over the status that
+         * is stored.
+         */
         foreach (uploadsForApplication((int) $app['id']) as $doc) {
             $kind = classifyUploadDocType((string) ($doc['docType'] ?? ''));
-            // The review status the coordinator picked for this document.
-            $postedDocStatus = $postedStatuses[(string) $doc['id']] ?? null;
-            $docStatusByKind[$kind] = $postedDocStatus !== null ? $postedDocStatus : (string) ($doc['status'] ?? 'submitted');
+            $id   = (string) $doc['id'];
+            $date = (string) ($doc['date'] ?? '');
+            if (!isset($docStatusByKind[$kind]) || $date >= (string) $docStatusByKind[$kind]['date']) {
+                $docStatusByKind[$kind] = ['date' => $date, 'id' => $id];
+            }
         }
-        $receiptNumberInput = trim((string) ($stagePosted['receiptNumber'] ?? ''));
+        $docStatusByKind = [];
+        foreach ($docStatusByKind as $kind => $row) {
+            $docStatusByKind[$kind] = isset($postedStatuses[$row['id']])
+                ? (string) $postedStatuses[$row['id']]
+                : ($storedStatuses[$row['id']] ?? 'submitted');
+        }
         $receiptVerified = ($docStatusByKind['receipt'] ?? '') === 'verified';
 
         /*
@@ -146,7 +198,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         $gradEndorsed = array_key_exists('gradSchoolEndorsed', $stagePosted)
             ? ($stagePosted['gradSchoolEndorsed'] === '1')
             : !empty($app['gradSchoolEndorsed']);
-        $paymentRecorded = $receiptVerified || $receiptNumberInput !== '';
+        // The receipt details come from the student, so the payment counts as
+        // recorded once the student sent the details or the coordinator
+        // verified the receipt.
+        $paymentRecorded = $receiptVerified || trim((string) ($app['receiptNumber'] ?? '')) !== '';
         $readyForPresentation = array_key_exists('readyForPresentation', $stagePosted)
             ? ($stagePosted['readyForPresentation'] === '1')
             : !empty($app['readyForPresentation']);
@@ -159,11 +214,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             'workflowState' => $workflowState,
             'gradSchoolEndorsed' => $gradEndorsed,
             'paymentRecorded' => $paymentRecorded,
-            'receiptNumber' => $receiptNumberInput,
-            'paymentDate' => trim((string) ($stagePosted['paymentDate'] ?? '')),
-            'paymentAmount' => trim((string) ($stagePosted['paymentAmount'] ?? '')),
             'readyForPresentation' => $readyForPresentation,
-            'result' => trim((string) ($stagePosted['result'] ?? '')),
+            'result' => $effectiveResult,
         ];
 
         try {
@@ -175,9 +227,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
                          coordinator_comment = :coordinator_comment,
                          grad_school_endorsed = :grad_school_endorsed,
                          payment_recorded = :payment_recorded,
-                         receipt_number = :receipt_number,
-                         payment_date = :payment_date,
-                         payment_amount = :payment_amount,
                          ready_for_presentation = :ready_for_presentation,
                          workflow_state = :workflow_state,
                          result = :result
@@ -189,23 +238,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
                     'coordinator_comment' => $comment,
                     'grad_school_endorsed' => $updatedFields['gradSchoolEndorsed'] ? 1 : 0,
                     'payment_recorded' => $updatedFields['paymentRecorded'] ? 1 : 0,
-                    'receipt_number' => $updatedFields['receiptNumber'] !== '' ? $updatedFields['receiptNumber'] : null,
-                    'payment_date' => $updatedFields['paymentDate'] !== '' ? $updatedFields['paymentDate'] : null,
-                    'payment_amount' => $updatedFields['paymentAmount'] !== '' ? (float) $updatedFields['paymentAmount'] : null,
                     'ready_for_presentation' => $updatedFields['readyForPresentation'] ? 1 : 0,
                     'workflow_state' => json_encode($workflowState, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: null,
                     'result' => $updatedFields['result'] !== '' ? $updatedFields['result'] : null,
                     'application_id' => (int) $app['id'],
                 ]);
                 saveApplicationComment((int) $app['id'], $comment);
-                if ($updatedFields['paymentRecorded']) {
-                    saveApplicationPayment(
-                        (int) $app['id'],
-                        $updatedFields['receiptNumber'],
-                        $updatedFields['paymentDate'],
-                        $updatedFields['paymentAmount']
-                    );
-                }
             }
 
 
@@ -239,7 +277,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             } elseif ($approveStage !== '') {
                 $actionUploads = uploadsForApplication($actionAppId);
                 $actionMissing = applicationMissingRequirements($track, $actionStage, $actionUploads, $actionApp);
-                $actionResult  = trim((string) ($stagePosted['result'] ?? '')) !== '' ? trim((string) ($stagePosted['result'] ?? '')) : (string) ($actionApp['result'] ?? '');
+                // The result of the stage that is approved, not the one of the
+                // stage the coordinator happens to be looking at.
+                $actionStagePosted = $_POST['stage_data'][$actionStage] ?? [];
+                if (!is_array($actionStagePosted)) {
+                    $actionStagePosted = [];
+                }
+                $actionResult = trim((string) ($actionStagePosted['result'] ?? '')) !== ''
+                    ? trim((string) $actionStagePosted['result'])
+                    : (string) ($actionApp['result'] ?? '');
                 if ($actionMissing) {
                     $processError = 'This stage cannot be approved yet. Please complete the required items first.';
                 } elseif ($actionResult === '') {
@@ -453,6 +499,9 @@ require_once __DIR__ . '/../../includes/header.php';
         $stageApp  = $panel['app'];
         $stageName = $panel['stage']['label'];
         $isSelected = $key === $selectedStage;
+        // The receipt details come from the student, who sends them with the
+        // official receipt. The coordinator only reads them, never changes them.
+        $receiptDetails = applicationReceiptDetails($stageApp ?? []);
     ?>
     <section class="stage-panel" data-stage="<?= htmlspecialchars($key) ?>" data-saved-approved="<?= in_array($panel['status'], ['completed', 'approved'], true) ? '1' : '0' ?>"<?= $isSelected ? '' : ' hidden' ?>>
 
@@ -531,9 +580,10 @@ require_once __DIR__ . '/../../includes/header.php';
                             $state = $step['state']['status'] ?? 'pending';
                             $isDone = $state === 'done';
                             $isFlagged = $state === 'flagged';
-                            $isActive = !$isDone && !$isFlagged && $si === $panel['stats']['firstPending'];
-                            $iconState = $isFlagged ? 'flagged' : ($isDone ? 'done' : ($isActive ? 'active' : 'pending'));
-                            $rowClass = $isFlagged ? 'is-flagged' : ($isDone ? 'is-done' : ($isActive ? 'is-active' : 'is-pending'));
+                            $isSubmitted = $state === 'submitted';
+                            $isActive = !$isDone && !$isFlagged && !$isSubmitted && $si === $panel['stats']['firstPending'];
+                            $iconState = $isFlagged ? 'flagged' : ($isDone ? 'done' : ($isSubmitted ? 'submitted' : ($isActive ? 'active' : 'pending')));
+                            $rowClass = $isFlagged ? 'is-flagged' : ($isDone ? 'is-done' : ($isSubmitted ? 'is-submitted' : ($isActive ? 'is-active' : 'is-pending')));
                             $stepKey = $step['key'] ?? '';
                         ?>
                         <div class="ms-step <?= $rowClass ?>">
@@ -548,7 +598,8 @@ require_once __DIR__ . '/../../includes/header.php';
                                     <span><?= htmlspecialchars($step['label']) ?></span>
                                     <?php if ($step['coord']): ?><span class="coord-chip">Coordinator</span><?php endif; ?>
                                     <?php if ($isActive): ?><span class="ms-step-tag active">Next</span><?php endif; ?>
-                                    <?php if ($isDone): ?><span class="ms-step-tag done">Done</span><?php endif; ?>
+                                    <?php if ($isDone): ?><span class="ms-step-tag done">Verified</span><?php endif; ?>
+                                    <?php if ($isSubmitted): ?><span class="ms-step-tag submitted">Submitted</span><?php endif; ?>
                                     <?php if ($isFlagged): ?><span class="ms-step-tag flagged">Action needed</span><?php endif; ?>
                                 </div>
                                 <p class="ms-step-detail"><?= htmlspecialchars($step['detail']) ?></p>
@@ -664,10 +715,25 @@ require_once __DIR__ . '/../../includes/header.php';
                                 $label = $document ? $document['fileName'] : ($requirement['label'] ?? 'Document');
                                 $type = $document['docType'] ?? ($requirement['label'] ?? '');
                                 $submittedDate = $document && !empty($document['date']) ? date('M d, Y', strtotime($document['date'])) : '';
+                                // The official receipt carries the details of the
+                                // payment, so clicking it shows them.
+                                $isReceipt = (bool) $document
+                                    && classifyUploadDocType((string) ($document['docType'] ?? '')) === 'receipt';
                             ?>
                             <tr>
                                 <td>
+                                    <?php if ($isReceipt): ?>
+                                    <details class="tpl-doc-records">
+                                        <summary><strong><?= htmlspecialchars($label) ?></strong> <i class="fas fa-chevron-down" aria-hidden="true"></i></summary>
+                                        <div class="tpl-doc-records-body">
+                                            <div><span>Receipt Number</span><strong><?= htmlspecialchars($receiptDetails['receiptNumber'] !== '' ? $receiptDetails['receiptNumber'] : '—') ?></strong></div>
+                                            <div><span>Amount</span><strong><?= htmlspecialchars($receiptDetails['amount'] !== '' ? $receiptDetails['amount'] : '—') ?></strong></div>
+                                            <div><span>Payment Date</span><strong><?= htmlspecialchars($receiptDetails['date'] !== '' ? $receiptDetails['date'] : '—') ?></strong></div>
+                                        </div>
+                                    </details>
+                                    <?php else: ?>
                                     <strong><?= htmlspecialchars($label) ?></strong>
+                                    <?php endif; ?>
                                     <?php if ($type !== '' && $type !== $label): ?>
                                     <div style="font-size:0.75rem;color:var(--gray-500);"><?= htmlspecialchars($type) ?></div>
                                     <?php endif; ?>
@@ -683,15 +749,16 @@ require_once __DIR__ . '/../../includes/header.php';
                                         <?php endif; ?>
                                         <select name="upload_status[<?= htmlspecialchars($document['id']) ?>]" style="padding:3px 8px;margin-left:.4rem;" title="Review status">
                                             <option value="submitted" <?= $document['status'] === 'submitted' ? 'selected' : '' ?>>Submitted</option>
-                                            <option value="verified" <?= $document['status'] === 'verified' || $document['status'] === 'approved' ? 'selected' : '' ?>>Verified</option>
+                                            <option value="verified" <?= in_array($document['status'], ['verified', 'approved'], true) ? 'selected' : '' ?>>Verified</option>
                                             <option value="incomplete" <?= $document['status'] === 'incomplete' ? 'selected' : '' ?>>Incomplete</option>
+                                            <option value="revision" <?= $document['status'] === 'revision' ? 'selected' : '' ?>>Revision</option>
                                         </select>
                                     <?php elseif ($requirement && ($requirement['kind'] ?? '') === 'grad_school_endorsement'): ?>
                                         <span style="color:var(--gray-400);font-size:.8rem;">Issued by the coordinator</span>
                                     <?php elseif ($requirement && ($requirement['kind'] ?? '') === 'receipt'): ?>
-                                        <span style="color:var(--gray-400);font-size:.8rem;">Recorded by the coordinator</span>
+                                        <span style="color:var(--gray-400);font-size:.8rem;">Not submitted yet</span>
                                     <?php else: ?>
-                                        <span class="status-badge status-pending">Not Submitted</span>
+                                    <span class="status-badge status-not-submitted">Not Submitted</span>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -706,24 +773,25 @@ require_once __DIR__ . '/../../includes/header.php';
             <div class="card-header"><h3>Workflow Records — <?= htmlspecialchars($stageName) ?></h3></div>
             <div class="card-body">
                 <div class="form-row">
-                    <div class="form-field"><label>Receipt Number</label><input type="text" name="stage_data[<?= htmlspecialchars($key) ?>][receiptNumber]" value="<?= htmlspecialchars($stageApp['receiptNumber'] ?? '') ?>" placeholder="Receipt number"></div>
-                    <div class="form-field"><label>Payment Date</label><input type="date" name="stage_data[<?= htmlspecialchars($key) ?>][paymentDate]" value="<?= htmlspecialchars($stageApp['paymentDate'] ?? '') ?>"></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-field"><label>Amount</label><input type="text" name="stage_data[<?= htmlspecialchars($key) ?>][paymentAmount]" value="<?= htmlspecialchars($stageApp['paymentAmount'] ?? '') ?>" placeholder="e.g. 1500.00"></div>
                     <div class="form-field">
-                        <label>Presentation</label>
-                        <?php if ($panel['schedule']): ?>
-                        <p style="margin:0;font-size:.82rem;color:var(--gray-700);">
-                            <?= htmlspecialchars(date('M d, Y', strtotime((string) $panel['schedule']['date']))) ?>
-                            <?= htmlspecialchars((string) ($panel['schedule']['time'] ?? '')) ?>
-                            <?php if (!empty($panel['schedule']['venue'])): ?> — <?= htmlspecialchars($panel['schedule']['venue']) ?><?php endif; ?>
-                        </p>
-                        <?php else: ?>
-                        <p style="margin:0;font-size:.82rem;color:var(--gray-400);">Not scheduled yet.</p>
-                        <?php endif; ?>
+                        <label>Receipt Number</label>
+                        <p class="workflow-record-value"><?= htmlspecialchars($receiptDetails['receiptNumber'] !== '' ? $receiptDetails['receiptNumber'] : '—') ?></p>
+                    </div>
+                    <div class="form-field">
+                        <label>Amount</label>
+                        <p class="workflow-record-value"><?= htmlspecialchars($receiptDetails['amount'] !== '' ? $receiptDetails['amount'] : '—') ?></p>
+                    </div>
+                    <div class="form-field">
+                        <label>Payment Date</label>
+                        <p class="workflow-record-value"><?= htmlspecialchars($receiptDetails['date'] !== '' ? $receiptDetails['date'] : '—') ?></p>
                     </div>
                 </div>
+                <?php if ($receiptDetails['receiptNumber'] === '' && $receiptDetails['amount'] === '' && $receiptDetails['date'] === ''): ?>
+                <p class="field-hint" style="margin:0;">
+                    The student has not sent an official receipt for this stage yet. The receipt number, the amount
+                    and the payment date come with the receipt.
+                </p>
+                <?php endif; ?>
                 <p class="field-hint" style="margin-top:.75rem;">
                     The Graduate School endorsement, the payment record, the readiness mark and the presentation
                     result are handled in the <strong>Milestone Tracker</strong> and the
@@ -793,11 +861,25 @@ require_once __DIR__ . '/../../includes/header.php';
 
             <div class="form-field" style="margin:0;min-width:230px;">
                 <label>Presentation Result</label>
-                <select name="stage_data[<?= htmlspecialchars($key) ?>][result]" <?= $panel['schedule'] ? '' : 'disabled' ?> title="<?= $panel['schedule'] ? 'Record the result of the presentation' : 'Schedule the presentation first' ?>">
+                <?php
+                // The result can be recorded as soon as the stage has an
+                // application. Whether the presentation was scheduled in the
+                // portal is a hint, not a lock: the coordinator knows whether
+                // the presentation already took place.
+                $resultDisabled = empty($stageApp);
+                ?>
+                <select name="stage_data[<?= htmlspecialchars($key) ?>][result]" <?= $resultDisabled ? 'disabled' : '' ?>
+                        title="<?= $resultDisabled ? 'The student has no application for this stage yet' : 'Record the result of the presentation' ?>">
                     <option value="" <?= empty($panel['result']) ? 'selected' : '' ?>>Not yet presented</option>
                     <option value="approved" <?= $panel['result'] === 'approved' ? 'selected' : '' ?>>Approved</option>
                     <option value="requires_revision" <?= $panel['result'] === 'requires_revision' ? 'selected' : '' ?>>Requires Revision</option>
                 </select>
+                <?php if (!$resultDisabled && empty($panel['schedule'])): ?>
+                <p class="field-hint" style="margin:.35rem 0 0;">
+                    <i class="fas fa-info-circle" style="margin-right:5px;"></i>
+                    The presentation is not scheduled yet. You can still record the result if it already took place.
+                </p>
+                <?php endif; ?>
             </div>
         </div>
     </section>

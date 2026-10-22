@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/db.php';
-require_once __DIR__ . '/../../includes/calendar.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -13,13 +12,7 @@ $currentPage = 'schedule';
 $userName    = $mockCoordinator['name'];
 
 if (isset($_GET['delete']) && $_GET['delete'] !== '') {
-    try {
-        deleteScheduleRecord((string) $_GET['delete']);
-        setFlash('success', 'Presentation schedule deleted.');
-    } catch (Throwable $e) {
-        error_log('[schedule delete] ' . $e->getMessage());
-        setFlash('error', 'The presentation schedule could not be deleted. Please try again.');
-    }
+    deleteScheduleRecord((string) $_GET['delete']);
     redirectTo('coordinator/schedule/manage.php');
 }
 
@@ -124,7 +117,6 @@ require_once __DIR__ . '/../../includes/header.php';
     <a href="<?= url('coordinator/schedule/add.php') ?>" class="btn btn-primary"><i class="fas fa-calendar-plus"></i> Schedule Presentation</a>
 </div>
 
-<?php renderScheduleCalendar(); ?>
 
 <div class="card">
     <div class="card-header"><h3>Scheduled Presentations</h3></div>

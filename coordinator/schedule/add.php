@@ -49,80 +49,98 @@ foreach ($students as $s) {
     ];
 }
 
-$formError = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim((string) ($_POST['studentEmail'] ?? ''));
-    $stage = trim($_POST['stage'] ?? '');
-    $dateInput = trim((string) ($_POST['date'] ?? ''));
-    $timeInput = trim((string) ($_POST['time'] ?? ''));
-    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $dateInput);
-    $time = DateTimeImmutable::createFromFormat('!H:i', $timeInput);
-    $dateErrors = DateTimeImmutable::getLastErrors();
-    $dateValid = $date !== false && $date->format('Y-m-d') === $dateInput
-        && ($dateErrors === false || ((int) $dateErrors['warning_count'] === 0 && (int) $dateErrors['error_count'] === 0));
-    $timeErrors = DateTimeImmutable::getLastErrors();
-    $timeValid = $time !== false && $time->format('H:i') === $timeInput
-        && ($timeErrors === false || ((int) $timeErrors['warning_count'] === 0 && (int) $timeErrors['error_count'] === 0));
-    $venue = trim((string) ($_POST['venue'] ?? ''));
-
-    if ($email === '' || $stage === '' || !$dateValid || !$timeValid || $venue === '') {
-        $formError = 'Select a student and presentation stage, then enter a valid date, time, and venue.';
-    } else {
+    $email = $_POST['studentEmail'] ?? '';
+    $st = findStudentByEmail($email);
+    if (!$st) {
         try {
-            $student = findStudentByEmail($email);
-            if (!$student) {
-                $studentStmt = DB::getConnection()->prepare(
-                    'SELECT s.student_id, s.first_name, s.last_name, s.middle_initial,
-                            s.program, s.track, s.adviser_name AS adviser, u.email
-                     FROM students s
-                     INNER JOIN users u ON u.user_id = s.user_id
-                     WHERE u.email = :email AND s.archived_at IS NULL
-                     LIMIT 1'
-                );
-                $studentStmt->execute(['email' => $email]);
-                $student = $studentStmt->fetch() ?: null;
-                if ($student) {
-                    $student['program'] = programCodeForStudent($student);
-                    $student['track'] = $student['track'] ?: getTrackForProgram($student['program']);
-                }
+            $studentStmt = DB::getConnection()->prepare(
+                'SELECT s.student_id, s.first_name, s.last_name, s.middle_initial,
+                        s.program, s.track, s.adviser_name AS adviser, u.email
+                 FROM students s
+                 INNER JOIN users u ON u.user_id = s.user_id
+                 WHERE u.email = :email AND s.archived_at IS NULL
+                 LIMIT 1'
+            );
+            $studentStmt->execute(['email' => $email]);
+            $st = $studentStmt->fetch() ?: null;
+            if ($st) {
+                $st['program'] = programCodeForStudent($st);
+                $st['track'] = $st['track'] ?: getTrackForProgram($st['program']);
             }
-            $userId = databaseUserIdForEmail($email);
-            if (!$student || $userId <= 0) {
-                throw new RuntimeException('The selected student is not linked to a database account.');
-            }
-
-            $applicationId = databaseApplicationIdForStudent($userId, $stage);
-            $application = $applicationId !== null ? findApplication($applicationId) : null;
-            if (!$application || stageKeyFromLabel((string) ($application['stage'] ?? '')) !== stageKeyFromLabel($stage)) {
-                throw new RuntimeException('No saved application matches the selected presentation stage.');
-            }
-
-            $panel = implode(', ', array_filter([
-                trim((string) ($_POST['panel1'] ?? '')),
-                trim((string) ($_POST['panel2'] ?? '')),
-                trim((string) ($_POST['panel3'] ?? '')),
-            ]));
-            addScheduleRecord([
-                'studentEmail' => $email,
-                'studentName' => studentDisplayName($student),
-                'applicationId' => $applicationId,
-                'stage' => $stage,
-                'date' => $date->format('Y-m-d'),
-                'time' => $time->format('H:i'),
-                'venue' => $venue,
-                'panel' => $panel ?: 'TBD',
-                'adviser' => formatPersonName($_POST['adviser'] ?? ''),
-                'documentor' => trim((string) ($_POST['documentor'] ?? '')),
-                'status' => ($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
-            ]);
-            setFlash('success', 'Presentation schedule saved.');
-            redirectTo('coordinator/schedule/manage.php');
         } catch (Throwable $e) {
-            error_log('[schedule create] ' . $e->getMessage());
-            $formError = $e instanceof RuntimeException && !($e instanceof PDOException)
-                ? $e->getMessage()
-                : 'The presentation schedule could not be saved. Please check the application and try again.';
+            $st = null;
         }
+    }
+    $stage = trim($_POST['stage'] ?? '');
+    if ($st && $stage !== '') {
+        $displayDate = trim($_POST['date'] ?? '');
+        if ($displayDate !== '') {
+            $ts = strtotime($displayDate);
+            if ($ts) {
+                $displayDate = date('M j, Y', $ts);
+            }
+        }
+        $displayTime = trim($_POST['time'] ?? '');
+        if ($displayTime !== '') {
+            $tts = strtotime('2000-01-01 ' . $displayTime);
+            if ($tts) {
+                $displayTime = date('g:i A', $tts);
+            }
+        }
+        $panel = implode(', ', array_filter([$_POST['panel1'] ?? '', $_POST['panel2'] ?? '', $_POST['panel3'] ?? '']));
+        $venue = trim($_POST['venue'] ?? '');
+        $app = latestApplicationForEmail($email);
+        $applicationId = (int) ($app['id'] ?? 0);
+        $databaseUserId = databaseUserIdForEmail($email);
+        if ($databaseUserId > 0) {
+            $databaseApplicationId = databaseApplicationIdForStudent($databaseUserId, $stage);
+            if ($databaseApplicationId !== null) {
+                $applicationId = $databaseApplicationId;
+            }
+        }
+        addScheduleRecord([
+            'studentEmail' => $email,
+            'studentName' => studentDisplayName($st),
+            'applicationId' => $applicationId > 0 ? $applicationId : null,
+            'stage' => $stage,
+            'date' => $displayDate,
+            'time' => $displayTime,
+            'venue' => $venue,
+            'panel' => $panel ?: 'TBD',
+            'adviser' => formatPersonName($_POST['adviser'] ?? ''),
+            'documentor' => trim($_POST['documentor'] ?? ''),
+            'status' => ($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
+        ]);
+        if ($app) {
+            updateApplicationRecord((int) $app['id'], ['status' => 'scheduled']);
+        }
+        if (class_exists('DB')) {
+            try {
+                $userId = databaseUserIdForEmail($email);
+                if ($userId > 0) {
+                    $dbAppId = databaseApplicationIdForStudent($userId, $stage);
+                    if ($dbAppId) {
+                        $pdo = DB::getConnection();
+                        $cur = $pdo->prepare('SELECT workflow_state FROM applications WHERE application_id = :id LIMIT 1');
+                        $cur->execute(['id' => $dbAppId]);
+                        $wf = json_decode((string) ($cur->fetchColumn() ?: '[]'), true) ?: [];
+                        $wf['presentation_date'] = $displayDate;
+                        $wf['presentation_time'] = $displayTime;
+                        $wf['presentation_venue'] = $venue;
+                        $wf['presentation_panel'] = $panel ?: 'TBD';
+                        $upd = $pdo->prepare('UPDATE applications SET status = :status, workflow_state = :wf WHERE application_id = :id');
+                        $upd->execute([
+                            'status' => 'scheduled',
+                            'wf' => json_encode($wf, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                            'id' => $dbAppId,
+                        ]);
+                    }
+                }
+            } catch (Throwable $e) {
+            }
+        }
+        redirectTo('coordinator/schedule/manage.php');
     }
 }
 
@@ -133,10 +151,6 @@ require_once __DIR__ . '/../../includes/header.php';
     <h2>Schedule Presentation</h2>
     <p>Set presentation date, venue, and assign panel members. Presentation stages shown depend on the selected student's course type.</p>
 </div>
-
-<?php if ($formError !== ''): ?>
-<div class="alert alert-danger" role="alert"><?= htmlspecialchars($formError) ?></div>
-<?php endif; ?>
 
 <form method="post" action="<?= url('coordinator/schedule/add.php') ?>" data-validate>
     <div class="card">

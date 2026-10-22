@@ -14,6 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $gender = $_POST['gender'] ?? '';
     $middleInitial = strtoupper(trim($_POST['middleInitial'] ?? ''));
     $studentIdRaw = trim($_POST['studentId'] ?? '');
+    // The track the student follows. A course that can be followed in more
+    // than one way lets the student choose.
+    $track = trim($_POST['track'] ?? '');
 
     if ($first === '' || $last === '' || $email === '' || $program === '' || $password === '' || $studentIdRaw === '') {
         $registerError = 'Please complete all required fields.';
@@ -21,6 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $registerError = 'Enter a valid ADZU ID number (4–10 digits).';
     } elseif (!isset(PROGRAMS[$program])) {
         $registerError = 'Select a valid program.';
+    } elseif (!in_array($track, getTracksForProgram($program), true)) {
+        $registerError = 'Select the track your program follows.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $registerError = 'Enter a valid ADZU email address.';
     } elseif ($password !== $confirm) {
@@ -36,7 +41,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new LogicException('An account with this email address already exists.');
             }
 
-            $track = getTrackForProgram($program);
             $fullName = canonicalStudentName($first, $last, $middleInitial);
             // Official student ID = the ADZU ID number typed by the student.
             // Falls back to the numeric part of the ADZU email only when the
@@ -199,7 +203,7 @@ $trackHints = [
                     </button>
                     <div class="program-list" id="programList">
                         <?php foreach (PROGRAMS as $code => $name): ?>
-                        <button type="button" class="program-option" data-code="<?= htmlspecialchars($code) ?>" data-track="<?= getTrackForProgram($code) ?>">
+                        <button type="button" class="program-option" data-code="<?= htmlspecialchars($code) ?>" data-tracks="<?= htmlspecialchars(implode(',', getTracksForProgram($code))) ?>">
                             <span><?= htmlspecialchars($name) ?></span>
                         </button>
                         <?php endforeach; ?>
@@ -208,6 +212,19 @@ $trackHints = [
                 <p id="trackHint" style="display:none;margin-top:0.5rem;font-size:0.76rem;color:rgba(255,255,255,0.55);">
                     <i class="fas fa-info-circle" style="color:var(--adzu-gold);"></i>
                     <span></span>
+                </p>
+            </div>
+
+            <div class="form-group" id="trackGroup" style="display:none;">
+                <label for="trackSelect">Track *</label>
+                <div class="input-icon-wrap">
+                    <i class="fas fa-route"></i>
+                    <select id="trackSelect" name="track" required>
+                        <option value="">Select your track</option>
+                    </select>
+                </div>
+                <p class="field-hint" style="color:rgba(255,255,255,0.55);" id="trackChoiceHint">
+                    Your program can be followed in more than one way. Choose the track you are enrolled in.
                 </p>
             </div>
 
@@ -261,6 +278,11 @@ $trackHints = [
 
 <script>
 window.CSITE_TRACK_HINTS = <?= json_encode($trackHints) ?>;
+window.CSITE_TRACK_LABELS = <?= json_encode([
+    'thesis'   => 'Thesis',
+    'capstone' => 'Capstone',
+    'seminar'  => 'Seminar Paper',
+]) ?>;
 </script>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

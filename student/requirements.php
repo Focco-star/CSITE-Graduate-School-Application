@@ -99,6 +99,10 @@ require_once __DIR__ . '/../includes/header.php';
     // the student's own track and stage.
     $steps = milestoneStepsForStage($p, $track, $stage['key']);
     $firstPending = milestoneProgress($steps)['firstPending'];
+    // The document types the student may upload now. The same rule decides
+    // the Document Type list of the Application page. A stage that is locked
+    // has no open document type at all.
+    $openTypes = ($lockStates[$stage['key']]['locked'] ?? false) ? [] : openDocumentTypes($steps);
 ?>
 <div class="card">
     <div class="card-header" style="background:<?= $isDone ? 'rgba(22,163,74,0.06)' : 'rgba(6,2,151,0.04)' ?>;">
@@ -117,9 +121,23 @@ require_once __DIR__ . '/../includes/header.php';
         <?php endif; ?>
 
         <div class="substep-list">
+            <?php
+            // The next step of the student, in the order of their workflow.
+            $nextStep = nextMilestoneStep($steps);
+            ?>
+            <?php if ($nextStep): ?>
+            <div class="tpl-next-step<?= $nextStep['coord'] ? ' is-coord' : '' ?>">
+                <i class="fas <?= $nextStep['coord'] ? 'fa-user-tie' : 'fa-arrow-right' ?>" aria-hidden="true"></i>
+                <div>
+                    <strong>Next step: <?= htmlspecialchars($nextStep['label']) ?></strong>
+                    <span><?= htmlspecialchars($nextStep['detail']) ?></span>
+                </div>
+            </div>
+            <?php endif; ?>
             <?php foreach ($steps as $si => $step):
                 $st = $step['state']['status'] ?? 'pending';
-                $iconState = $st === 'flagged' ? 'flagged' : ($st === 'done' ? 'done' : ($si === $firstPending ? 'active' : 'pending'));
+                $isSubmitted = $st === 'submitted';
+                $iconState = $st === 'flagged' ? 'flagged' : ($st === 'done' ? 'done' : ($isSubmitted ? 'submitted' : ($si === $firstPending ? 'active' : 'pending')));
             ?>
             <div class="substep-row">
                 <div class="substep-icon-col">
@@ -130,12 +148,21 @@ require_once __DIR__ . '/../includes/header.php';
                     <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.2rem;">
                         <span style="font-size:0.875rem;font-weight:600;color:<?= $st === 'pending' ? 'var(--gray-400)' : 'var(--gray-800)' ?>;"><?= htmlspecialchars($step['label']) ?></span>
                         <?php if ($step['coord']): ?><span class="coord-chip">Coordinator</span><?php endif; ?>
+                        <?php if ($st === 'done'): ?><span class="ms-step-tag done">Verified</span><?php endif; ?>
+                        <?php if ($isSubmitted): ?><span class="ms-step-tag submitted">Submitted</span><?php endif; ?>
+                        <?php if ($st === 'flagged'): ?><span class="ms-step-tag flagged">Action needed</span><?php endif; ?>
                     </div>
                     <p style="font-size:0.78rem;color:<?= $st === 'flagged' ? '#b45309' : 'var(--gray-500)' ?>;margin:0;line-height:1.4;"><?= htmlspecialchars($step['detail']) ?></p>
                 </div>
                 <div>
-                    <?php if ($st === 'pending' && !$step['coord'] && $si <= $firstPending): ?>
-                    <a class="btn btn-sm btn-primary" href="<?= url('student/application.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload</a>
+                    <?php
+                    // The Upload button follows the same rule as the Document
+                    // Type list of the Application page: the document of the
+                    // milestone the student is working on.
+                    $stepDocType = (string) ($step['docType'] ?? '');
+                    if ($stepDocType !== '' && in_array($stepDocType, $openTypes, true)):
+                    ?>
+                    <a class="btn btn-sm btn-primary" href="<?= url('student/application.php?stage=' . urlencode($stage['key']) . '&docType=' . urlencode($stepDocType)) ?>"><i class="fas fa-upload"></i> Upload</a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -172,7 +199,20 @@ require_once __DIR__ . '/../includes/header.php';
                 <span style="font-weight:700;font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--gray-600);">Payment Proof Required</span>
             </div>
             <p style="font-size:0.83rem;color:var(--gray-700);margin-bottom:0.75rem;"><?= htmlspecialchars($doc['label']) ?></p>
-            <a class="btn btn-primary btn-sm" href="<?= url('student/application.php?stage=' . urlencode($stage['key'])) ?>"><i class="fas fa-upload"></i> Upload Receipt</a>
+            <?php
+            // The button follows the same rule as the Document Type list of
+            // the Application page: the receipt is only open when the
+            // workflow of the track asks for it.
+            $receiptOpen = in_array('Official Receipt / Payment Proof', $openTypes, true);
+            ?>
+            <?php if ($receiptOpen): ?>
+            <a class="btn btn-primary btn-sm" href="<?= url('student/application.php?stage=' . urlencode($stage['key']) . '&docType=' . urlencode('Official Receipt / Payment Proof')) ?>"><i class="fas fa-upload"></i> Upload Receipt</a>
+            <?php else: ?>
+            <p class="field-hint" style="margin:0;">
+                <i class="fas fa-lock" aria-hidden="true"></i>
+                The receipt opens when the milestones before it are done.
+            </p>
+            <?php endif; ?>
         </div>
         <?php endforeach; ?>
     </div>

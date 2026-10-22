@@ -225,7 +225,48 @@
     const programValue = document.getElementById('programValue');
     const programLabel = document.getElementById('programLabel');
     const trackHint = document.getElementById('trackHint');
+    const trackGroup = document.getElementById('trackGroup');
+    const trackSelect = document.getElementById('trackSelect');
+    const trackChoiceHint = document.getElementById('trackChoiceHint');
     const hints = window.CSITE_TRACK_HINTS || {};
+    const trackLabels = window.CSITE_TRACK_LABELS || {};
+
+    // The tracks a course can follow. A course that can be followed in more
+    // than one way lets the student choose; a course with one track is set
+    // for them.
+    function fillTracks(tracks) {
+        if (!trackSelect) return;
+        const list = String(tracks || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+        trackSelect.innerHTML = '<option value="">Select your track</option>'
+            + list.map(function (t) {
+                return '<option value="' + t + '">' + (trackLabels[t] || t) + '</option>';
+            }).join('');
+        if (!trackGroup) return;
+        if (!list.length) {
+            trackGroup.style.display = 'none';
+            return;
+        }
+        trackGroup.style.display = 'block';
+        if (list.length === 1) {
+            // A course with one track is set for the student. The field stays
+            // in the form, so the track is saved with the account.
+            trackSelect.value = list[0];
+            if (trackChoiceHint) {
+                trackChoiceHint.textContent = 'Your program follows the ' + (trackLabels[list[0]] || list[0]) + ' track.';
+            }
+        } else {
+            if (trackChoiceHint) {
+                trackChoiceHint.textContent = 'Your program can be followed in more than one way. Choose the track you are enrolled in.';
+            }
+        }
+    }
+
+    // The workflow of a track, shown under the program.
+    function showTrackHint(track) {
+        if (!trackHint || !hints[track]) return;
+        trackHint.style.display = 'flex';
+        trackHint.querySelector('span').textContent = hints[track];
+    }
 
     programToggle?.addEventListener('click', () => {
         programList?.classList.toggle('open');
@@ -239,12 +280,13 @@
             programLabel.textContent = opt.textContent.trim();
             programToggle.classList.add('has-value');
             programList.classList.remove('open');
-            const track = opt.dataset.track;
-            if (trackHint && hints[track]) {
-                trackHint.style.display = 'flex';
-                trackHint.querySelector('span').textContent = hints[track];
-            }
+            fillTracks(opt.dataset.tracks);
+            showTrackHint(trackSelect ? trackSelect.value : '');
         });
+    });
+
+    trackSelect?.addEventListener('change', function () {
+        showTrackHint(trackSelect.value);
     });
 
     document.querySelectorAll('[data-filter-table]').forEach(bar => {
@@ -1033,496 +1075,4 @@
     else boot();
 })();
 
-})();
-
-/* ==========================================================================
- * Presentation Schedule Calendar
- * Used on coordinator/dashboard.php and coordinator/schedule/manage.php.
- * Markup: includes/calendar.php  |  Data: coordinator/schedule/calendar_data.php
- * ========================================================================== */
-(function () {
-    'use strict';
-
-    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const CLOSE_MS = 180;
-    const REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    const STATUS_LABELS = { pending: 'Pending', confirmed: 'Confirmed', completed: 'Completed', scheduled: 'Scheduled' };
-
-    /* ---------- small DOM helpers (all text goes through textContent) ---------- */
-    function el(tag, cls, text) {
-        const n = document.createElement(tag);
-        if (cls) n.className = cls;
-        if (text !== undefined && text !== null) n.textContent = text;
-        return n;
-    }
-    function icon(name) {
-        const i = el('i', 'fas ' + name);
-        i.setAttribute('aria-hidden', 'true');
-        return i;
-    }
-
-    /* ---------- calendar-date maths (UTC arithmetic: no local-time drift) ---------- */
-    function pad(n) { return n < 10 ? '0' + n : String(n); }
-    function toISO(y, m, d) { return y + '-' + pad(m) + '-' + pad(d); }
-    function parseISO(s) {
-        const p = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
-        return p ? { y: +p[1], m: +p[2], d: +p[3] } : null;
-    }
-    function utcDate(iso) { const p = parseISO(iso); return new Date(Date.UTC(p.y, p.m - 1, p.d)); }
-    function fromUtc(dt) { return toISO(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate()); }
-    function addDays(iso, n) { const dt = utcDate(iso); dt.setUTCDate(dt.getUTCDate() + n); return fromUtc(dt); }
-    function weekday(iso) { return utcDate(iso).getUTCDay(); }
-    function daysInMonth(y, m) { return new Date(Date.UTC(y, m, 0)).getUTCDate(); }
-    function shiftMonth(iso, delta) {
-        const p = parseISO(iso);
-        const idx = p.y * 12 + (p.m - 1) + delta;
-        const y = Math.floor(idx / 12), m = (idx % 12) + 1;
-        return toISO(y, m, Math.min(p.d, daysInMonth(y, m)));
-    }
-    function longDate(iso) {
-        return utcDate(iso).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
-    }
-
-    /** Today's date (YYYY-MM-DD) in the configured timezone, not the visitor's. */
-    function todayIn(tz) {
-        try {
-            const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
-            const get = t => (parts.find(p => p.type === t) || {}).value;
-            const iso = get('year') + '-' + get('month') + '-' + get('day');
-            return parseISO(iso) ? iso : null;
-        } catch (e) {
-            return null;
-        }
-    }
-
-    /* ---------------------------------------------------------------------- */
-    function initCalendar(root) {
-        const endpoint = root.dataset.endpoint;
-        const tz = root.dataset.timezone || 'Asia/Manila';
-        const pollMs = Math.max(0, parseInt(root.dataset.poll, 10) || 0);
-
-        const refs = {
-            grid: root.querySelector('[data-psc-grid]'),
-            calendar: root.querySelector('.psc-calendar'),
-            month: root.querySelector('[data-psc-month]'),
-            summary: root.querySelector('[data-psc-summary]'),
-            prev: root.querySelector('[data-psc-prev]'),
-            next: root.querySelector('[data-psc-next]'),
-            todayBtn: root.querySelector('[data-psc-today]'),
-            alert: root.querySelector('[data-psc-alert]'),
-            alertMsg: root.querySelector('[data-psc-alert-msg]'),
-            retry: root.querySelector('[data-psc-retry]'),
-            overlay: root.querySelector('[data-psc-overlay]'),
-        };
-        refs.dialog = refs.overlay.querySelector('.psc-dialog');
-        refs.dlgTitle = refs.overlay.querySelector('[data-psc-dlg-title]');
-        refs.dlgSub = refs.overlay.querySelector('[data-psc-dlg-sub]');
-        refs.dlgBody = refs.overlay.querySelector('[data-psc-dlg-body]');
-        refs.close = refs.overlay.querySelector('[data-psc-close]');
-        // Lift the dialog out of the page layout so no parent can clip or stack over it.
-        document.body.appendChild(refs.overlay);
-
-        /* ----- state ----- */
-        let today = todayIn(tz) || root.dataset.today;
-        const t0 = parseISO(today);
-        let view = { y: t0.y, m: t0.m };
-        let focusISO = today;
-        const cache = new Map();      // range key -> { dates, signature }
-        let dates = {};               // events for the visible grid
-        let loaded = false;           // true once the visible grid has real data
-        let loading = false;
-        let errorMsg = '';
-        let seq = 0;
-        let controller = null;
-        const dlg = { open: false, iso: null, trigger: null, locked: false, prevOverflow: '', timer: 0 };
-
-        /* ----- range helpers ----- */
-        function gridStart() {
-            const first = toISO(view.y, view.m, 1);
-            return addDays(first, -weekday(first));
-        }
-        function range() {
-            const start = gridStart();
-            const end = addDays(start, 41);
-            return { start: start, end: end, key: start + '|' + end };
-        }
-        function inView(iso) { const p = parseISO(iso); return p.y === view.y && p.m === view.m; }
-
-        /* ----- rendering ----- */
-        function monthCount() {
-            const prefix = view.y + '-' + pad(view.m) + '-';
-            let n = 0;
-            Object.keys(dates).forEach(k => { if (k.indexOf(prefix) === 0) n += dates[k].length; });
-            return n;
-        }
-
-        function updateSummary() {
-            const label = MONTHS[view.m - 1] + ' ' + view.y;
-            if (!loaded) {
-                refs.summary.textContent = errorMsg ? 'Schedule unavailable' : 'Loading schedules…';
-                return;
-            }
-            const n = monthCount();
-            refs.summary.textContent = n === 0
-                ? 'No presentations scheduled in ' + label
-                : n + (n === 1 ? ' presentation' : ' presentations') + ' scheduled in ' + label;
-        }
-
-        function updateStatus() {
-            root.classList.toggle('is-loading', loading);
-            refs.calendar.setAttribute('aria-busy', loading && !loaded ? 'true' : 'false');
-            refs.alert.hidden = !(errorMsg && !loaded);
-            refs.alertMsg.textContent = errorMsg || '';
-            updateSummary();
-        }
-
-        function buildCell(iso) {
-            const p = parseISO(iso);
-            const list = dates[iso] || [];
-            const n = list.length;
-            const isToday = iso === today;
-
-            const cell = el('div', 'psc-cell');
-            cell.setAttribute('role', 'gridcell');
-
-            const btn = el('button', 'psc-day');
-            btn.type = 'button';
-            btn.dataset.date = iso;
-            btn.tabIndex = iso === focusISO ? 0 : -1;
-            if (n) btn.classList.add('is-assigned');
-            if (isToday) { btn.classList.add('is-today'); btn.setAttribute('aria-current', 'date'); }
-            if (!inView(iso)) btn.classList.add('is-outside');
-
-            let label = longDate(iso) + '. ';
-            if (!loaded) label += 'Schedule loading.';
-            else label += n ? n + (n === 1 ? ' presentation scheduled.' : ' presentations scheduled.') : 'No presentations scheduled.';
-            if (isToday) label += ' Today.';
-            btn.setAttribute('aria-label', label);
-
-            btn.appendChild(el('span', 'psc-day-num', String(p.d)));
-            if (n) {
-                const meta = el('span', 'psc-day-meta');
-                meta.appendChild(el('span', 'psc-count', String(n)));
-                if (list[0].startLabel) meta.appendChild(el('span', 'psc-time', list[0].startLabel));
-                btn.appendChild(meta);
-            }
-            cell.appendChild(btn);
-            return cell;
-        }
-
-        function render() {
-            const hadFocus = refs.grid.contains(document.activeElement);
-            refs.month.textContent = MONTHS[view.m - 1] + ' ' + view.y;
-            const start = gridStart();
-            refs.grid.textContent = '';
-            for (let w = 0; w < 6; w++) {
-                const row = el('div', 'psc-week');
-                row.setAttribute('role', 'row');
-                for (let i = 0; i < 7; i++) row.appendChild(buildCell(addDays(start, w * 7 + i)));
-                refs.grid.appendChild(row);
-            }
-            updateStatus();
-            if (hadFocus) focusDay(focusISO);
-        }
-
-        function focusDay(iso) {
-            const btn = refs.grid.querySelector('[data-date="' + iso + '"]');
-            if (!btn) return;
-            refs.grid.querySelectorAll('.psc-day[tabindex="0"]').forEach(b => { b.tabIndex = -1; });
-            btn.tabIndex = 0;
-            btn.focus({ preventScroll: false });
-        }
-
-        /* ----- loading ----- */
-        function fail(err, hadData) {
-            if (hadData) return; // a failed background refresh keeps showing the last good data
-            errorMsg = (err && err.userMessage) || 'We couldn’t load the schedule. Check your connection and try again.';
-            updateStatus();
-            refreshDialog();
-        }
-
-        function load(silent) {
-            const r = range();
-            if (controller) controller.abort();
-            controller = 'AbortController' in window ? new AbortController() : null;
-            const mine = ++seq;
-            const hadData = cache.has(r.key);
-            if (!silent || !hadData) { loading = true; errorMsg = ''; updateStatus(); }
-
-            const url = endpoint + (endpoint.indexOf('?') > -1 ? '&' : '?') + 'start=' + r.start + '&end=' + r.end;
-            fetch(url, {
-                credentials: 'same-origin',
-                cache: 'no-store',
-                headers: { Accept: 'application/json' },
-                signal: controller ? controller.signal : undefined,
-            })
-                .then(res => res.json().catch(() => null).then(body => ({ res: res, body: body })))
-                .then(out => {
-                    if (mine !== seq) return;
-                    if (!out.res.ok || !out.body || out.body.ok !== true) {
-                        const e = new Error('Request failed');
-                        e.userMessage = out.body && out.body.error;
-                        throw e;
-                    }
-                    const prev = cache.get(r.key);
-                    const next = { dates: out.body.dates || {}, signature: out.body.signature || '' };
-                    cache.set(r.key, next);
-                    loading = false;
-                    errorMsg = '';
-                    const changed = !prev || prev.signature !== next.signature || !loaded;
-                    dates = next.dates;
-                    loaded = true;
-                    if (changed) { render(); refreshDialog(); } else { updateStatus(); }
-                })
-                .catch(err => {
-                    if (err && err.name === 'AbortError') return;
-                    if (mine !== seq) return;
-                    loading = false;
-                    fail(err, hadData);
-                    updateStatus();
-                });
-        }
-
-        function setView(y, m, opts) {
-            opts = opts || {};
-            view = { y: y, m: m };
-            const first = toISO(y, m, 1);
-            if (!opts.keepFocus) focusISO = inView(today) ? today : first;
-            const cached = cache.get(range().key);
-            dates = cached ? cached.dates : {};
-            loaded = !!cached;
-            errorMsg = '';
-            render();
-            if (opts.focus) focusDay(focusISO);
-            load(false);
-        }
-
-        function stepMonth(delta) {
-            const idx = view.y * 12 + (view.m - 1) + delta;
-            setView(Math.floor(idx / 12), (idx % 12) + 1);
-        }
-
-        function moveFocus(iso) {
-            const p = parseISO(iso);
-            focusISO = iso;
-            if (p.y !== view.y || p.m !== view.m) setView(p.y, p.m, { keepFocus: true, focus: true });
-            else focusDay(iso);
-        }
-
-        /* ----- details dialog ----- */
-        function eventCard(ev) {
-            const card = el('article', 'psc-event');
-
-            const time = el('div', 'psc-event-time');
-            const clock = el('span', 'psc-event-clock');
-            clock.appendChild(icon('fa-clock'));
-            clock.appendChild(document.createTextNode(' Time'));
-            time.appendChild(clock);
-            if (ev.startLabel) {
-                time.appendChild(el('strong', 'psc-event-start', ev.startLabel));
-                const tail = [];
-                if (ev.endLabel) tail.push('to ' + ev.endLabel);
-                if (ev.duration) tail.push(ev.duration);
-                if (tail.length) time.appendChild(el('span', 'psc-event-end', tail.join(' · ')));
-            } else {
-                time.appendChild(el('strong', 'psc-event-start', 'To be announced'));
-            }
-            card.appendChild(time);
-
-            const main = el('div', 'psc-event-main');
-            const status = (ev.status || '').toLowerCase();
-            if (STATUS_LABELS[status]) {
-                const chip = el('span', 'psc-status psc-status-' + status);
-                chip.appendChild(el('span', 'psc-status-dot'));
-                chip.appendChild(document.createTextNode(STATUS_LABELS[status]));
-                main.appendChild(chip);
-            }
-
-            const who = el('div', 'psc-field');
-            who.appendChild(el('span', 'psc-field-label', 'Student'));
-            who.appendChild(el('span', 'psc-event-student', ev.student || 'Student not recorded'));
-            main.appendChild(who);
-
-            const what = el('div', 'psc-field');
-            what.appendChild(el('span', 'psc-field-label', 'Presentation title'));
-            what.appendChild(el('span', 'psc-event-title', ev.title || 'Title not recorded'));
-            main.appendChild(what);
-
-            const meta = el('div', 'psc-event-meta');
-            if (ev.stage) meta.appendChild(el('span', 'psc-chip', ev.stage));
-            if (ev.venue) {
-                const v = el('span', 'psc-venue');
-                v.appendChild(icon('fa-map-marker-alt'));
-                v.appendChild(document.createTextNode(' ' + ev.venue));
-                meta.appendChild(v);
-            }
-            if (meta.childNodes.length) main.appendChild(meta);
-
-            card.appendChild(main);
-            return card;
-        }
-
-        function notice(iconName, text, retry) {
-            const box = el('div', 'psc-note');
-            box.appendChild(icon(iconName));
-            box.appendChild(el('p', null, text));
-            if (retry) {
-                const b = el('button', 'psc-alert-btn', 'Try again');
-                b.type = 'button';
-                b.addEventListener('click', () => load(false));
-                box.appendChild(b);
-            }
-            return box;
-        }
-
-        function fillDialog() {
-            const iso = dlg.iso;
-            const list = dates[iso] || [];
-            refs.dlgTitle.textContent = longDate(iso);
-            refs.dlgBody.textContent = '';
-            refs.dlgBody.scrollTop = 0;
-
-            if (!loaded && errorMsg) {
-                refs.dlgSub.textContent = '';
-                refs.dlgBody.appendChild(notice('fa-exclamation-triangle', errorMsg, true));
-            } else if (!loaded) {
-                refs.dlgSub.textContent = '';
-                const box = notice('fa-circle-notch fa-spin', 'Loading schedule…');
-                refs.dlgBody.appendChild(box);
-            } else if (!list.length) {
-                refs.dlgSub.textContent = '';
-                refs.dlgBody.appendChild(notice('fa-calendar', 'No presentations scheduled for this date'));
-            } else {
-                refs.dlgSub.textContent = list.length + (list.length === 1 ? ' presentation scheduled' : ' presentations scheduled');
-                const wrap = el('div', 'psc-events');
-                list.forEach(ev => wrap.appendChild(eventCard(ev)));
-                refs.dlgBody.appendChild(wrap);
-            }
-        }
-
-        function refreshDialog() { if (dlg.open) fillDialog(); }
-
-        function openDialog(iso, trigger) {
-            dlg.iso = iso;
-            dlg.trigger = trigger;
-            fillDialog();
-            if (dlg.timer) { clearTimeout(dlg.timer); dlg.timer = 0; }
-            if (!dlg.locked) {
-                dlg.prevOverflow = document.body.style.overflow;
-                document.body.style.overflow = 'hidden';
-                dlg.locked = true;
-            }
-            dlg.open = true;
-            refs.overlay.hidden = false;
-            refs.overlay.classList.remove('is-closing');
-            // Restart the entrance animation on every open.
-            void refs.overlay.offsetWidth;
-            refs.overlay.classList.add('is-open');
-            refs.close.focus({ preventScroll: true });
-        }
-
-        function finishClose() {
-            dlg.timer = 0;
-            refs.overlay.hidden = true;
-            refs.overlay.classList.remove('is-open', 'is-closing');
-            if (dlg.locked) { document.body.style.overflow = dlg.prevOverflow; dlg.locked = false; }
-            const target = refs.grid.querySelector('[data-date="' + dlg.iso + '"]') || dlg.trigger;
-            if (target && document.contains(target)) {
-                focusISO = dlg.iso || focusISO;
-                refs.grid.querySelectorAll('.psc-day[tabindex="0"]').forEach(b => { b.tabIndex = -1; });
-                target.tabIndex = 0;
-                target.focus({ preventScroll: true });
-            }
-        }
-
-        function closeDialog() {
-            if (!dlg.open) return;
-            dlg.open = false;
-            if (REDUCED) { finishClose(); return; }
-            refs.overlay.classList.remove('is-open');
-            refs.overlay.classList.add('is-closing');
-            dlg.timer = setTimeout(finishClose, CLOSE_MS + 40);
-        }
-
-        /* ----- events ----- */
-        refs.prev.addEventListener('click', () => stepMonth(-1));
-        refs.next.addEventListener('click', () => stepMonth(1));
-        refs.todayBtn.addEventListener('click', () => {
-            today = todayIn(tz) || today;
-            const p = parseISO(today);
-            focusISO = today;
-            setView(p.y, p.m, { keepFocus: true });
-        });
-        refs.retry.addEventListener('click', () => load(false));
-
-        refs.grid.addEventListener('click', e => {
-            const btn = e.target.closest && e.target.closest('.psc-day');
-            if (btn) openDialog(btn.dataset.date, btn);
-        });
-
-        refs.grid.addEventListener('keydown', e => {
-            const btn = e.target.closest && e.target.closest('.psc-day');
-            if (!btn || e.altKey || e.ctrlKey || e.metaKey) return;
-            const iso = btn.dataset.date;
-            let next = null;
-            switch (e.key) {
-                case 'ArrowLeft': next = addDays(iso, -1); break;
-                case 'ArrowRight': next = addDays(iso, 1); break;
-                case 'ArrowUp': next = addDays(iso, -7); break;
-                case 'ArrowDown': next = addDays(iso, 7); break;
-                case 'Home': next = addDays(iso, -weekday(iso)); break;
-                case 'End': next = addDays(iso, 6 - weekday(iso)); break;
-                case 'PageUp': next = shiftMonth(iso, -1); break;
-                case 'PageDown': next = shiftMonth(iso, 1); break;
-                default: return;
-            }
-            e.preventDefault();
-            moveFocus(next);
-        });
-
-        refs.close.addEventListener('click', closeDialog);
-        refs.overlay.addEventListener('mousedown', e => { if (e.target === refs.overlay) closeDialog(); });
-        refs.overlay.addEventListener('keydown', e => {
-            if (e.key !== 'Tab') return;
-            const items = Array.prototype.filter.call(
-                refs.dialog.querySelectorAll('button, [href], [tabindex]:not([tabindex="-1"])'),
-                n => !n.disabled && n.offsetParent !== null
-            );
-            if (!items.length) { e.preventDefault(); refs.dialog.focus(); return; }
-            const first = items[0], last = items[items.length - 1];
-            if (e.shiftKey && (document.activeElement === first || document.activeElement === refs.dialog)) { e.preventDefault(); last.focus(); }
-            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-        });
-        document.addEventListener('keydown', e => {
-            if (dlg.open && e.key === 'Escape') { e.preventDefault(); closeDialog(); }
-        });
-
-        /* ----- real-time behaviour ----- */
-        function checkToday() {
-            const t = todayIn(tz);
-            if (t && t !== today) { today = t; render(); }
-        }
-        setInterval(checkToday, 60000);
-        if (pollMs) {
-            setInterval(() => { if (!document.hidden) load(true); }, pollMs);
-        }
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) { checkToday(); load(true); }
-        });
-        window.addEventListener('online', () => load(true));
-
-        /* ----- go ----- */
-        render();
-        load(false);
-    }
-
-    function boot() {
-        document.querySelectorAll('[data-schedule-calendar]').forEach(root => {
-            try { initCalendar(root); }
-            catch (err) { if (window.console) console.error('Schedule calendar failed to start:', err); }
-        });
-    }
-
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-    else boot();
 })();

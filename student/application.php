@@ -243,13 +243,16 @@ $draft = loadApplicationDraft($userId);
  * ------------------------------------------------------------------ */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'draft') {
     saveApplicationDraft($userId, [
-        'title'       => $_POST['title'] ?? '',
-        'adviser'     => $_POST['adviser'] ?? '',
-        'abstract'    => $_POST['abstract'] ?? '',
-        'enroll_date' => $_POST['enroll_date'] ?? '',
-        'stage_key'   => $_POST['stage'] ?? '',
-        'doc_type'    => $_POST['docType'] ?? '',
-        'file_name'   => $_POST['file_name'] ?? '',
+        'title'          => $_POST['title'] ?? '',
+        'adviser'        => $_POST['adviser'] ?? '',
+        'abstract'       => $_POST['abstract'] ?? '',
+        'enroll_date'    => $_POST['enroll_date'] ?? '',
+        'stage_key'      => $_POST['stage'] ?? '',
+        'doc_type'       => $_POST['docType'] ?? '',
+        'file_name'      => $_POST['file_name'] ?? '',
+        'receipt_number' => $_POST['receiptNumber'] ?? '',
+        'payment_amount' => $_POST['paymentAmount'] ?? '',
+        'payment_date'   => $_POST['paymentDate'] ?? '',
     ]);
     header('Content-Type: image/gif');
     header('Cache-Control: no-store, no-cache, must-revalidate');
@@ -281,35 +284,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'discard
 $postedValues = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postedValues = [
-        'title'       => trim((string) ($_POST['title'] ?? '')),
-        'adviser'     => trim((string) ($_POST['adviser'] ?? '')),
-        'abstract'    => trim((string) ($_POST['abstract'] ?? '')),
-        'enroll_date' => trim((string) ($_POST['enroll_date'] ?? '')),
-        'stage'       => trim((string) ($_POST['stage'] ?? '')),
-        'docType'     => trim((string) ($_POST['docType'] ?? '')),
+        'title'         => trim((string) ($_POST['title'] ?? '')),
+        'adviser'       => trim((string) ($_POST['adviser'] ?? '')),
+        'abstract'      => trim((string) ($_POST['abstract'] ?? '')),
+        'enroll_date'   => trim((string) ($_POST['enroll_date'] ?? '')),
+        'stage'         => trim((string) ($_POST['stage'] ?? '')),
+        'docType'       => trim((string) ($_POST['docType'] ?? '')),
+        'receiptNumber' => trim((string) ($_POST['receiptNumber'] ?? '')),
+        'paymentAmount' => trim((string) ($_POST['paymentAmount'] ?? '')),
+        'paymentDate'   => trim((string) ($_POST['paymentDate'] ?? '')),
     ];
 }
 
 $existingApplication = applicationForStage($mockStudent['email'], $currentStageKey);
 
 $formValues = [
-    'title'       => (string) ($mockStudent['title'] ?? ''),
-    'adviser'     => (string) ($mockStudent['adviser'] ?? ''),
-    'abstract'    => '',
-    'enroll_date' => (string) ($mockStudent['enroll_date'] ?? ''),
-    'stage'       => $currentStageKey,
-    'docType'     => '',
+    'title'         => (string) ($mockStudent['title'] ?? ''),
+    'adviser'       => (string) ($mockStudent['adviser'] ?? ''),
+    'abstract'      => '',
+    'enroll_date'   => (string) ($mockStudent['enroll_date'] ?? ''),
+    'stage'         => $currentStageKey,
+    'docType'       => '',
+    'receiptNumber' => '',
+    'paymentAmount' => '',
+    'paymentDate'   => '',
 ];
 if ($existingApplication) {
     // The student already submitted this stage: keep their details on the form
     // so they can attach further documents without retyping anything.
     $formValues['title']   = (string) ($existingApplication['title'] ?? $formValues['title']);
     $formValues['adviser'] = (string) ($existingApplication['adviser'] ?? $formValues['adviser']);
+    // The receipt details the student entered are kept as well.
+    $existingReceipt = applicationReceiptDetails($existingApplication);
+    $formValues['receiptNumber'] = $existingReceipt['receiptNumber'];
+    $formValues['paymentAmount'] = $existingReceipt['amount'];
+    $formValues['paymentDate']   = $existingReceipt['date'] !== ''
+        ? date('Y-m-d', strtotime($existingReceipt['date']))
+        : '';
 }
 if ($draft) {
     foreach (['title', 'adviser', 'abstract', 'enroll_date', 'stage', 'docType'] as $field) {
         if (($draft[$field] ?? '') !== '') {
             $formValues[$field] = (string) $draft[$field];
+        }
+    }
+    foreach (['receipt_number' => 'receiptNumber', 'payment_amount' => 'paymentAmount', 'payment_date' => 'paymentDate'] as $draftField => $formField) {
+        if (($draft[$draftField] ?? '') !== null && ($draft[$draftField] ?? '') !== '') {
+            $formValues[$formField] = (string) $draft[$draftField];
         }
     }
 }
@@ -320,14 +341,52 @@ if (!isset($stages[$formValues['stage']])) {
     $formValues['stage'] = $currentStageKey;
 }
 
-// The Milestone Tracker sends the student here for a particular stage.
+/*
+ * The document types that are open for the student, taken from the Milestone
+ * Tracker of every stage. A type that is not open is shown in the list, but
+ * it can not be picked: the workflow of the track asks for the documents in
+ * the order of the milestones.
+ */
+$openTypesByStage = openDocumentTypesByStage($mockStudent['email'], $track, $stages, $progress);
+
+// The Milestone Tracker sends the student here for a particular stage, and
+// for the official receipt it also says which document is expected.
 $requestedStage = trim((string) ($_GET['stage'] ?? ''));
+$requestedDocType = trim((string) ($_GET['docType'] ?? ''));
 if ($postedValues === null && isset($stages[$requestedStage])) {
-    $formValues['stage'] = $requestedStage;
-    $existingApplication = applicationForStage($mockStudent['email'], $requestedStage);
+    /*
+     * A stage the student has not reached yet stays locked: the form falls
+     * back to the stage they are really working on, the same way the Process
+     * Tracker does.
+     */
+    $stageAccess = resolveStudentStageAccess(
+        $progress,
+        array_values($stages),
+        workflowCurrentIndex($progress, array_values($stages)),
+        $requestedStage
+    );
+    $formValues['stage'] = $stageAccess['stageKey'] ?: $requestedStage;
+    $existingApplication = applicationForStage($mockStudent['email'], $formValues['stage']);
     if ($existingApplication) {
         $formValues['title']   = (string) ($existingApplication['title'] ?? $formValues['title']);
         $formValues['adviser'] = (string) ($existingApplication['adviser'] ?? $formValues['adviser']);
+        $existingReceipt = applicationReceiptDetails($existingApplication);
+        $formValues['receiptNumber'] = $existingReceipt['receiptNumber'];
+        $formValues['paymentAmount'] = $existingReceipt['amount'];
+        $formValues['paymentDate']   = $existingReceipt['date'] !== ''
+            ? date('Y-m-d', strtotime($existingReceipt['date']))
+            : '';
+    }
+}
+if ($postedValues === null && $requestedDocType !== '') {
+    // Only a document that the workflow asks for now is put on the form. A
+    // document of a later milestone stays locked until its turn comes.
+    $openForStage = $openTypesByStage[$formValues['stage']] ?? [];
+    foreach ($openForStage as $openType) {
+        if (strcasecmp($openType, $requestedDocType) === 0) {
+            $formValues['docType'] = $requestedDocType;
+            break;
+        }
     }
 }
 $draftFileName = (string) ($draft['file_name'] ?? '');
@@ -345,6 +404,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
     $docType     = $formValues['docType'];
     $file        = $_FILES['document'] ?? null;
     $hasFile     = csiteUploadHasFile($file);
+
+    // The official receipt comes with the details of the payment: the
+    // receipt number, the amount and the day it was paid.
+    $isReceipt      = ($docType !== '' && classifyUploadDocType($docType) === 'receipt');
+    $receiptNumber  = trim((string) $formValues['receiptNumber']);
+    $paymentAmount  = trim((string) $formValues['paymentAmount']);
+    $paymentDate    = trim((string) $formValues['paymentDate']);
 
     // An application the student already submitted for this stage is updated
     // rather than created again, and it is not blocked by the stage sequence.
@@ -397,6 +463,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
         $appError = $stageLockError;
     } elseif ($enrollDate === false) {
         $appError = 'Please enter a valid enrollment / start date.';
+    } elseif ($isReceipt && $receiptNumber === '') {
+        $appError = 'Please enter the receipt number of your official receipt.';
+    } elseif ($isReceipt && $paymentAmount === '') {
+        $appError = 'Please enter the amount you paid for the official receipt.';
+    } elseif ($isReceipt && !is_numeric($paymentAmount)) {
+        $appError = 'Please enter the amount as a number, for example 1500.00.';
+    } elseif ($isReceipt && (float) $paymentAmount <= 0) {
+        $appError = 'Please enter the amount you paid.';
+    } elseif ($isReceipt && $paymentDate === '') {
+        $appError = 'Please enter the date you paid for the official receipt.';
+    } elseif ($isReceipt && !csiteParseDate($paymentDate)) {
+        $appError = 'Please enter a valid payment date.';
     } elseif (!$hasDetails && !$hasFile) {
         $appError = 'Fill in your application details or attach a document before you submit.';
     } elseif ($requireFields && $missing['fields']) {
@@ -559,6 +637,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                 $documentSaved = true;
             }
 
+            // The receipt details the student entered are saved with the
+            // document, so the coordinator sees them in the same stage.
+            if ($isReceipt) {
+                $receiptAppId = databaseApplicationIdForStudent($userId, $stages[$stageKey]['label'] ?? '');
+                if ($receiptAppId === null || $receiptAppId <= 0) {
+                    $receiptApplication = applicationForStage($mockStudent['email'], $stageKey);
+                    $receiptAppId = (int) ($receiptApplication['id'] ?? 0);
+                }
+                if ($receiptAppId > 0) {
+                    saveApplicationReceipt(
+                        $receiptAppId,
+                        $receiptNumber,
+                        (string) csiteParseDate($paymentDate),
+                        $paymentAmount,
+                        $userId
+                    );
+                }
+            }
+
             // Everything is saved: the draft is no longer needed.
             clearApplicationDraft($userId);
             $draft = null;
@@ -587,13 +684,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
             }
             // Keep what the student typed so nothing is lost.
             saveApplicationDraft($userId, [
-                'title'       => $title,
-                'adviser'     => $adviser,
-                'abstract'    => $abstract,
-                'enroll_date' => $formValues['enroll_date'],
-                'stage_key'   => $stageKey,
-                'doc_type'    => $docType,
-                'file_name'   => $hasFile ? (string) $file['name'] : '',
+                'title'          => $title,
+                'adviser'        => $adviser,
+                'abstract'       => $abstract,
+                'enroll_date'    => $formValues['enroll_date'],
+                'stage_key'      => $stageKey,
+                'doc_type'       => $docType,
+                'file_name'      => $hasFile ? (string) $file['name'] : '',
+                'receipt_number' => $receiptNumber,
+                'payment_amount' => $paymentAmount,
+                'payment_date'   => $paymentDate,
             ]);
             $appError = $applicationSaved
                 ? 'Your application was saved, but the document could not be uploaded: ' . $e->getMessage()
@@ -676,7 +776,23 @@ $paperAttached = !in_array($stageDefinition['documents'][0]['label'] ?? '', $mis
     && !empty($stageDefinition['documents'][0]['label'] ?? '');
 $applicationSent = $existingApplication !== null;
 
-if ($applicationSent && $requirementsComplete) {
+/*
+ * A document the coordinator sent back has to be dealt with first, so the
+ * student is told what is wrong before anything else.
+ */
+$flaggedMilestone = null;
+foreach ($stageMilestones as $step) {
+    if (($step['state']['status'] ?? '') === 'flagged') {
+        $flaggedMilestone = $step;
+        break;
+    }
+}
+
+if ($flaggedMilestone) {
+    $statusTag = 'flagged';
+    $statusText = 'Action needed';
+    $statusNote = (string) ($flaggedMilestone['detail'] ?? 'A document has to be corrected.');
+} elseif ($applicationSent && $requirementsComplete) {
     $statusTag = 'done';
     $statusText = 'Requirements completed.';
     $statusNote = 'Waiting for coordinator approval.';
@@ -809,6 +925,35 @@ require_once __DIR__ . '/../includes/header.php';
                     </p>
                     <?php endif; ?>
                 </div>
+
+                <?php
+                // The details of the payment are only asked for when the
+                // document is the official receipt.
+                $showReceiptFields = ($formValues['docType'] !== '' && classifyUploadDocType($formValues['docType']) === 'receipt');
+                ?>
+                <div class="form-row" id="receiptFields"<?= $showReceiptFields ? '' : ' hidden' ?>>
+                    <div class="form-field">
+                        <label>Receipt Number <span class="required">*</span></label>
+                        <input type="text" name="receiptNumber" id="receiptNumber"
+                               value="<?= htmlspecialchars($formValues['receiptNumber']) ?>"
+                               placeholder="Number printed on your official receipt">
+                    </div>
+                    <div class="form-field">
+                        <label>Amount <span class="required">*</span></label>
+                        <input type="text" name="paymentAmount" id="paymentAmount" inputmode="decimal"
+                               value="<?= htmlspecialchars($formValues['paymentAmount']) ?>"
+                               placeholder="e.g. 1500.00">
+                    </div>
+                    <div class="form-field">
+                        <label>Payment Date <span class="required">*</span></label>
+                        <input type="date" name="paymentDate" id="paymentDate"
+                               value="<?= htmlspecialchars($formValues['paymentDate']) ?>">
+                    </div>
+                </div>
+                <p class="field-hint" id="receiptHint"<?= $showReceiptFields ? '' : ' hidden' ?>>
+                    <i class="fas fa-receipt" style="margin-right:5px;"></i>
+                    Enter the details printed on your official receipt. The coordinator sees them with the document.
+                </p>
             </div>
 
             <div class="form-actions" style="border-top:1px solid var(--gray-100);padding-top:1rem;margin-top:1rem;">
@@ -829,6 +974,7 @@ require_once __DIR__ . '/../includes/header.php';
 <script>
 (function () {
     const types = <?= json_encode($docTypesByStage) ?>;
+    const openTypes = <?= json_encode($openTypesByStage) ?>;
     const missingDocuments = <?= json_encode($missingDocumentsByStage) ?>;
     const form = document.getElementById('applicationForm');
     const stageSelect = document.getElementById('applicationStage');
@@ -836,17 +982,67 @@ require_once __DIR__ . '/../includes/header.php';
     const fileInput = form.querySelector('input[type="file"]');
     const submitBtn = document.getElementById('submitApplicationBtn');
     const hasExistingApplication = <?= $existingApplication ? 'true' : 'false' ?>;
+    const typeHint = document.getElementById('documentTypeHint');
 
-    // Keeps the "Document Type" list in sync with the chosen stage.
+    // The document types that may be picked for the chosen stage. The Milestone
+    // Tracker decides: the type of the milestone the student is working on.
+    function openTypesFor(stageKey) {
+        return openTypes[stageKey] || [];
+    }
+
+    // Keeps the "Document Type" list in sync with the chosen stage. A type
+    // that the workflow does not ask for yet is shown, but it stays locked.
     function fillDocTypes(keep) {
         const opts = types[stageSelect.value] || [];
+        const open = openTypesFor(stageSelect.value);
         const previous = keep || typeSelect.value;
         typeSelect.innerHTML = '<option value="">Select document type</option>'
-            + opts.map(function (o) { return '<option>' + o + '</option>'; }).join('');
-        if (previous && opts.indexOf(previous) !== -1) typeSelect.value = previous;
+            + opts.map(function (o) {
+                const isOpen = open.indexOf(o) !== -1;
+                return '<option value="' + o + '"' + (isOpen ? '' : ' disabled')
+                    + '>' + o + (isOpen ? '' : ' — locked') + '</option>';
+            }).join('');
+        if (previous && open.indexOf(previous) !== -1) {
+            typeSelect.value = previous;
+        }
+        if (typeHint) {
+            typeHint.textContent = open.length
+                ? 'Send the ' + open[0] + ' — it is the next step of your workflow.'
+                : 'Every document of this stage is with the coordinator already.';
+        }
     }
     stageSelect.addEventListener('change', function () { fillDocTypes(''); });
     fillDocTypes('<?= htmlspecialchars($formValues['docType']) ?>');
+
+    /* ------------------------------------------------------------------
+     * Official receipt
+     *
+     * The details of the payment are only asked for when the document is
+     * the official receipt, so they are shown and hidden with the document
+     * type.
+     * ------------------------------------------------------------------ */
+    const receiptFields = document.getElementById('receiptFields');
+    const receiptHint = document.getElementById('receiptHint');
+    const receiptType = <?= json_encode('Official Receipt / Payment Proof') ?>;
+
+    function isReceiptType(value) {
+        const name = String(value || '').toLowerCase();
+        return name.indexOf('receipt') !== -1 || name.indexOf('payment') !== -1;
+    }
+
+    function toggleReceiptFields() {
+        const show = isReceiptType(typeSelect.value);
+        if (receiptFields) receiptFields.hidden = !show;
+        if (receiptHint) receiptHint.hidden = !show;
+        // The three fields are only required while the receipt is the
+        // document that is being sent.
+        ['receiptNumber', 'paymentAmount', 'paymentDate'].forEach(function (id) {
+            const field = document.getElementById(id);
+            if (field) field.required = show;
+        });
+    }
+    typeSelect.addEventListener('change', toggleReceiptFields);
+    toggleReceiptFields();
 
     /* ------------------------------------------------------------------
      * Draft
@@ -857,7 +1053,8 @@ require_once __DIR__ . '/../includes/header.php';
     function draftPayload() {
         const data = new URLSearchParams();
         data.append('form', 'draft');
-        ['title', 'adviser', 'abstract', 'enroll_date', 'stage', 'docType'].forEach(function (name) {
+        ['title', 'adviser', 'abstract', 'enroll_date', 'stage', 'docType',
+         'receiptNumber', 'paymentAmount', 'paymentDate'].forEach(function (name) {
             const field = form.querySelector('[name="' + name + '"]');
             if (field) data.append(name, field.value);
         });
