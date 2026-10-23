@@ -61,8 +61,15 @@ $coordinatorLinks = [
         ],
     ],
     ['key' => 'templates', 'label' => 'Templates/Form',         'icon' => 'fa-file-pen',      'href' => url('coordinator/templates/manage.php'), 'badge' => $templateBadgeCount],
-    ['key' => 'panel',     'label' => 'Panel Members',          'icon' => 'fa-users-gear',    'href' => url('coordinator/panel/manage.php')],
-    ['key' => 'advisers',  'label' => 'Pool of Advisers',       'icon' => 'fa-user-tie',      'href' => url('coordinator/advisers/manage.php')],
+    [
+        'key'     => 'academic_assessment_team',
+        'label'   => 'Academic Assessment Team',
+        'icon'    => 'fa-user-group',
+        'submenu' => [
+            ['key' => 'advisers', 'label' => 'Pool of Advisers', 'icon' => 'fa-user-tie',   'href' => url('coordinator/advisers/manage.php')],
+            ['key' => 'panel',    'label' => 'Panel Members',    'icon' => 'fa-users-gear', 'href' => url('coordinator/panel/manage.php')],
+        ],
+    ],
     ['key' => 'schedule',  'label' => 'Presentation Schedules', 'icon' => 'fa-calendar-days', 'href' => url('coordinator/schedule/manage.php')],
     ['key' => 'reports',   'label' => 'Reports',                'icon' => 'fa-chart-column',  'href' => url('coordinator/reports/dashboard.php')],
 ];
