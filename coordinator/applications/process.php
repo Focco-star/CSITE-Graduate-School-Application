@@ -153,12 +153,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         }
 
         /*
-         * The "Graduate School endorsement issued", "Official payment /
-         * receipt recorded" and "Requirements verified; ready for presentation"
-         * checkboxes used to sit in the Workflow Records card. They now follow
-         * the state of the documents themselves: the coordinator confirms each
-         * requirement in the Submitted Documents checklist and the student's
-         * Process Tracker updates from that.
+         * Payment and readiness follow their submitted records; the Graduate
+         * School endorsement is a student-uploaded document reviewed above.
          */
         $docStatusByKind = [];
         $postedStatuses = $_POST['upload_status'] ?? [];
@@ -170,8 +166,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
          * The status of the newest file of every kind. A student may send the
          * same kind of document more than once, and the file that was sent
          * last is the one that is reviewed, so it is the one that counts.
-         * The action the coordinator is picking now wins over the status that
-         * is stored.
          */
         foreach (uploadsForApplication((int) $app['id']) as $doc) {
             $kind = classifyUploadDocType((string) ($doc['docType'] ?? ''));
@@ -181,7 +175,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
                 $docStatusByKind[$kind] = ['date' => $date, 'id' => $id];
             }
         }
-        $docStatusByKind = [];
         foreach ($docStatusByKind as $kind => $row) {
             $docStatusByKind[$kind] = isset($postedStatuses[$row['id']])
                 ? (string) $postedStatuses[$row['id']]
@@ -189,15 +182,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         }
         $receiptVerified = ($docStatusByKind['receipt'] ?? '') === 'verified';
 
-        /*
-         * The milestones the coordinator ticks in the tracker are saved exactly
-         * as they are left. Each checkbox posts an explicit value: a hidden
-         * companion field sends "0" when the box is cleared, so clearing it is
-         * saved as well. Nothing restores the tick afterwards.
-         */
-        $gradEndorsed = array_key_exists('gradSchoolEndorsed', $stagePosted)
-            ? ($stagePosted['gradSchoolEndorsed'] === '1')
-            : !empty($app['gradSchoolEndorsed']);
+        $gradSchoolUpload = latestUploadOfKind(uploadsForApplication((int) $app['id']), 'grad_school_endorsement');
+        $gradEndorsed = $gradSchoolUpload
+            && in_array(($gradSchoolUpload['status'] ?? ''), ['verified', 'approved'], true);
         // The receipt details come from the student, so the payment counts as
         // recorded once the student sent the details or the coordinator
         // verified the receipt.
@@ -605,13 +592,7 @@ require_once __DIR__ . '/../../includes/header.php';
                                 <p class="ms-step-detail"><?= htmlspecialchars($step['detail']) ?></p>
                             </div>
                             <div class="ms-step-action">
-                                <?php if ($stepKey === 'grad_school_endorsement' && $stageApp): ?>
-                                    <label style="display:inline-flex;align-items:center;gap:.45rem;font-size:.78rem;cursor:pointer;white-space:nowrap;">
-                                        <input type="hidden" name="stage_data[<?= htmlspecialchars($key) ?>][gradSchoolEndorsed]" value="0">
-                                        <input type="checkbox" name="stage_data[<?= htmlspecialchars($key) ?>][gradSchoolEndorsed]" value="1" style="width:auto;" <?= !empty($stageApp['gradSchoolEndorsed']) ? 'checked' : '' ?>>
-                                        <span><?= !empty($stageApp['gradSchoolEndorsed']) ? 'Issued' : 'Issue Endorsement' ?></span>
-                                    </label>
-                                <?php elseif ($stepKey === 'ready_for_presentation' && $stageApp): ?>
+                                <?php if ($stepKey === 'ready_for_presentation' && $stageApp): ?>
                                     <label style="display:inline-flex;align-items:center;gap:.45rem;font-size:.78rem;cursor:pointer;white-space:nowrap;">
                                         <input type="hidden" name="stage_data[<?= htmlspecialchars($key) ?>][readyForPresentation]" value="0">
                                         <input type="checkbox" name="stage_data[<?= htmlspecialchars($key) ?>][readyForPresentation]" value="1" style="width:auto;" <?= !empty($stageApp['readyForPresentation']) ? 'checked' : '' ?>>
@@ -753,8 +734,6 @@ require_once __DIR__ . '/../../includes/header.php';
                                             <option value="incomplete" <?= $document['status'] === 'incomplete' ? 'selected' : '' ?>>Incomplete</option>
                                             <option value="revision" <?= $document['status'] === 'revision' ? 'selected' : '' ?>>Revision</option>
                                         </select>
-                                    <?php elseif ($requirement && ($requirement['kind'] ?? '') === 'grad_school_endorsement'): ?>
-                                        <span style="color:var(--gray-400);font-size:.8rem;">Issued by the coordinator</span>
                                     <?php elseif ($requirement && ($requirement['kind'] ?? '') === 'receipt'): ?>
                                         <span style="color:var(--gray-400);font-size:.8rem;">Not submitted yet</span>
                                     <?php else: ?>
@@ -793,7 +772,7 @@ require_once __DIR__ . '/../../includes/header.php';
                 </p>
                 <?php endif; ?>
                 <p class="field-hint" style="margin-top:.75rem;">
-                    The Graduate School endorsement, the payment record, the readiness mark and the presentation
+                    The student-submitted Graduate School endorsement, payment record, readiness mark and presentation
                     result are handled in the <strong>Milestone Tracker</strong> and the
                     <strong>Schedule Presentation</strong> section of this stage.
                 </p>
@@ -837,17 +816,6 @@ require_once __DIR__ . '/../../includes/header.php';
         </div>
 
         <div class="form-actions stage-panel-actions">
-            <?php $endorsementReady = $stageApp && $panel['requirementsComplete']; ?>
-            <?php if ($stageApp): ?>
-            <a href="<?= url('coordinator/applications/endorsement.php?id=' . (int) $stageApp['id']) ?>" class="btn btn-secondary"
-               <?= $endorsementReady ? '' : 'disabled' ?>
-               title="<?= $endorsementReady ? 'Generate the endorsement for this stage' : 'Verify the paper and the adviser endorsement form first' ?>">
-                <i class="fas fa-file-signature"></i> Generate Endorsement
-            </a>
-            <?php else: ?>
-            <button type="button" class="btn btn-secondary" disabled title="The student has no application for this stage yet"><i class="fas fa-file-signature"></i> Generate Endorsement</button>
-            <?php endif; ?>
-
             <?php if ($panel['unlocked'] && $stageApp): ?>
             <a href="<?= url('coordinator/schedule/add.php?app=' . (int) $stageApp['id']) ?>" class="btn btn-outline" id="schedulePresentationBtn-<?= htmlspecialchars($key) ?>"><i class="fas fa-calendar-plus"></i> Schedule Presentation</a>
             <?php else: ?>

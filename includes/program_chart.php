@@ -2,8 +2,7 @@
 /**
  * Shared "Student Population by Academic Program" component.
  *
- * Used by BOTH coordinator/dashboard.php and coordinator/reports/dashboard.php
- * so the two pages always show identical data, colors and chart behavior.
+ * Used by coordinator/dashboard.php to show student population by program.
  *
  * Usage:  renderProgramPopulationChart($pdo ?? null);
  */

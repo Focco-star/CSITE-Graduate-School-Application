@@ -161,6 +161,13 @@ foreach ($templateLibrary as $libraryTrack) {
             <div class="process-step">
                 <div class="step-number">4</div>
                 <div class="step-content">
+                    <h4>Complete the Graduate School Endorsement</h4>
+                    <p>Download and complete the endorsement form for your stage, then upload it on the <a href="<?= url('student/application.php') ?>">Application</a> page for review.</p>
+                </div>
+            </div>
+            <div class="process-step">
+                <div class="step-number">5</div>
+                <div class="step-content">
                     <h4>Upload &amp; Submit</h4>
                     <p>Upload your completed documents on the <a href="<?= url('student/application.php') ?>">Application</a> page and submit your application.</p>
                 </div>

@@ -156,7 +156,8 @@ require_once __DIR__ . '/../../includes/header.php';
             <div class="detail-item"><label>Adviser</label><span><?= htmlspecialchars($student['adviser'] !== '' ? $student['adviser'] : '—') ?></span></div>
             <div class="detail-item"><label>Submission Date</label><span><?= $selected['date'] ? date('F d, Y', strtotime($selected['date'])) : '—' ?></span></div>
             <div class="detail-item"><label>Presentation Result</label><span><?= $selected['result'] ? htmlspecialchars($selected['result'] === 'approved' ? 'Approved' : 'Requires Revision') : '—' ?></span></div>
-            <div class="detail-item"><label>Graduate School Endorsement</label><span><?= !empty($selected['gradSchoolEndorsed']) ? 'Issued' : 'Not yet issued' ?></span></div>
+            <?php $gradSchoolUpload = bestUploadOfKind($uploads, 'grad_school_endorsement'); ?>
+            <div class="detail-item"><label>Graduate School Endorsement</label><span><?= $gradSchoolUpload ? htmlspecialchars(ucfirst((string) ($gradSchoolUpload['status'] ?? 'submitted'))) : 'Not submitted' ?></span></div>
             <div class="detail-item"><label>Payment Recorded</label><span><?= paymentIsRecorded($selected, $uploads) ? 'Yes' . (!empty($selected['receiptNumber']) ? ' (' . htmlspecialchars($selected['receiptNumber']) . ')' : '') : 'No' ?></span></div>
             <div class="detail-item"><label>Ready for Presentation</label><span><?= !empty($selected['readyForPresentation']) ? 'Yes' : 'No' ?></span></div>
             <?php if (!empty($selected['coordinatorComment'])): ?>
@@ -232,11 +233,7 @@ require_once __DIR__ . '/../../includes/header.php';
                     <tr>
                         <td><?= htmlspecialchars($requirement['label']) ?></td>
                         <td>
-                            <?php if ($requirement['kind'] === 'grad_school_endorsement'): ?>
-                                <span class="status-badge <?= !empty($selected['gradSchoolEndorsed']) ? 'status-approved' : 'status-not-submitted' ?>">
-                                    <?= !empty($selected['gradSchoolEndorsed']) ? 'Issued' : 'Not Yet Issued' ?>
-                                </span>
-                            <?php elseif ($isDone): ?>
+                            <?php if ($isDone): ?>
                                 <span class="status-badge status-approved">Verified</span>
                             <?php elseif ($isFlagged): ?>
                                 <span class="status-badge status-revision">Incomplete</span>

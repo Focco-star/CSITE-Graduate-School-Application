@@ -2391,6 +2391,86 @@ a.stage-stepper-btn:hover .stage-stepper-label { color: var(--adzu-navy); }
 .dashstat-grid.theme-ateneo .dashstat:hover { box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35); }
 .dashstat-desc { font-size: 0.82rem; font-weight: 400; line-height: 1.5; opacity: 0.92; margin-top: 0.3rem; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
 
+.quick-summary {
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background: var(--white);
+    box-shadow: var(--shadow);
+}
+.quick-summary-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+}
+.quick-summary-header h3 {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--adzu-navy);
+}
+.quick-summary-header span {
+    font-size: 0.78rem;
+    color: var(--gray-500);
+}
+.quick-summary-body {
+    padding: 1.25rem;
+    background: var(--gray-50);
+}
+.quick-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+.quick-summary-stat {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.1rem 1.25rem;
+    border-radius: var(--radius);
+    background: var(--white);
+    box-shadow: 0 1px 4px rgba(6, 2, 151, 0.1);
+    text-decoration: none;
+}
+.quick-summary-stat:hover,
+.quick-summary-stat:focus-visible {
+    color: inherit;
+    box-shadow: 0 4px 12px rgba(6, 2, 151, 0.16);
+}
+.quick-summary-icon {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    background: var(--adzu-navy);
+    color: #ffffff;
+    font-size: 1.05rem;
+}
+.quick-summary-stat > span:last-child {
+    display: flex;
+    flex-direction: column;
+}
+.quick-summary-value {
+    font-family: var(--font-heading);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--adzu-navy);
+}
+.quick-summary-label {
+    margin-top: 0.2rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+}
+
 /* ==========================================================================
    Track indicator (student application page)
    Capstone = yellow, Thesis = red, Seminar Paper = green.
@@ -2673,177 +2753,6 @@ a.stage-stepper-btn:hover .stage-stepper-label { color: var(--adzu-navy); }
     animation: sp-countdown 5s linear forwards;
 }
 
-.report-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 1.25rem;
-}
-
-.report-link-card {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
-    padding: 1.5rem;
-    background: linear-gradient(135deg, #2e3844 0%, #232b35 60%, #1a222c 100%);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: var(--radius-lg);
-    color: #e8edf2;
-    text-decoration: none;
-    box-shadow: 0 2px 6px rgba(35, 43, 53, 0.18);
-    transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
-}
-
-.report-link-card:hover,
-.report-link-card:focus-visible {
-    color: #e8edf2;
-    transform: translateY(-4px);
-    box-shadow: 0 14px 28px rgba(35, 43, 53, 0.35);
-}
-
-.report-link-card:focus-visible { outline: 2px solid var(--adzu-navy); outline-offset: 2px; }
-
-.report-link-icon {
-    width: 48px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 0.4rem;
-    background: #FFB82B;
-    color: #232b35;
-    border-radius: var(--radius);
-    font-size: 1.2rem;
-    transition: transform var(--transition), background var(--transition);
-}
-
-.report-link-card:hover .report-link-icon {
-    background: #ffc955;
-    transform: scale(1.08);
-}
-
-.report-link-card h3 {
-    font-family: var(--font-heading);
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: #ffffff;
-}
-
-.report-link-card p {
-    font-size: 0.875rem;
-    line-height: 1.55;
-    color: #cbd5e1;
-}
-
-.report-link-cta {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    margin-top: auto;
-    padding-top: 0.75rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-    font-size: 0.8rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    color: #FFB82B;
-}
-
-.report-link-cta i { font-size: 0.7rem; transition: transform var(--transition); }
-.report-link-card:hover .report-link-cta i { transform: translateX(5px); }
-
-/* ---------- Summary panel (white + blue, no hover effects) ---------- */
-.report-summary {
-    margin-top: 1.5rem;
-    margin-bottom: 1.5rem;
-    overflow: hidden;
-    border: 0;
-    border-radius: var(--radius-lg);
-    background: var(--white);
-    box-shadow: var(--shadow);
-}
-
-.report-summary-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 1rem 1.25rem;
-    background: var(--white);
-}
-
-.report-summary-header h3 {
-    font-family: var(--font-heading);
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--adzu-navy);
-}
-
-.report-summary-header span {
-    font-size: 0.78rem;
-    color: var(--gray-500);
-}
-
-.report-summary-body {
-    padding: 1.25rem;
-    background: var(--gray-50);
-}
-
-/* ---------- Stat cards ---------- */
-.report-stat-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1rem;
-}
-
-.report-stat {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1.1rem 1.25rem;
-    background: var(--white);
-    border: 0;
-    border-radius: var(--radius);
-    box-shadow: 0 1px 4px rgba(6, 2, 151, 0.1);
-}
-
-.report-stat-icon {
-    width: 44px;
-    height: 44px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--adzu-navy);
-    color: #ffffff;
-    border-radius: var(--radius);
-    font-size: 1.05rem;
-}
-
-.report-stat-value {
-    font-family: var(--font-heading);
-    font-size: 1.75rem;
-    font-weight: 700;
-    line-height: 1.1;
-    color: var(--adzu-navy);
-}
-
-.report-stat-label {
-    margin-top: 0.2rem;
-    font-size: 0.78rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--gray-500);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .report-link-card,
-    .report-link-icon,
-    .report-link-cta i { transition: none; }
-    .report-link-card:hover { transform: none; }
-}
-
 @keyframes sp-fade-in  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sp-fade-out { from { opacity: 1; } to { opacity: 0; } }
 @keyframes sp-pop      { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
@@ -2858,7 +2767,7 @@ a.stage-stepper-btn:hover .stage-stepper-label { color: var(--adzu-navy); }
 }
 
 /* ==========================================================================
-  Charts and reports 
+  Charts
    ========================================================================== */
 .pop-dashboard { margin-bottom: 1.5rem; }
 

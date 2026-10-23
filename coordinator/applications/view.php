@@ -142,7 +142,6 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <div class="form-actions no-print">
     <a href="<?= url('coordinator/applications/process.php?id=' . $app['id']) ?>" class="btn btn-primary"><i class="fas fa-cog"></i> Process Application</a>
-    <a href="<?= url('coordinator/applications/endorsement.php?id=' . $app['id']) ?>" class="btn btn-secondary"><i class="fas fa-file-signature"></i> Generate Endorsement</a>
     <a href="<?= url('coordinator/applications/manage.php') ?>" class="btn btn-outline">Back to List</a>
 </div>
 <?php endif; ?>

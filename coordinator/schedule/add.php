@@ -38,9 +38,29 @@ try {
 }
 $panelOpts = panelSelectOptions();
 $adviserOpts = [];
+$documenterOpts = [];
+$documenterPoolError = '';
 try {
     $adviserOpts = DB::query("SELECT name, availability FROM advisor_pool ORDER BY availability = 'available' DESC, name ASC")->fetchAll();
 } catch (Throwable $e) {
+}
+try {
+    $documenterOpts = DB::query(
+        "SELECT first_name, middle_name, last_name, qualification
+         FROM documenter_pool
+         WHERE availability = 'available'
+         ORDER BY last_name, first_name, middle_name"
+    )->fetchAll();
+} catch (Throwable $e) {
+    error_log('[documenter pool] ' . $e->getMessage());
+    $documenterPoolError = 'The documenter pool is unavailable. Apply the documenter-pool migration before scheduling a presentation.';
+}
+$documenterOptions = [];
+foreach ($documenterOpts as $documenter) {
+    $documenterOptions[] = [
+        'name' => trim($documenter['last_name'] . ', ' . $documenter['first_name'] . ' ' . ($documenter['middle_name'] ?? '')),
+        'qualification' => (string) ($documenter['qualification'] ?? ''),
+    ];
 }
 $preselected = '';
 if (!empty($_GET['app'])) {
@@ -91,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     );
     $adviser = trim((string) ($_POST['adviser'] ?? ''));
     $documentor = trim((string) ($_POST['documentor'] ?? ''));
+    $validDocumenterNames = array_column($documenterOptions, 'name');
     $dateValue = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
     $dateErrors = DateTimeImmutable::getLastErrors();
     $timeValue = DateTimeImmutable::createFromFormat('!H:i', $time);
@@ -105,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$st || $stage === '' || !$dateIsValid || !$timeIsValid || $venue === ''
         || !in_array($stage, $validStages, true) || in_array('', $panelMembers, true)
-        || $adviser === '' || $documentor === '') {
+        || $adviser === '' || !in_array($documentor, $validDocumenterNames, true)) {
         setFlash('error', 'Complete all required schedule details and try again.');
         redirectTo('coordinator/schedule/add.php');
     }
@@ -187,6 +208,10 @@ require_once __DIR__ . '/../../includes/header.php';
     <p>Set presentation date, venue, and assign panel members. Presentation stages shown depend on the selected student's course type.</p>
 </div>
 
+<?php if ($documenterPoolError): ?>
+<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($documenterPoolError) ?> <a href="<?= url('coordinator/documenter/documenter.php') ?>">Open Documenter Pool</a></div>
+<?php endif; ?>
+
 <form method="post" action="<?= url('coordinator/schedule/add.php') ?>" data-validate>
     <div class="card">
         <div class="card-header"><h3>Student &amp; Stage</h3></div>
@@ -250,7 +275,7 @@ require_once __DIR__ . '/../../includes/header.php';
             </div>
             <div style="margin-top:0.5rem;padding:0.9rem 1rem;background:rgba(37,99,235,0.04);border-radius:var(--radius);border:1px solid rgba(37,99,235,0.12);font-size:0.82rem;">
                 <p style="font-weight:700;color:var(--gray-700);margin-bottom:0.5rem;"><i class="fas fa-clipboard-check" style="margin-right:5px;color:var(--adzu-navy);"></i>Prerequisites before scheduling:</p>
-                <?php foreach (['Paper submitted and verified','Adviser endorsement verified','Graduate School endorsement recorded','Official receipt / payment recorded','Stage marked as Ready for Presentation'] as $req): ?>
+                <?php foreach (['Paper submitted and verified','Adviser endorsement verified','Graduate School endorsement submitted and verified','Official receipt / payment recorded','Stage marked as Ready for Presentation'] as $req): ?>
                 <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem;">
                     <i class="fas fa-check-circle" style="color:var(--success);font-size:0.75rem;"></i>
                     <span style="color:var(--gray-600);"><?= htmlspecialchars($req) ?></span>
@@ -304,11 +329,14 @@ require_once __DIR__ . '/../../includes/header.php';
                 </div>
             </div>
             <div class="form-field">
-                <label>Documentor <span class="required">*</span></label>
-                <select name="documentor" required>
-                    <option value="">Select documentor</option>
-                    <?php foreach ($panelOpts as $p): ?><option><?= htmlspecialchars($p) ?></option><?php endforeach; ?>
-                </select>
+                <label>Documenter <span class="required">*</span></label>
+            <select name="documentor" required <?= $documenterPoolError ? 'disabled' : '' ?>>
+                    <option value="">Select documenter</option>
+                <?php foreach ($documenterOptions as $documenter): ?>
+                <option value="<?= htmlspecialchars($documenter['name']) ?>"><?= htmlspecialchars($documenter['name'] . ($documenter['qualification'] !== '' ? ' (' . $documenter['qualification'] . ')' : '')) ?></option>
+                <?php endforeach; ?>
+                <?php if (!$documenterPoolError && !$documenterOptions): ?><option value="" disabled>No available documenters found</option><?php endif; ?>
+            </select>
             </div>
         </div>
     </div>

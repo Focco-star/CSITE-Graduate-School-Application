@@ -48,6 +48,26 @@ INSERT INTO `advisor_pool` (`adviser_id`, `name`, `qualification`, `email`, `ava
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `documenter_pool`
+--
+
+CREATE TABLE `documenter_pool` (
+  `documenter_id` int(11) NOT NULL AUTO_INCREMENT,
+  `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(100) DEFAULT NULL,
+  `last_name` varchar(100) NOT NULL,
+  `qualification` varchar(150) NOT NULL,
+  `email` varchar(100) DEFAULT NULL,
+  `availability` enum('available','unavailable') NOT NULL DEFAULT 'available',
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`documenter_id`),
+  KEY `idx_documenter_availability_name` (`availability`,`last_name`,`first_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `applications`
 --
 

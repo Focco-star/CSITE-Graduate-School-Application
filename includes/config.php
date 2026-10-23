@@ -308,7 +308,7 @@ function getWorkflow(string $track): array {
                     ['id' => 'concept_receipt', 'label' => 'Official Receipt / Payment Proof', 'file' => '', 'folder' => '', 'type' => 'receipt', 'description' => 'Scanned copy of official receipt from Graduate School'],
                 ],
                 'adviserEndorsementForm' => ['id' => 'concept_adviser', 'label' => 'Concept Paper Adviser Endorsement Form', 'file' => '1 CONCEPT PAPER ADVISER ENDORSEMENT FORM_.docx', 'folder' => $T, 'type' => 'form', 'description' => 'Signed by your research adviser'],
-                'gradSchoolEndorsementForm' => ['id' => 'concept_gradschool', 'label' => 'Concept Paper Endorsement to Graduate School', 'file' => '2 CONCEPT PAPER ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $T, 'type' => 'form', 'description' => 'Issued by the coordinator to the Graduate School'],
+                'gradSchoolEndorsementForm' => ['id' => 'concept_gradschool', 'label' => 'Concept Paper Endorsement to Graduate School', 'file' => '2 CONCEPT PAPER ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $T, 'type' => 'form', 'description' => 'Complete this form and upload it for Graduate School review'],
             ],
             [
                 'key' => 'proposal',
@@ -319,7 +319,7 @@ function getWorkflow(string $track): array {
                     ['id' => 'proposal_receipt', 'label' => 'Official Receipt / Payment Proof', 'file' => '', 'folder' => '', 'type' => 'receipt', 'description' => 'Scanned copy of official receipt from Graduate School'],
                 ],
                 'adviserEndorsementForm' => ['id' => 'proposal_adviser', 'label' => 'Thesis Proposal Adviser Endorsement Form', 'file' => '3 THESIS PROPOSAL ADVISER ENDORSEMENT FORM.docx', 'folder' => $T, 'type' => 'form', 'description' => 'Signed by your research adviser'],
-                'gradSchoolEndorsementForm' => ['id' => 'proposal_gradschool', 'label' => 'Thesis Proposal Endorsement to Graduate School', 'file' => '4 THESIS PROPOSAL ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $T, 'type' => 'form', 'description' => 'Issued by the coordinator to the Graduate School'],
+                'gradSchoolEndorsementForm' => ['id' => 'proposal_gradschool', 'label' => 'Thesis Proposal Endorsement to Graduate School', 'file' => '4 THESIS PROPOSAL ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $T, 'type' => 'form', 'description' => 'Complete this form and upload it for Graduate School review'],
             ],
             [
                 'key' => 'final',
@@ -330,7 +330,7 @@ function getWorkflow(string $track): array {
                     ['id' => 'final_receipt', 'label' => 'Official Receipt / Payment Proof', 'file' => '', 'folder' => '', 'type' => 'receipt', 'description' => 'Scanned copy of official receipt from Graduate School'],
                 ],
                 'adviserEndorsementForm' => ['id' => 'final_adviser', 'label' => 'Final Thesis Adviser Endorsement Form', 'file' => '5 FINAL THESIS ADVISER ENDORSEMENT FORM.docx', 'folder' => $T, 'type' => 'form', 'description' => 'Signed by your research adviser'],
-                'gradSchoolEndorsementForm' => ['id' => 'final_gradschool', 'label' => 'Final Thesis Endorsement to Graduate School', 'file' => '6 FINAL THESIS ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $T, 'type' => 'form', 'description' => 'Issued by the coordinator to the Graduate School'],
+                'gradSchoolEndorsementForm' => ['id' => 'final_gradschool', 'label' => 'Final Thesis Endorsement to Graduate School', 'file' => '6 FINAL THESIS ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $T, 'type' => 'form', 'description' => 'Complete this form and upload it for Graduate School review'],
             ],
         ],
         'refs' => [
@@ -350,7 +350,7 @@ function getWorkflow(string $track): array {
                     ['id' => 'cp_receipt', 'label' => 'Official Receipt / Payment Proof', 'file' => '', 'folder' => '', 'type' => 'receipt', 'description' => 'Scanned copy of official receipt from Graduate School'],
                 ],
                 'adviserEndorsementForm' => ['id' => 'cp_adviser', 'label' => 'Capstone Adviser Endorsement Form – Proposal', 'file' => '1 CAPSTONE ADVISER ENDORSEMENT FORM - PROPOSAL.docx', 'folder' => $C, 'type' => 'form', 'description' => 'Signed by your capstone adviser'],
-                'gradSchoolEndorsementForm' => ['id' => 'cp_gradschool', 'label' => 'Capstone Proposal Endorsement to Graduate School', 'file' => '2 CAPSTONE PROPOSAL ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $C, 'type' => 'form', 'description' => 'Issued by the coordinator to the Graduate School'],
+                'gradSchoolEndorsementForm' => ['id' => 'cp_gradschool', 'label' => 'Capstone Proposal Endorsement to Graduate School', 'file' => '2 CAPSTONE PROPOSAL ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $C, 'type' => 'form', 'description' => 'Complete this form and upload it for Graduate School review'],
             ],
             [
                 'key' => 'final',
@@ -361,7 +361,7 @@ function getWorkflow(string $track): array {
                     ['id' => 'cf_receipt', 'label' => 'Official Receipt / Payment Proof', 'file' => '', 'folder' => '', 'type' => 'receipt', 'description' => 'Scanned copy of official receipt from Graduate School'],
                 ],
                 'adviserEndorsementForm' => ['id' => 'cf_adviser', 'label' => 'Final Capstone Adviser Endorsement Form', 'file' => '3 FINAL CAPSTONE ADVISER ENDORSEMENT FORM - PROPOSAL.docx', 'folder' => $C, 'type' => 'form', 'description' => 'Signed by your capstone adviser'],
-                'gradSchoolEndorsementForm' => ['id' => 'cf_gradschool', 'label' => 'Final Capstone Endorsement to Graduate School', 'file' => '4 FINAL CAPSTONE ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $C, 'type' => 'form', 'description' => 'Issued by the coordinator to the Graduate School'],
+                'gradSchoolEndorsementForm' => ['id' => 'cf_gradschool', 'label' => 'Final Capstone Endorsement to Graduate School', 'file' => '4 FINAL CAPSTONE ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $C, 'type' => 'form', 'description' => 'Complete this form and upload it for Graduate School review'],
             ],
         ],
         'refs' => [
@@ -382,7 +382,7 @@ function getWorkflow(string $track): array {
                     ['id' => 'sp_receipt', 'label' => 'Official Receipt / Payment Proof', 'file' => '', 'folder' => '', 'type' => 'receipt', 'description' => 'Scanned copy of official receipt from Graduate School'],
                 ],
                 'adviserEndorsementForm' => ['id' => 'sp_adviser', 'label' => 'Seminar Paper Proposal Adviser Endorsement Form', 'file' => '1 SEMINAR PAPER PROPOSAL ADVISER ENDORSEMENT FORM .docx', 'folder' => $S, 'type' => 'form', 'description' => 'Signed by your research adviser'],
-                'gradSchoolEndorsementForm' => ['id' => 'sp_gradschool', 'label' => 'Seminar Paper Proposal Endorsement to Graduate School', 'file' => '2 SEMINAR PAPER PROPOSAL ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $S, 'type' => 'form', 'description' => 'Issued by the coordinator to the Graduate School'],
+                'gradSchoolEndorsementForm' => ['id' => 'sp_gradschool', 'label' => 'Seminar Paper Proposal Endorsement to Graduate School', 'file' => '2 SEMINAR PAPER PROPOSAL ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $S, 'type' => 'form', 'description' => 'Complete this form and upload it for Graduate School review'],
             ],
             [
                 'key' => 'final',
@@ -393,7 +393,7 @@ function getWorkflow(string $track): array {
                     ['id' => 'sf_receipt', 'label' => 'Official Receipt / Payment Proof', 'file' => '', 'folder' => '', 'type' => 'receipt', 'description' => 'Scanned copy of official receipt from Graduate School'],
                 ],
                 'adviserEndorsementForm' => ['id' => 'sf_adviser', 'label' => 'Final Seminar Paper Adviser Endorsement Form', 'file' => '3 FINAL SEMINAR PAPER ADVISER ENDORSEMENT FORM - PROPOSAL.docx', 'folder' => $S, 'type' => 'form', 'description' => 'Signed by your research adviser'],
-                'gradSchoolEndorsementForm' => ['id' => 'sf_gradschool', 'label' => 'Final Seminar Paper Endorsement to Graduate School', 'file' => '2 SEMINAR PAPER PROPOSAL ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $S, 'type' => 'form', 'description' => 'Issued by the coordinator to the Graduate School'],
+                'gradSchoolEndorsementForm' => ['id' => 'sf_gradschool', 'label' => 'Final Seminar Paper Endorsement to Graduate School', 'file' => '2 SEMINAR PAPER PROPOSAL ENDORSEMENT TO GRADSCHOOL.docx', 'folder' => $S, 'type' => 'form', 'description' => 'Complete this form and upload it for Graduate School review'],
             ],
         ],
         'refs' => [
@@ -454,7 +454,7 @@ function requiredDocumentsForStage(string $track, string $stageKey): array {
         $required[] = [
             'label'   => $stage['gradSchoolEndorsementForm']['label'],
             'kind'    => 'grad_school_endorsement',
-            'docType' => '',
+            'docType' => $stage['gradSchoolEndorsementForm']['label'],
         ];
     }
     return $required;
@@ -3027,24 +3027,6 @@ function databasePanelMembers(): array {
     return array_map('normalizePanelMemberRow', storeGet('panels'));
 }
 
-function databasePanelParticipation(): array {
-    if (!class_exists('DB')) return [];
-    try {
-        return DB::query(
-            'SELECT p.panel_member_id, CONCAT(p.last_name, ", ", p.first_name, IF(p.middle_name IS NULL OR p.middle_name = "", "", CONCAT(" ", p.middle_name))) AS name,
-                    p.qualification, COUNT(spa.assignment_id) AS times,
-                    MAX(sc.presentation_date) AS last_assignment
-             FROM panel_members p
-             LEFT JOIN schedule_panel_assignments spa ON spa.panel_member_id = p.panel_member_id
-             LEFT JOIN schedules sc ON sc.schedule_id = spa.schedule_id
-             GROUP BY p.panel_member_id
-             ORDER BY times DESC, p.last_name, p.first_name'
-        )->fetchAll();
-    } catch (Throwable $e) {
-        return [];
-    }
-}
-
 function findPanelMember(string $id): ?array {
     foreach (storeGet('panels') as $p) {
         if ((string) $p['id'] === $id) {
@@ -3295,26 +3277,17 @@ function addScheduleRecord(array $s): array {
             }
             $pdo->prepare('DELETE FROM schedule_panel_assignments WHERE schedule_id = :schedule_id')
                 ->execute(['schedule_id' => $scheduleId]);
-            $memberStmt = $pdo->prepare('SELECT panel_member_id FROM panel_members WHERE CONCAT(last_name, ", ", first_name, IF(middle_name IS NULL OR middle_name = "", "", CONCAT(" ", middle_name))) = :name LIMIT 1');
             $assignmentStmt = $pdo->prepare('INSERT IGNORE INTO schedule_panel_assignments (schedule_id, panel_member_id, panel_role) VALUES (:schedule_id, :panel_member_id, :panel_role)');
             $panelText = (string) ($s['panel'] ?? '');
-            $documentorText = trim((string) ($s['documentor'] ?? ''));
             $panelRows = $pdo->query('SELECT panel_member_id, first_name, middle_name, last_name FROM panel_members')->fetchAll();
             foreach ($panelRows as $panelRow) {
                 $panelName = trim($panelRow['last_name'] . ', ' . $panelRow['first_name'] . (!empty($panelRow['middle_name']) ? ' ' . $panelRow['middle_name'] : ''));
-                if ($panelName === '' || $panelName === $documentorText || !str_contains($panelText, $panelName)) {
+                if ($panelName === '' || !str_contains($panelText, $panelName)) {
                     continue;
                 }
                 $memberId = (int) $panelRow['panel_member_id'];
                 if ($memberId > 0) {
                     $assignmentStmt->execute(['schedule_id' => $scheduleId, 'panel_member_id' => $memberId, 'panel_role' => 'member']);
-                }
-            }
-            if (!empty($s['documentor'])) {
-                $memberStmt->execute(['name' => trim((string) $s['documentor'])]);
-                $documentorId = (int) ($memberStmt->fetchColumn() ?: 0);
-                if ($documentorId > 0) {
-                    $assignmentStmt->execute(['schedule_id' => $scheduleId, 'panel_member_id' => $documentorId, 'panel_role' => 'documentor']);
                 }
             }
             $pdo->commit();
@@ -3648,9 +3621,7 @@ function getStudentProgress(string $email, string $track): array {
         $coordStatus = ($paperStatus === 'flagged' || $adviserStatus === 'flagged')
             ? 'flagged'
             : (($paperStatus === 'done' && $adviserStatus === 'done') ? 'done' : 'pending');
-        $gradStatus = !empty($app['gradSchoolEndorsed'])
-            ? 'done'
-            : 'pending';
+        $gradStatus = $gradSchoolUpload ? documentMilestoneState($gradWf) : 'pending';
         $paymentStatus = $paymentUpload
             ? documentMilestoneState($paymentWf)
             : (paymentIsRecorded($app) ? 'done' : 'pending');
@@ -3962,15 +3933,13 @@ function milestoneStepsForStage(array $p, string $track, string $stageKey): arra
             'key'    => 'grad_school_endorsement',
             'label'  => $gradLabel,
             'state'  => $p['gradSchoolEndorsement'] ?? ['status' => 'pending'],
-            'coord'  => true,
+            'coord'  => false,
             'docType' => $gradLabel,
-            'detail' => ($p['gradSchoolEndorsement']['status'] ?? '') === 'done'
-                ? 'Endorsement issued'
-                : $documentDetail(
-                    $p['gradSchoolEndorsement'] ?? [],
-                    '',
-                    'Coordinator endorses the student to the Graduate School'
-                ),
+            'detail' => $documentDetail(
+                $p['gradSchoolEndorsement'] ?? [],
+                !empty($p['gradSchoolEndorsement']['submitted']) ? 'Uploaded: ' . $p['gradSchoolEndorsement']['submitted'] : '',
+                'Complete the Graduate School endorsement form and upload it for review'
+            ),
         ],
         [
             'key'    => 'payment',
@@ -4695,16 +4664,10 @@ function documentStatusBadge(?array $upload): array {
 }
 
 /**
- * The status badge of a requirement, taking the items the coordinator issues
- * or records himself into account.
+ * The status badge of a student-submitted requirement, with receipt/payment
+ * records as the only coordinator-entered exception.
  */
 function requirementStatusBadge(array $requirement, ?array $upload, array $app = []): array {
-    if (($requirement['kind'] ?? '') === 'grad_school_endorsement') {
-        // Issued by the coordinator, so it waits for the coordinator.
-        return !empty($app['gradSchoolEndorsed'])
-            ? ['label' => 'Verified', 'class' => 'status-approved', 'action' => 'verified']
-            : ['label' => 'Under Review', 'class' => 'status-confirmed', 'action' => 'submitted'];
-    }
     if (($requirement['kind'] ?? '') === 'receipt' && empty($upload)) {
         // The payment can also be recorded without a receipt upload.
         return (!empty($app['paymentRecorded']) || trim((string) ($app['receiptNumber'] ?? '')) !== '')
@@ -4874,8 +4837,9 @@ function applicationForStage(string $email, string $stageKey): ?array {
  * The list follows the track (seminar paper, capstone or thesis) and the stage
  * the application is currently on, and it follows the same milestone workflow
  * the student sees: the paper and the adviser endorsement have to be uploaded
- * and verified, the coordinator has to issue the Graduate School endorsement
- * and mark the student ready, and the official receipt has to be recorded.
+ * and verified, the student has to upload a Graduate School endorsement for
+ * review, the coordinator has to mark the student ready, and the official
+ * receipt has to be recorded.
  *
  * An empty array means every requirement is met and the presentation may be
  * scheduled.
@@ -4884,10 +4848,8 @@ function applicationMissingRequirements(string $track, string $stageKey, array $
     $missing = [];
 
     foreach (requiredDocumentsForStage($track, $stageKey) as $requirement) {
-        // The Graduate School endorsement is issued by the coordinator and the
-        // receipt can also be recorded by the coordinator, so both are checked
-        // separately below instead of as an upload.
-        if ($requirement['kind'] === 'grad_school_endorsement' || $requirement['kind'] === 'receipt') {
+        // A receipt can also be satisfied by payment details recorded by the coordinator.
+        if ($requirement['kind'] === 'receipt') {
             continue;
         }
         $document = bestUploadOfKind($uploads, $requirement['kind']);
@@ -4901,14 +4863,6 @@ function applicationMissingRequirements(string $track, string $stageKey, array $
                     : 'Not submitted by the student',
             ];
         }
-    }
-
-    if (empty($app['gradSchoolEndorsed'])) {
-        $missing[] = [
-            'label' => 'Endorsement to Graduate School',
-            'kind'  => 'grad_school_endorsement',
-            'why'   => 'Not yet issued by the coordinator',
-        ];
     }
 
     /*

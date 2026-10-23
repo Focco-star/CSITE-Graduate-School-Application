@@ -31,16 +31,20 @@ if (!isset($pdo) || !($pdo instanceof PDO)) {
 }
 
 
-$pendingAppsCount = 0;
-$totalAppsCount   = 0;
 $activeStudentsCount = 0;
-$decidedAppsCount = 0;
-$pendingApps = [];
+$students = function_exists('storeGet') ? (array) (storeGet('students') ?? []) : [];
+$completedStudentsCount = count(array_filter($students, static function ($student) {
+    return in_array($student['status'] ?? '', ['completed', 'approved'], true);
+}));
+$activePanelMembersCount = 0;
+$academicYearStart = (int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 1;
+$academicYearStartDate = strtotime($academicYearStart . '-07-01');
+$academicYearEndDate = strtotime(($academicYearStart + 1) . '-07-01');
+$academicYearLabel = $academicYearStart . '-' . ($academicYearStart + 1);
 $upcomingPresentations = [];
 
-// The upcoming presentations table now lives on coordinator/schedule/manage.php.
-// The list is still built here because the "Upcoming Presentations" stat tile
-// below shows its count.
+// Merge saved schedules with workflow-only schedules so the academic-year
+// summary counts each presentation once.
 if (function_exists('databaseSchedules')) {
     try {
         $upcomingPresentations = databaseSchedules();
@@ -104,67 +108,45 @@ if ($pdo && class_exists('DB')) {
     }
 }
 
-usort($upcomingPresentations, static function ($a, $b) {
-    $ta = strtotime((string) ($a['date'] ?? ''));
-    $tb = strtotime((string) ($b['date'] ?? ''));
-    if ($ta && $tb) {
-        return $ta <=> $tb;
-    }
-    return $ta ? -1 : ($tb ? 1 : 0);
-});
-
 if ($pdo) {
     try {
-
-        $stmt = $pdo->query("SELECT COUNT(*) FROM applications WHERE archived_at IS NULL AND status IN ('submitted', 'under_review')");
-        $pendingAppsCount = (int) $stmt->fetchColumn();
-
-
-        $stmt = $pdo->query("SELECT COUNT(*) FROM applications WHERE archived_at IS NULL");
-        $totalAppsCount = (int) $stmt->fetchColumn();
-
+        $studentStatuses = $pdo->query(
+            "SELECT
+                (SELECT a.status
+                 FROM applications a
+                 WHERE a.user_id = s.user_id AND a.archived_at IS NULL
+                 ORDER BY a.submitted_at DESC, a.application_id DESC
+                 LIMIT 1) AS latest_status
+             FROM students s
+             WHERE s.archived_at IS NULL"
+        )->fetchAll(PDO::FETCH_COLUMN);
+        $completedStudentsCount = count(array_filter($studentStatuses, static function ($status) {
+            return in_array($status, ['completed', 'approved'], true);
+        }));
 
         $stmt = $pdo->query("SELECT COUNT(*) FROM students WHERE archived_at IS NULL");
         $activeStudentsCount = (int) $stmt->fetchColumn();
 
-
-        $stmt = $pdo->query("SELECT COUNT(*) FROM applications WHERE archived_at IS NULL AND status IN ('approved', 'completed')");
-        $decidedAppsCount = (int) $stmt->fetchColumn();
-
-
-        $stmt = $pdo->prepare("
-            SELECT 
-                a.application_id AS id,
-                COALESCE(
-                    NULLIF(TRIM(CONCAT(s.last_name, ', ', s.first_name, IF(s.middle_initial IS NULL OR TRIM(REPLACE(s.middle_initial, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(s.middle_initial, '.', '')))))), ''), 
-                    u.full_name
-                ) AS student,
-                COALESCE(s.program, 'Graduate Program') AS program,
-                a.presentation_stage AS stage,
-                a.submitted_at AS date,
-                a.status
-            FROM applications a
-            JOIN users u ON u.user_id = a.user_id
-            LEFT JOIN students s ON s.user_id = u.user_id
-            WHERE a.archived_at IS NULL
-              AND a.status IN ('submitted', 'under_review')
-            -- Alphabetical by last name, then first name ('Last, First MI' format).
-            ORDER BY SUBSTRING_INDEX(u.full_name, ',', 1) ASC, SUBSTRING_INDEX(u.full_name, ',', -1) ASC, a.submitted_at DESC
-        ");
-        $stmt->execute();
-        $pendingApps = $stmt->fetchAll();
     } catch (PDOException $e) {
 
     }
 }
 
+$panelMembers = function_exists('databasePanelMembers') ? databasePanelMembers() : [];
+$activePanelMembersCount = count(array_filter($panelMembers, static function ($member) {
+    return ($member['availability'] ?? '') === 'available';
+}));
 
+$presentationsThisAcademicYear = count(array_filter($upcomingPresentations, static function ($presentation) use ($academicYearStartDate, $academicYearEndDate) {
+    $date = strtotime((string) ($presentation['date'] ?? ''));
+    return $date !== false
+        && $date >= $academicYearStartDate
+        && $date < $academicYearEndDate
+        && ($presentation['status'] ?? '') !== 'cancelled';
+}));
 
-
-if (!$pdo && empty($pendingApps) && function_exists('storeGet')) {
-    $pendingApps = array_values(array_filter(storeGet('applications') ?? [], static function ($a) {
-        return empty($a['archivedAt'] ?? '') && in_array($a['status'] ?? '', ['submitted', 'under_review'], true);
-    }));
+if (!$activeStudentsCount && !$pdo) {
+    $activeStudentsCount = count($students);
 }
 
 require_once __DIR__ . '/../includes/header.php';
@@ -175,48 +157,44 @@ require_once __DIR__ . '/../includes/header.php';
     <p>Overview of applications, submissions, and upcoming presentations requiring your attention.</p>
 </div>
 
-<div class="dashstat-grid theme-ateneo">
-    <a href="<?= url('coordinator/applications/manage.php') ?>" class="dashstat dashstat-rose">
-        <div class="dashstat-text">
-            <div class="dashstat-value"><?= $pendingAppsCount ?></div>
-            <div class="dashstat-label">Pending Applications</div>
-            <div class="dashstat-link">Review now <i class="fas fa-arrow-right"></i></div>
+<section class="quick-summary">
+    <div class="quick-summary-header">
+        <h3>Quick Summary</h3>
+        <span>Current academic year: <?= htmlspecialchars($academicYearLabel) ?></span>
+    </div>
+    <div class="quick-summary-body">
+        <div class="quick-summary-grid">
+            <a href="<?= url('coordinator/students/manage.php') ?>" class="quick-summary-stat">
+                <span class="quick-summary-icon"><i class="fas fa-check-circle"></i></span>
+                <span>
+                    <span class="quick-summary-value"><?= $completedStudentsCount ?></span>
+                    <span class="quick-summary-label">Completed This Year</span>
+                </span>
+            </a>
+            <a href="<?= url('coordinator/panel/manage.php') ?>" class="quick-summary-stat">
+                <span class="quick-summary-icon"><i class="fas fa-chalkboard-teacher"></i></span>
+                <span>
+                    <span class="quick-summary-value"><?= $activePanelMembersCount ?></span>
+                    <span class="quick-summary-label">Active Panel Members</span>
+                </span>
+            </a>
+            <a href="<?= url('coordinator/schedule/manage.php') ?>" class="quick-summary-stat">
+                <span class="quick-summary-icon"><i class="fas fa-chalkboard"></i></span>
+                <span>
+                    <span class="quick-summary-value"><?= $presentationsThisAcademicYear ?></span>
+                    <span class="quick-summary-label">Presentations, SY <?= htmlspecialchars($academicYearLabel) ?></span>
+                </span>
+            </a>
+            <a href="<?= url('coordinator/students/manage.php') ?>" class="quick-summary-stat">
+                <span class="quick-summary-icon"><i class="fas fa-user-graduate"></i></span>
+                <span>
+                    <span class="quick-summary-value"><?= $activeStudentsCount ?></span>
+                    <span class="quick-summary-label">Active Students</span>
+                </span>
+            </a>
         </div>
-        <div class="dashstat-icon"><i class="fas fa-inbox"></i></div>
-    </a>
-    <a href="<?= url('coordinator/applications/manage.php') ?>" class="dashstat dashstat-amber">
-        <div class="dashstat-text">
-            <div class="dashstat-value"><?= $totalAppsCount ?></div>
-            <div class="dashstat-label">Total Applications</div>
-            <div class="dashstat-link">View all <i class="fas fa-arrow-right"></i></div>
-        </div>
-        <div class="dashstat-icon"><i class="fas fa-file-alt"></i></div>
-    </a>
-    <a href="<?= url('coordinator/schedule/manage.php') ?>" class="dashstat dashstat-blue">
-        <div class="dashstat-text">
-            <div class="dashstat-value"><?= count($upcomingPresentations) ?></div>
-            <div class="dashstat-label">Upcoming Presentations</div>
-            <div class="dashstat-link">See schedule <i class="fas fa-arrow-right"></i></div>
-        </div>
-        <div class="dashstat-icon"><i class="fas fa-calendar-alt"></i></div>
-    </a>
-    <a href="<?= url('coordinator/students/manage.php') ?>" class="dashstat dashstat-emerald">
-        <div class="dashstat-text">
-            <div class="dashstat-value"><?= $activeStudentsCount ?></div>
-            <div class="dashstat-label">Active Students</div>
-            <div class="dashstat-link">Manage <i class="fas fa-arrow-right"></i></div>
-        </div>
-        <div class="dashstat-icon"><i class="fas fa-user-graduate"></i></div>
-    </a>
-    <a href="<?= url('coordinator/reports/dashboard.php') ?>" class="dashstat dashstat-purple">
-        <div class="dashstat-text">
-            <div class="dashstat-value"><?= $decidedAppsCount ?></div>
-            <div class="dashstat-label">Decided Outcomes</div>
-            <div class="dashstat-link">Reports <i class="fas fa-arrow-right"></i></div>
-        </div>
-        <div class="dashstat-icon"><i class="fas fa-chart-bar"></i></div>
-    </a>
-</div>
+    </div>
+</section>
 
 <?php renderScheduleCalendar(); ?>
 
