@@ -776,6 +776,40 @@ img { max-width: 100%; height: auto; }
     box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
 }
 
+.schedule-picker-wrap {
+    position: relative;
+}
+.form-field input.schedule-picker {
+    min-height: 44px;
+    padding: 0.6rem 0.85rem;
+    border-color: var(--gray-300);
+    background-color: var(--gray-50);
+    color: var(--gray-700);
+    color-scheme: light;
+    accent-color: var(--adzu-gold);
+}
+.form-field input.schedule-picker:focus {
+    border-color: var(--adzu-gold);
+    box-shadow: 0 0 0 3px rgba(255, 184, 43, 0.22);
+}
+.form-field input.schedule-picker::-webkit-calendar-picker-indicator {
+    width: 1.15rem;
+    height: 1.15rem;
+    padding: 0.2rem;
+    border-radius: 5px;
+    background-color: var(--adzu-gold);
+    cursor: pointer;
+    filter: none;
+}
+.form-field input.schedule-time-picker::-webkit-calendar-picker-indicator {
+    background-color: transparent;
+    filter: invert(65%) sepia(87%) saturate(600%) hue-rotate(2deg) brightness(95%) contrast(90%);
+}
+.form-field select.panel-member-select option:disabled {
+    color: var(--gray-400);
+    background-color: var(--gray-100);
+}
+
 .form-field textarea { min-height: 100px; resize: vertical; }
 
 /* Read-only (auto-filled) fields: grayed out so they clearly look non-editable */

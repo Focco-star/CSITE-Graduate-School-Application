@@ -123,11 +123,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         && ($timeErrors === false || ((int) $timeErrors['warning_count'] === 0 && (int) $timeErrors['error_count'] === 0))
         && $timeValue->format('H:i') === $time;
     $validStages = $stageMap[$email]['stages'] ?? [];
+    $panelMembersAreUnique = count(array_unique($panelMembers)) === count($panelMembers);
+    $panelMembersAreValid = count(array_diff($panelMembers, $panelOpts)) === 0;
 
     if (!$st || $stage === '' || !$dateIsValid || !$timeIsValid || $venue === ''
         || !in_array($stage, $validStages, true) || in_array('', $panelMembers, true)
+        || !$panelMembersAreUnique || !$panelMembersAreValid
         || $adviser === '' || !in_array($documentor, $validDocumenterNames, true)) {
-        setFlash('error', 'Complete all required schedule details and try again.');
+        setFlash(
+            'error',
+            !$panelMembersAreUnique
+                ? 'Each panel member can only be assigned once to a presentation.'
+                : 'Complete all required schedule details and try again.'
+        );
         redirectTo('coordinator/schedule/add.php');
     }
 
@@ -255,11 +263,15 @@ require_once __DIR__ . '/../../includes/header.php';
             <div class="form-row">
                 <div class="form-field">
                     <label>Presentation Date <span class="required">*</span></label>
-                    <input type="date" name="date" required>
+                    <div class="schedule-picker-wrap">
+                        <input class="schedule-picker" type="date" name="date" required>
+                    </div>
                 </div>
                 <div class="form-field">
                     <label>Presentation Time <span class="required">*</span></label>
-                    <input type="time" name="time" required>
+                    <div class="schedule-picker-wrap">
+                        <input class="schedule-picker schedule-time-picker" type="time" name="time" required>
+                    </div>
                 </div>
             </div>
             <div class="form-field">
@@ -296,14 +308,14 @@ require_once __DIR__ . '/../../includes/header.php';
             <div class="form-row">
                 <div class="form-field">
                     <label>Panel Member 1 <span class="required">*</span></label>
-                    <select name="panel1" required>
+                    <select name="panel1" class="panel-member-select" required>
                         <option value="">Select panel member</option>
                         <?php foreach ($panelOpts as $p): ?><option><?= htmlspecialchars($p) ?></option><?php endforeach; ?>
                     </select>
                 </div>
                 <div class="form-field">
                     <label>Panel Member 2 <span class="required">*</span></label>
-                    <select name="panel2" required>
+                    <select name="panel2" class="panel-member-select" required>
                         <option value="">Select panel member</option>
                         <?php foreach ($panelOpts as $p): ?><option><?= htmlspecialchars($p) ?></option><?php endforeach; ?>
                     </select>
@@ -312,7 +324,7 @@ require_once __DIR__ . '/../../includes/header.php';
             <div class="form-row">
                 <div class="form-field">
                     <label>Panel Member 3 <span class="required">*</span></label>
-                    <select name="panel3" required>
+                    <select name="panel3" class="panel-member-select" required>
                         <option value="">Select panel member</option>
                         <?php foreach ($panelOpts as $p): ?><option><?= htmlspecialchars($p) ?></option><?php endforeach; ?>
                     </select>
@@ -355,6 +367,7 @@ require_once __DIR__ . '/../../includes/header.php';
     const track = document.getElementById('schedTrack');
     const program = document.getElementById('schedProgram');
     const hint = document.getElementById('schedStageHint');
+    const panelSelects = Array.from(document.querySelectorAll('.panel-member-select'));
     function fill() {
         const info = map[student.value];
         stage.innerHTML = '';
@@ -371,8 +384,20 @@ require_once __DIR__ . '/../../includes/header.php';
         stage.appendChild(new Option('Select stage', ''));
         info.stages.forEach(s => stage.appendChild(new Option(s, s)));
     }
+    function updatePanelChoices() {
+        const selectedValues = panelSelects.map(select => select.value).filter(Boolean);
+        panelSelects.forEach(select => {
+            Array.from(select.options).forEach(option => {
+                option.disabled = option.value !== ''
+                    && option.value !== select.value
+                    && selectedValues.includes(option.value);
+            });
+        });
+    }
     student.addEventListener('change', fill);
+    panelSelects.forEach(select => select.addEventListener('change', updatePanelChoices));
     fill();
+    updatePanelChoices();
 })();
 </script>
 
