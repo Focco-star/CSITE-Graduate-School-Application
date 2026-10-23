@@ -3104,6 +3104,154 @@ function updatePanelMemberRecord(string $id, array $patch): ?array {
     return null;
 }
 
+/**
+ * =========================================================================
+ * Documenter Pool Functions
+ * =========================================================================
+ */
+
+function normalizeDocumenterRow(array $row): array {
+    $firstName = trim((string) ($row['first_name'] ?? ''));
+    $middleName = trim((string) ($row['middle_name'] ?? ''));
+    $lastName = trim((string) ($row['last_name'] ?? ''));
+    $givenName = trim(implode(' ', array_filter([$firstName, $middleName])));
+    return [
+        'id' => (string) ($row['documenter_id'] ?? $row['id'] ?? ''),
+        'name' => $lastName !== '' ? $lastName . ', ' . $givenName : (string) ($row['name'] ?? ''),
+        'first_name' => $firstName,
+        'middle_name' => $middleName,
+        'last_name' => $lastName,
+        'qualification' => (string) ($row['qualification'] ?? ''),
+        'email' => (string) ($row['email'] ?? ''),
+        'notes' => (string) ($row['notes'] ?? ''),
+        'availability' => (string) ($row['availability'] ?? 'available'),
+    ];
+}
+
+function databaseDocumenters(): array {
+    if (class_exists('DB')) {
+        try {
+            $rows = DB::query('SELECT d.*, COUNT(s.schedule_id) AS documenter_sessions FROM documenter_pool d LEFT JOIN schedules s ON s.documenter_id = d.documenter_id GROUP BY d.documenter_id ORDER BY d.last_name, d.first_name, d.middle_name')->fetchAll();
+            return array_map('normalizeDocumenterRow', $rows);
+        } catch (Throwable $e) {
+        }
+    }
+    return array_map('normalizeDocumenterRow', storeGet('documenters') ?: []);
+}
+
+function findDocumenter(string $id): ?array {
+    foreach (storeGet('documenters') as $d) {
+        if ((string) $d['id'] === $id) {
+            return normalizeDocumenterRow($d);
+        }
+    }
+    if (class_exists('DB') && ctype_digit($id)) {
+        try {
+            $stmt = DB::getConnection()->prepare('SELECT * FROM documenter_pool WHERE documenter_id = :id LIMIT 1');
+            $stmt->execute(['id' => (int) $id]);
+            $row = $stmt->fetch();
+            return $row ? normalizeDocumenterRow($row) : null;
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+    return null;
+}
+
+function addDocumenterRecord(array $m): array {
+    if (class_exists('DB') && isset($m['first_name'], $m['last_name'])) {
+        $row = DB::insert('documenter_pool', [
+            'first_name' => formatPersonName($m['first_name']),
+            'middle_name' => formatPersonName((string) ($m['middle_name'] ?? '')) ?: null,
+            'last_name' => formatPersonName($m['last_name']),
+            'qualification' => trim($m['qualification']),
+            'email' => trim((string) ($m['email'] ?? '')) ?: null,
+            'notes' => trim((string) ($m['notes'] ?? '')) ?: null,
+            'availability' => $m['availability'] ?? 'available',
+        ]);
+        return normalizeDocumenterRow($row);
+    }
+    $list = storeGet('documenters') ?: [];
+    $rec = [
+        'id' => 'doc_' . uniqid(),
+        'name' => $m['name'],
+        'qualification' => $m['qualification'],
+        'email' => $m['email'] ?? '',
+        'notes' => $m['notes'] ?? '',
+        'availability' => $m['availability'] ?? 'available',
+    ];
+    $list[] = $rec;
+    storeSet('documenters', $list);
+    return $rec;
+}
+
+function updateDocumenterRecord(string $id, array $patch): ?array {
+    if (class_exists('DB') && ctype_digit($id)) {
+        $data = array_intersect_key($patch, array_flip(['first_name', 'middle_name', 'last_name', 'qualification', 'email', 'notes', 'availability']));
+        if ($data) {
+            foreach (['first_name', 'middle_name', 'last_name'] as $nameField) {
+                if (array_key_exists($nameField, $data)) {
+                    $data[$nameField] = formatPersonName((string) $data[$nameField]);
+                }
+            }
+            foreach (['middle_name', 'email', 'notes'] as $nullable) {
+                if (array_key_exists($nullable, $data)) {
+                    $data[$nullable] = trim((string) $data[$nullable]) ?: null;
+                }
+            }
+            DB::update('documenter_pool', $data, ['documenter_id' => (int) $id]);
+        }
+        return findDocumenter($id);
+    }
+    $list = storeGet('documenters') ?: [];
+    foreach ($list as $i => $d) {
+        if ((string) $d['id'] !== $id) {
+            continue;
+        }
+        $list[$i] = array_merge($d, $patch);
+        storeSet('documenters', $list);
+        return $list[$i];
+    }
+    return null;
+}
+
+function deleteDocumenterRecord(string $id): void {
+    if (class_exists('DB') && ctype_digit($id)) {
+        try {
+            $assigned = DB::getConnection()->prepare('SELECT COUNT(*) FROM schedules WHERE documenter_id = :id');
+            $assigned->execute(['id' => (int) $id]);
+            if ((int) $assigned->fetchColumn() > 0) {
+                throw new LogicException('This documenter is assigned to existing schedules. Mark the documenter unavailable instead of removing them.');
+            }
+            DB::query('DELETE FROM documenter_pool WHERE documenter_id = :id', ['id' => (int) $id]);
+        } catch (Throwable $e) {
+            throw $e;
+        }
+    }
+    $list = storeGet('documenters') ?: [];
+    foreach ($list as $i => $d) {
+        if ((string) $d['id'] === $id) {
+            unset($list[$i]);
+            storeSet('documenters', array_values($list));
+            break;
+        }
+    }
+}
+
+function documenterSelectOptions(): array {
+    try {
+        $rows = DB::query("SELECT first_name, middle_name, last_name, qualification FROM documenter_pool WHERE availability = 'available' ORDER BY last_name, first_name, middle_name")->fetchAll();
+        $options = [];
+        foreach ($rows as $row) {
+            $name = trim($row['last_name'] . ', ' . $row['first_name'] . ' ' . ($row['middle_name'] ?? ''));
+            $options[] = $name . ($row['qualification'] !== '' ? ' (' . $row['qualification'] . ')' : '');
+        }
+        return $options;
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
 function findSchedule(string $id): ?array {
     foreach (storeGet('schedules') as $s) {
         if ((string) $s['id'] === $id) {

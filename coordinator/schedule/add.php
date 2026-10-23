@@ -101,111 +101,118 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $st = null;
         }
     }
-    $stage = trim((string) ($_POST['stage'] ?? ''));
-    $date = trim((string) ($_POST['date'] ?? ''));
-    $time = trim((string) ($_POST['time'] ?? ''));
-    $venue = trim((string) ($_POST['venue'] ?? ''));
-    $panelMembers = array_map(
-        static fn(string $key): string => trim((string) ($_POST[$key] ?? '')),
-        ['panel1', 'panel2', 'panel3']
-    );
-    $adviser = trim((string) ($_POST['adviser'] ?? ''));
-    $documentor = trim((string) ($_POST['documentor'] ?? ''));
-    $validDocumenterNames = array_column($documenterOptions, 'name');
-    $dateValue = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
-    $dateErrors = DateTimeImmutable::getLastErrors();
-    $timeValue = DateTimeImmutable::createFromFormat('!H:i', $time);
-    $timeErrors = DateTimeImmutable::getLastErrors();
-    $dateIsValid = $dateValue !== false
-        && ($dateErrors === false || ((int) $dateErrors['warning_count'] === 0 && (int) $dateErrors['error_count'] === 0))
-        && $dateValue->format('Y-m-d') === $date;
-    $timeIsValid = $timeValue !== false
-        && ($timeErrors === false || ((int) $timeErrors['warning_count'] === 0 && (int) $timeErrors['error_count'] === 0))
-        && $timeValue->format('H:i') === $time;
-    $validStages = $stageMap[$email]['stages'] ?? [];
-    $panelMembersAreUnique = count(array_unique($panelMembers)) === count($panelMembers);
-    $panelMembersAreValid = count(array_diff($panelMembers, $panelOpts)) === 0;
-
-    if (!$st || $stage === '' || !$dateIsValid || !$timeIsValid || $venue === ''
-        || !in_array($stage, $validStages, true) || in_array('', $panelMembers, true)
-        || !$panelMembersAreUnique || !$panelMembersAreValid
-        || $adviser === '' || !in_array($documentor, $validDocumenterNames, true)) {
-        setFlash(
-            'error',
-            !$panelMembersAreUnique
-                ? 'Each panel member can only be assigned once to a presentation.'
-                : 'Complete all required schedule details and try again.'
-        );
-        redirectTo('coordinator/schedule/add.php');
-    }
-
-    $databaseUserId = databaseUserIdForEmail($email);
-    if (class_exists('DB')) {
-        $applicationId = $databaseUserId > 0
-            ? (int) (databaseApplicationIdForStudent($databaseUserId, $stage) ?? 0)
-            : 0;
-        if ($applicationId <= 0) {
-            setFlash('error', 'This student has no active application for the selected presentation stage. The schedule was not saved.');
-            redirectTo('coordinator/schedule/add.php');
+    $stage = trim($_POST['stage'] ?? '');
+    if ($st && $stage !== '') {
+        $displayDate = trim($_POST['date'] ?? '');
+        if ($displayDate !== '') {
+            $ts = strtotime($displayDate);
+            if ($ts) {
+                $displayDate = date('M j, Y', $ts);
+            }
         }
-    } else {
+        $displayTime = trim($_POST['time'] ?? '');
+        if ($displayTime !== '') {
+            $tts = strtotime('2000-01-01 ' . $displayTime);
+            if ($tts) {
+                $displayTime = date('g:i A', $tts);
+            }
+        }
+        $panel = implode(', ', array_filter([$_POST['panel1'] ?? '', $_POST['panel2'] ?? '', $_POST['panel3'] ?? '']));
+        $venue = trim($_POST['venue'] ?? '');
         $app = latestApplicationForEmail($email);
         $applicationId = (int) ($app['id'] ?? 0);
-        if ($applicationId <= 0) {
-            setFlash('error', 'No application was found for this student. The schedule was not saved.');
-            redirectTo('coordinator/schedule/add.php');
+        $databaseUserId = databaseUserIdForEmail($email);
+        if ($databaseUserId > 0) {
+            $databaseApplicationId = databaseApplicationIdForStudent($databaseUserId, $stage);
+            if ($databaseApplicationId !== null) {
+                $applicationId = $databaseApplicationId;
+            }
         }
-    }
-
-    $panel = implode(', ', $panelMembers);
-    $status = ($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending';
-    try {
         addScheduleRecord([
             'studentEmail' => $email,
             'studentName' => studentDisplayName($st),
-            'applicationId' => $applicationId,
+            'applicationId' => $applicationId > 0 ? $applicationId : null,
             'stage' => $stage,
-            'date' => $date,
-            'time' => $time,
+            'date' => $displayDate,
+            'time' => $displayTime,
             'venue' => $venue,
-            'panel' => $panel,
-            'adviser' => formatPersonName($adviser),
-            'documentor' => $documentor,
-            'status' => $status,
+            'panel' => $panel ?: 'TBD',
+            'adviser' => formatPersonName($_POST['adviser'] ?? ''),
+            'documentor' => trim($_POST['documentor'] ?? ''),
+            'status' => ($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
         ]);
-    } catch (Throwable $e) {
-        error_log('[schedule save] ' . $e->getMessage());
-        setFlash('error', 'The presentation schedule could not be saved. Please verify the database migrations are applied and try again.');
-        redirectTo('coordinator/schedule/add.php');
-    }
-
-    if (class_exists('DB')) {
-        try {
-            $pdo = DB::getConnection();
-            $cur = $pdo->prepare('SELECT workflow_state FROM applications WHERE application_id = :id LIMIT 1');
-            $cur->execute(['id' => $applicationId]);
-            $wf = json_decode((string) ($cur->fetchColumn() ?: '[]'), true) ?: [];
-            $wf['presentation_date'] = $date;
-            $wf['presentation_time'] = $time;
-            $wf['presentation_venue'] = $venue;
-            $wf['presentation_panel'] = $panel;
-            $upd = $pdo->prepare('UPDATE applications SET status = :status, workflow_state = :wf WHERE application_id = :id');
-            $upd->execute([
-                'status' => 'scheduled',
-                'wf' => json_encode($wf, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                'id' => $applicationId,
-            ]);
-        } catch (Throwable $e) {
-            error_log('[schedule save] Application workflow update failed: ' . $e->getMessage());
-            setFlash('error', 'The schedule was saved, but the application status could not be updated.');
-            redirectTo('coordinator/schedule/manage.php');
+        if ($app) {
+            updateApplicationRecord((int) $app['id'], ['status' => 'scheduled']);
         }
-    } else {
-        updateApplicationRecord($applicationId, ['status' => 'scheduled']);
+        if (class_exists('DB')) {
+            try {
+                $userId = databaseUserIdForEmail($email);
+                if ($userId > 0) {
+                    $dbAppId = databaseApplicationIdForStudent($userId, $stage);
+                    if ($dbAppId) {
+                        $pdo = DB::getConnection();
+                        $cur = $pdo->prepare('SELECT workflow_state FROM applications WHERE application_id = :id LIMIT 1');
+                        $cur->execute(['id' => $dbAppId]);
+                        $wf = json_decode((string) ($cur->fetchColumn() ?: '[]'), true) ?: [];
+                        $wf['presentation_date'] = $displayDate;
+                        $wf['presentation_time'] = $displayTime;
+                        $wf['presentation_venue'] = $venue;
+                        $wf['presentation_panel'] = $panel ?: 'TBD';
+                        $upd = $pdo->prepare('UPDATE applications SET status = :status, workflow_state = :wf WHERE application_id = :id');
+                        $upd->execute([
+                            'status' => 'scheduled',
+                            'wf' => json_encode($wf, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                            'id' => $dbAppId,
+                        ]);
+                    }
+                }
+            } catch (Throwable $e) {
+            }
+        }
+        redirectTo('coordinator/schedule/manage.php');
     }
+}
 
-    setFlash('success', 'Presentation schedule saved successfully.');
-    redirectTo('coordinator/schedule/manage.php');
+$panelOpts = panelSelectOptions();
+$adviserOpts = [];
+$documenterOpts = [];
+$documenterPoolError = '';
+try {
+    $adviserOpts = DB::query("SELECT name, availability FROM advisor_pool ORDER BY availability = 'available' DESC, name ASC")->fetchAll();
+} catch (Throwable $e) {
+}
+try {
+    $documenterOpts = DB::query(
+        "SELECT first_name, middle_name, last_name, qualification
+         FROM documenter_pool
+         WHERE availability = 'available'
+         ORDER BY last_name, first_name, middle_name"
+    )->fetchAll();
+} catch (Throwable $e) {
+    error_log('[documenter pool] ' . $e->getMessage());
+    $documenterPoolError = 'The documenter pool is unavailable. Apply the documenter-pool migration before scheduling a presentation.';
+}
+$documenterOptions = [];
+foreach ($documenterOpts as $documenter) {
+    $documenterOptions[] = [
+        'name' => trim($documenter['last_name'] . ', ' . $documenter['first_name'] . ' ' . ($documenter['middle_name'] ?? '')),
+        'qualification' => (string) ($documenter['qualification'] ?? ''),
+    ];
+}
+$preselected = '';
+if (!empty($_GET['app'])) {
+    $preApp = findApplication((int) $_GET['app']);
+    $preselected = $preApp['studentEmail'] ?? '';
+}
+
+$stageMap = [];
+foreach ($students as $s) {
+    $track = $s['track'] ?? getTrackForProgram($s['program']);
+    $stageMap[$s['email']] = [
+        'track' => getTrackLabel($track),
+        'program' => $s['program'],
+        'stages' => presentationStageOptions($track),
+    ];
 }
 
 require_once __DIR__ . '/../../includes/header.php';
@@ -213,16 +220,12 @@ require_once __DIR__ . '/../../includes/header.php';
 
 <div class="page-header">
     <h2>Schedule Presentation</h2>
-    <p>Set presentation date, venue, and assign panel members. Presentation stages shown depend on the selected student's course type.</p>
+    <p>Set presentation date, venue, and assign the Academic Assessment Team. Presentation stages shown depend on the selected student's course type.</p>
 </div>
-
-<?php if ($documenterPoolError): ?>
-<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($documenterPoolError) ?> <a href="<?= url('coordinator/documenter/documenter.php') ?>">Open Documenter Pool</a></div>
-<?php endif; ?>
 
 <form method="post" action="<?= url('coordinator/schedule/add.php') ?>" data-validate>
     <div class="card">
-        <div class="card-header"><h3>Student &amp; Stage</h3></div>
+        <div class="card-header"><h3>Student & Stage</h3></div>
         <div class="card-body">
             <div class="form-row">
                 <div class="form-field">
@@ -299,12 +302,24 @@ require_once __DIR__ . '/../../includes/header.php';
 
     <div class="card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h3>Panel Assignment</h3>
+            <h3>Academic Assessment Team</h3>
             <a href="<?= url('coordinator/panel/add.php') ?>" class="btn btn-outline" style="font-size: 0.82rem; padding: 0.35rem 0.75rem;">
                 <i class="fas fa-plus"></i> Add Panel Member
             </a>
         </div>
         <div class="card-body">
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Adviser <span class="required">*</span></label>
+                    <select name="adviser" required>
+                        <option value="">Select adviser</option>
+                        <?php foreach ($adviserOpts as $adviser): $isUnavailable = ($adviser['availability'] ?? '') !== 'available'; ?>
+                        <option <?= $isUnavailable ? 'disabled' : '' ?>><?= htmlspecialchars($adviser['name']) ?><?= $isUnavailable ? ' [Unavailable]' : '' ?></option>
+                        <?php endforeach; ?>
+                        <?php if (!$adviserOpts): ?><option value="" disabled>No available advisers found</option><?php endif; ?>
+                    </select>
+                </div>
+            </div>
             <div class="form-row">
                 <div class="form-field">
                     <label>Panel Member 1 <span class="required">*</span></label>
@@ -330,25 +345,15 @@ require_once __DIR__ . '/../../includes/header.php';
                     </select>
                 </div>
                 <div class="form-field">
-                    <label>Adviser <span class="required">*</span></label>
-                    <select name="adviser" required>
-                        <option value="">Select adviser</option>
-                        <?php foreach ($adviserOpts as $adviser): $isUnavailable = ($adviser['availability'] ?? '') !== 'available'; ?>
-                        <option <?= $isUnavailable ? 'disabled' : '' ?>><?= htmlspecialchars($adviser['name']) ?><?= $isUnavailable ? ' [Unavailable]' : '' ?></option>
+                    <label>Documenter <span class="required">*</span></label>
+                    <select name="documentor" required <?= $documenterPoolError ? 'disabled' : '' ?>>
+                        <option value="">Select documenter</option>
+                        <?php foreach ($documenterOptions as $documenter): ?>
+                        <option value="<?= htmlspecialchars($documenter['name']) ?>"><?= htmlspecialchars($documenter['name'] . ($documenter['qualification'] !== '' ? ' (' . $documenter['qualification'] . ')' : '')) ?></option>
                         <?php endforeach; ?>
-                        <?php if (!$adviserOpts): ?><option value="" disabled>No available advisers found</option><?php endif; ?>
+                        <?php if (!$documenterPoolError && !$documenterOptions): ?><option value="" disabled>No available documenters found</option><?php endif; ?>
                     </select>
                 </div>
-            </div>
-            <div class="form-field">
-                <label>Documenter <span class="required">*</span></label>
-            <select name="documentor" required <?= $documenterPoolError ? 'disabled' : '' ?>>
-                    <option value="">Select documenter</option>
-                <?php foreach ($documenterOptions as $documenter): ?>
-                <option value="<?= htmlspecialchars($documenter['name']) ?>"><?= htmlspecialchars($documenter['name'] . ($documenter['qualification'] !== '' ? ' (' . $documenter['qualification'] . ')' : '')) ?></option>
-                <?php endforeach; ?>
-                <?php if (!$documenterPoolError && !$documenterOptions): ?><option value="" disabled>No available documenters found</option><?php endif; ?>
-            </select>
             </div>
         </div>
     </div>
@@ -394,10 +399,14 @@ require_once __DIR__ . '/../../includes/header.php';
             });
         });
     }
-    student.addEventListener('change', fill);
-    panelSelects.forEach(select => select.addEventListener('change', updatePanelChoices));
+    student.addEventListener('change', function () {
+        fill();
+        updatePanelChoices();
+    });
+    document.querySelectorAll('.panel-member-select').forEach(select => {
+        select.addEventListener('change', updatePanelChoices);
+    });
     fill();
-    updatePanelChoices();
 })();
 </script>
 
