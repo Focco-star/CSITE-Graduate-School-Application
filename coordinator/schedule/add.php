@@ -2,6 +2,15 @@
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/db.php';
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+$sessionUser = $_SESSION['user'] ?? [];
+if (!is_array($sessionUser) || strtolower((string) ($sessionUser['role'] ?? '')) !== 'coordinator') {
+    redirectTo('coordinator/login.php');
+}
+
 $pageTitle   = 'Schedule Presentation';
 $role        = 'coordinator';
 $currentPage = 'schedule';
@@ -50,7 +59,7 @@ foreach ($students as $s) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = $_POST['studentEmail'] ?? '';
+    $email = trim((string) ($_POST['studentEmail'] ?? ''));
     $st = findStudentByEmail($email);
     if (!$st) {
         try {
@@ -72,76 +81,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $st = null;
         }
     }
-    $stage = trim($_POST['stage'] ?? '');
-    if ($st && $stage !== '') {
-        $displayDate = trim($_POST['date'] ?? '');
-        if ($displayDate !== '') {
-            $ts = strtotime($displayDate);
-            if ($ts) {
-                $displayDate = date('M j, Y', $ts);
-            }
+    $stage = trim((string) ($_POST['stage'] ?? ''));
+    $date = trim((string) ($_POST['date'] ?? ''));
+    $time = trim((string) ($_POST['time'] ?? ''));
+    $venue = trim((string) ($_POST['venue'] ?? ''));
+    $panelMembers = array_map(
+        static fn(string $key): string => trim((string) ($_POST[$key] ?? '')),
+        ['panel1', 'panel2', 'panel3']
+    );
+    $adviser = trim((string) ($_POST['adviser'] ?? ''));
+    $documentor = trim((string) ($_POST['documentor'] ?? ''));
+    $dateValue = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+    $dateErrors = DateTimeImmutable::getLastErrors();
+    $timeValue = DateTimeImmutable::createFromFormat('!H:i', $time);
+    $timeErrors = DateTimeImmutable::getLastErrors();
+    $dateIsValid = $dateValue !== false
+        && ($dateErrors === false || ((int) $dateErrors['warning_count'] === 0 && (int) $dateErrors['error_count'] === 0))
+        && $dateValue->format('Y-m-d') === $date;
+    $timeIsValid = $timeValue !== false
+        && ($timeErrors === false || ((int) $timeErrors['warning_count'] === 0 && (int) $timeErrors['error_count'] === 0))
+        && $timeValue->format('H:i') === $time;
+    $validStages = $stageMap[$email]['stages'] ?? [];
+
+    if (!$st || $stage === '' || !$dateIsValid || !$timeIsValid || $venue === ''
+        || !in_array($stage, $validStages, true) || in_array('', $panelMembers, true)
+        || $adviser === '' || $documentor === '') {
+        setFlash('error', 'Complete all required schedule details and try again.');
+        redirectTo('coordinator/schedule/add.php');
+    }
+
+    $databaseUserId = databaseUserIdForEmail($email);
+    if (class_exists('DB')) {
+        $applicationId = $databaseUserId > 0
+            ? (int) (databaseApplicationIdForStudent($databaseUserId, $stage) ?? 0)
+            : 0;
+        if ($applicationId <= 0) {
+            setFlash('error', 'This student has no active application for the selected presentation stage. The schedule was not saved.');
+            redirectTo('coordinator/schedule/add.php');
         }
-        $displayTime = trim($_POST['time'] ?? '');
-        if ($displayTime !== '') {
-            $tts = strtotime('2000-01-01 ' . $displayTime);
-            if ($tts) {
-                $displayTime = date('g:i A', $tts);
-            }
-        }
-        $panel = implode(', ', array_filter([$_POST['panel1'] ?? '', $_POST['panel2'] ?? '', $_POST['panel3'] ?? '']));
-        $venue = trim($_POST['venue'] ?? '');
+    } else {
         $app = latestApplicationForEmail($email);
         $applicationId = (int) ($app['id'] ?? 0);
-        $databaseUserId = databaseUserIdForEmail($email);
-        if ($databaseUserId > 0) {
-            $databaseApplicationId = databaseApplicationIdForStudent($databaseUserId, $stage);
-            if ($databaseApplicationId !== null) {
-                $applicationId = $databaseApplicationId;
-            }
+        if ($applicationId <= 0) {
+            setFlash('error', 'No application was found for this student. The schedule was not saved.');
+            redirectTo('coordinator/schedule/add.php');
         }
+    }
+
+    $panel = implode(', ', $panelMembers);
+    $status = ($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending';
+    try {
         addScheduleRecord([
             'studentEmail' => $email,
             'studentName' => studentDisplayName($st),
-            'applicationId' => $applicationId > 0 ? $applicationId : null,
+            'applicationId' => $applicationId,
             'stage' => $stage,
-            'date' => $displayDate,
-            'time' => $displayTime,
+            'date' => $date,
+            'time' => $time,
             'venue' => $venue,
-            'panel' => $panel ?: 'TBD',
-            'adviser' => formatPersonName($_POST['adviser'] ?? ''),
-            'documentor' => trim($_POST['documentor'] ?? ''),
-            'status' => ($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
+            'panel' => $panel,
+            'adviser' => formatPersonName($adviser),
+            'documentor' => $documentor,
+            'status' => $status,
         ]);
-        if ($app) {
-            updateApplicationRecord((int) $app['id'], ['status' => 'scheduled']);
-        }
-        if (class_exists('DB')) {
-            try {
-                $userId = databaseUserIdForEmail($email);
-                if ($userId > 0) {
-                    $dbAppId = databaseApplicationIdForStudent($userId, $stage);
-                    if ($dbAppId) {
-                        $pdo = DB::getConnection();
-                        $cur = $pdo->prepare('SELECT workflow_state FROM applications WHERE application_id = :id LIMIT 1');
-                        $cur->execute(['id' => $dbAppId]);
-                        $wf = json_decode((string) ($cur->fetchColumn() ?: '[]'), true) ?: [];
-                        $wf['presentation_date'] = $displayDate;
-                        $wf['presentation_time'] = $displayTime;
-                        $wf['presentation_venue'] = $venue;
-                        $wf['presentation_panel'] = $panel ?: 'TBD';
-                        $upd = $pdo->prepare('UPDATE applications SET status = :status, workflow_state = :wf WHERE application_id = :id');
-                        $upd->execute([
-                            'status' => 'scheduled',
-                            'wf' => json_encode($wf, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                            'id' => $dbAppId,
-                        ]);
-                    }
-                }
-            } catch (Throwable $e) {
-            }
-        }
-        redirectTo('coordinator/schedule/manage.php');
+    } catch (Throwable $e) {
+        error_log('[schedule save] ' . $e->getMessage());
+        setFlash('error', 'The presentation schedule could not be saved. Please verify the database migrations are applied and try again.');
+        redirectTo('coordinator/schedule/add.php');
     }
+
+    if (class_exists('DB')) {
+        try {
+            $pdo = DB::getConnection();
+            $cur = $pdo->prepare('SELECT workflow_state FROM applications WHERE application_id = :id LIMIT 1');
+            $cur->execute(['id' => $applicationId]);
+            $wf = json_decode((string) ($cur->fetchColumn() ?: '[]'), true) ?: [];
+            $wf['presentation_date'] = $date;
+            $wf['presentation_time'] = $time;
+            $wf['presentation_venue'] = $venue;
+            $wf['presentation_panel'] = $panel;
+            $upd = $pdo->prepare('UPDATE applications SET status = :status, workflow_state = :wf WHERE application_id = :id');
+            $upd->execute([
+                'status' => 'scheduled',
+                'wf' => json_encode($wf, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'id' => $applicationId,
+            ]);
+        } catch (Throwable $e) {
+            error_log('[schedule save] Application workflow update failed: ' . $e->getMessage());
+            setFlash('error', 'The schedule was saved, but the application status could not be updated.');
+            redirectTo('coordinator/schedule/manage.php');
+        }
+    } else {
+        updateApplicationRecord($applicationId, ['status' => 'scheduled']);
+    }
+
+    setFlash('success', 'Presentation schedule saved successfully.');
+    redirectTo('coordinator/schedule/manage.php');
 }
 
 require_once __DIR__ . '/../../includes/header.php';

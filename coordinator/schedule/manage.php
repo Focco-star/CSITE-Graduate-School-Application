@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/calendar.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -12,7 +13,13 @@ $currentPage = 'schedule';
 $userName    = $mockCoordinator['name'];
 
 if (isset($_GET['delete']) && $_GET['delete'] !== '') {
-    deleteScheduleRecord((string) $_GET['delete']);
+    try {
+        deleteScheduleRecord((string) $_GET['delete']);
+        setFlash('success', 'Presentation schedule removed from the list and calendar.');
+    } catch (Throwable $e) {
+        error_log('[schedule delete] ' . $e->getMessage());
+        setFlash('error', 'The presentation schedule could not be removed. Please try again.');
+    }
     redirectTo('coordinator/schedule/manage.php');
 }
 
@@ -104,6 +111,7 @@ usort($upcomingPresentations, static function ($a, $b) {
     }
     return $ta ? -1 : ($tb ? 1 : 0);
 });
+$schedules = $upcomingPresentations;
 
 require_once __DIR__ . '/../../includes/header.php';
 ?>
@@ -117,6 +125,7 @@ require_once __DIR__ . '/../../includes/header.php';
     <a href="<?= url('coordinator/schedule/add.php') ?>" class="btn btn-primary"><i class="fas fa-calendar-plus"></i> Schedule Presentation</a>
 </div>
 
+<?php renderScheduleCalendar(); ?>
 
 <div class="card">
     <div class="card-header"><h3>Scheduled Presentations</h3></div>
@@ -147,10 +156,14 @@ require_once __DIR__ . '/../../includes/header.php';
                         <td style="max-width:200px;font-size:0.8rem;"><?= htmlspecialchars($sch['panel'] ?? $sch['panels'] ?? '') ?></td>
                         <td><?= statusBadge($sch['status']) ?></td>
                         <td class="actions">
+                            <?php if (strpos((string) ($sch['id'] ?? ''), 'db_') !== 0): ?>
                             <a href="<?= url('coordinator/schedule/edit.php?id=' . urlencode($sch['id'])) ?>" class="btn btn-sm btn-outline" title="Edit"><i class="fas fa-edit"></i></a>
                             <a href="<?= url('coordinator/schedule/panel.php?id=' . urlencode($sch['id'])) ?>" class="btn btn-sm btn-outline" title="Panel"><i class="fas fa-users"></i></a>
                             <a href="<?= url('coordinator/schedule/notification.php?id=' . urlencode($sch['id'])) ?>" class="btn btn-sm btn-primary" title="Notification preview"><i class="fas fa-bell"></i></a>
                             <?= coordDeleteLink(url('coordinator/schedule/manage.php?delete=' . urlencode($sch['id'])), 'Delete this schedule?') ?>
+                            <?php else: ?>
+                            <?= coordDeleteLink(url('coordinator/schedule/manage.php?delete=' . urlencode($sch['id'])), 'Remove this presentation schedule from the list and calendar?') ?>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>

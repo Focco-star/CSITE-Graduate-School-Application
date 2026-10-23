@@ -2901,17 +2901,86 @@ function deleteApplicationRecord(int $id): void {
 }
 
 function deleteScheduleRecord(string $id): void {
-    if (class_exists('DB') && ctype_digit($id)) {
+    if (class_exists('DB') && (ctype_digit($id) || preg_match('/^db_(\d+)$/', $id, $matches))) {
+        $pdo = DB::getConnection();
+        $applicationId = ctype_digit($id) ? 0 : (int) $matches[1];
+        $pdo->beginTransaction();
         try {
-            $stmt = DB::getConnection()->prepare('DELETE FROM schedules WHERE schedule_id = :id');
-            $stmt->execute(['id' => (int) $id]);
-            return;
+            if (ctype_digit($id)) {
+                $scheduleStmt = $pdo->prepare('SELECT application_id FROM schedules WHERE schedule_id = :id LIMIT 1');
+                $scheduleStmt->execute(['id' => (int) $id]);
+                $applicationId = (int) ($scheduleStmt->fetchColumn() ?: 0);
+                $deleteStmt = $pdo->prepare('DELETE FROM schedules WHERE schedule_id = :id');
+                $deleteStmt->execute(['id' => (int) $id]);
+            }
+
+            if ($applicationId > 0) {
+                $applicationStmt = $pdo->prepare('SELECT workflow_state, status FROM applications WHERE application_id = :id LIMIT 1');
+                $applicationStmt->execute(['id' => $applicationId]);
+                $application = $applicationStmt->fetch();
+                if ($application) {
+                    $workflow = json_decode((string) ($application['workflow_state'] ?? ''), true);
+                    $workflow = is_array($workflow) ? $workflow : [];
+                    unset(
+                        $workflow['presentation_date'],
+                        $workflow['presentation_time'],
+                        $workflow['presentation_venue'],
+                        $workflow['presentation_panel']
+                    );
+                    $applicationUpdate = $pdo->prepare(
+                        "UPDATE applications
+                         SET workflow_state = :workflow_state,
+                             status = CASE WHEN status = 'scheduled' THEN 'ready_for_presentation' ELSE status END
+                         WHERE application_id = :id"
+                    );
+                    $applicationUpdate->execute([
+                        'workflow_state' => json_encode($workflow, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                        'id' => $applicationId,
+                    ]);
+                }
+            }
+
+            $pdo->commit();
         } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    } elseif (class_exists('DB')) {
+        throw new InvalidArgumentException('The schedule identifier is invalid.');
+    }
+
+    $storedSchedules = storeGet('schedules');
+    $applicationId = 0;
+    foreach ($storedSchedules as $schedule) {
+        if ((string) ($schedule['id'] ?? '') === $id) {
+            $applicationId = (int) ($schedule['applicationId'] ?? 0);
+            break;
         }
     }
-    storeSet('schedules', array_values(array_filter(storeGet('schedules'), static function ($s) use ($id) {
-        return (string) $s['id'] !== $id;
+    storeSet('schedules', array_values(array_filter($storedSchedules, static function ($s) use ($id) {
+        return (string) ($s['id'] ?? '') !== $id;
     })));
+
+    if ($applicationId > 0) {
+        $applications = storeGet('applications');
+        foreach ($applications as &$application) {
+            if ((int) ($application['id'] ?? 0) !== $applicationId) {
+                continue;
+            }
+            if (is_array($application['workflowState'] ?? null)) {
+                foreach (['presentation_date', 'presentation_time', 'presentation_venue', 'presentation_panel'] as $key) {
+                    unset($application['workflowState'][$key]);
+                }
+            }
+            if (($application['status'] ?? '') === 'scheduled') {
+                $application['status'] = 'ready_for_presentation';
+            }
+        }
+        unset($application);
+        storeSet('applications', $applications);
+    }
 }
 
 function deletePanelMemberRecord(string $id): void {
@@ -3159,10 +3228,21 @@ function schedulesForEmail(string $email): array {
 
 function addScheduleRecord(array $s): array {
     if (class_exists('DB') && !empty($s['applicationId'])) {
-        $date = date('Y-m-d', strtotime((string) ($s['date'] ?? '')));
-        $time = date('H:i:s', strtotime((string) ($s['time'] ?? '')));
-        $coordinator = (int) (DB::getConnection()->query("SELECT user_id FROM users WHERE role = 'coordinator' ORDER BY user_id LIMIT 1")->fetchColumn() ?: 0);
         $pdo = DB::getConnection();
+        $coordinator = (int) ($_SESSION['user']['user_id'] ?? $_SESSION['user']['id'] ?? 0);
+        if ($coordinator <= 0) {
+            $coordinator = (int) ($pdo->query("SELECT user_id FROM users WHERE role = 'coordinator' ORDER BY user_id LIMIT 1")->fetchColumn() ?: 0);
+        }
+        if ($coordinator <= 0) {
+            throw new RuntimeException('No coordinator account is available to manage the schedule.');
+        }
+        $date = trim((string) ($s['date'] ?? ''));
+        $time = trim((string) ($s['time'] ?? ''));
+        $dateValue = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+        $timeValue = DateTimeImmutable::createFromFormat('!H:i', $time);
+        if (!$dateValue || $dateValue->format('Y-m-d') !== $date || !$timeValue || $timeValue->format('H:i') !== $time) {
+            throw new InvalidArgumentException('The schedule date or time is invalid.');
+        }
         $adviserStmt = $pdo->prepare('SELECT adviser_id FROM advisor_pool WHERE name = :name LIMIT 1');
         $adviserStmt->execute(['name' => trim((string) ($s['adviser'] ?? ''))]);
         $adviserId = (int) ($adviserStmt->fetchColumn() ?: 0);
@@ -3173,12 +3253,30 @@ function addScheduleRecord(array $s): array {
         $documentorMiddle = $documentorGiven ? implode(' ', $documentorGiven) : null;
         $pdo->beginTransaction();
         try {
-            $stmt = $pdo->prepare('INSERT INTO schedules (application_id, managed_by_user_id, presentation_date, start_time, venue, adviser_id, documentor_first_name, documentor_middle_name, documentor_last_name, status) VALUES (:application_id, :managed_by_user_id, :presentation_date, :start_time, :venue, :adviser_id, :documentor_first_name, :documentor_middle_name, :documentor_last_name, :status)');
+            $stmt = $pdo->prepare(
+                'INSERT INTO schedules
+                    (application_id, managed_by_user_id, presentation_date, start_time, venue, adviser_id,
+                     documentor_first_name, documentor_middle_name, documentor_last_name, status)
+                 VALUES
+                    (:application_id, :managed_by_user_id, :presentation_date, :start_time, :venue, :adviser_id,
+                     :documentor_first_name, :documentor_middle_name, :documentor_last_name, :status)
+                 ON DUPLICATE KEY UPDATE
+                    schedule_id = LAST_INSERT_ID(schedule_id),
+                    managed_by_user_id = VALUES(managed_by_user_id),
+                    presentation_date = VALUES(presentation_date),
+                    start_time = VALUES(start_time),
+                    venue = VALUES(venue),
+                    adviser_id = VALUES(adviser_id),
+                    documentor_first_name = VALUES(documentor_first_name),
+                    documentor_middle_name = VALUES(documentor_middle_name),
+                    documentor_last_name = VALUES(documentor_last_name),
+                    status = VALUES(status)'
+            );
             $stmt->execute([
                 'application_id' => (int) $s['applicationId'],
                 'managed_by_user_id' => $coordinator,
                 'presentation_date' => $date,
-                'start_time' => $time,
+                'start_time' => $time . ':00',
                 'venue' => trim((string) ($s['venue'] ?? '')),
                 'adviser_id' => $adviserId > 0 ? $adviserId : null,
                 'documentor_first_name' => $documentorFirst,
@@ -3187,6 +3285,16 @@ function addScheduleRecord(array $s): array {
                 'status' => ($s['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
             ]);
             $scheduleId = (int) $pdo->lastInsertId();
+            if ($scheduleId <= 0) {
+                $scheduleStmt = $pdo->prepare('SELECT schedule_id FROM schedules WHERE application_id = :application_id LIMIT 1');
+                $scheduleStmt->execute(['application_id' => (int) $s['applicationId']]);
+                $scheduleId = (int) ($scheduleStmt->fetchColumn() ?: 0);
+            }
+            if ($scheduleId <= 0) {
+                throw new RuntimeException('The schedule could not be loaded after saving.');
+            }
+            $pdo->prepare('DELETE FROM schedule_panel_assignments WHERE schedule_id = :schedule_id')
+                ->execute(['schedule_id' => $scheduleId]);
             $memberStmt = $pdo->prepare('SELECT panel_member_id FROM panel_members WHERE CONCAT(last_name, ", ", first_name, IF(middle_name IS NULL OR middle_name = "", "", CONCAT(" ", middle_name))) = :name LIMIT 1');
             $assignmentStmt = $pdo->prepare('INSERT IGNORE INTO schedule_panel_assignments (schedule_id, panel_member_id, panel_role) VALUES (:schedule_id, :panel_member_id, :panel_role)');
             $panelText = (string) ($s['panel'] ?? '');

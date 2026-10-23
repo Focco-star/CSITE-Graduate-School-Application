@@ -72,6 +72,21 @@ if (!function_exists('scheduleCalendarIsDate')) {
     }
 }
 
+/** Parses stored schedule dates in ISO or legacy display format. */
+if (!function_exists('scheduleCalendarParseDate')) {
+    function scheduleCalendarParseDate($value): ?string
+    {
+        $value = trim((string) $value);
+        foreach (['!Y-m-d', '!M j, Y', '!F j, Y'] as $format) {
+            $date = DateTimeImmutable::createFromFormat($format, $value);
+            if (scheduleCalendarCleanParse($date)) {
+                return $date->format('Y-m-d');
+            }
+        }
+        return null;
+    }
+}
+
 /** Runs a prepared statement and returns every row; throws on failure. */
 if (!function_exists('scheduleCalendarQuery')) {
     function scheduleCalendarQuery(PDO $pdo, string $sql, array $params = []): array
@@ -191,6 +206,7 @@ if (!function_exists('scheduleCalendarFetch')) {
 
         $byDate = [];
         $seen   = [];
+        $scheduledApplications = [];
         $add = static function (string $date, array $event) use (&$byDate, &$seen): void {
             // One presentation = one application at one date and time.
             $key = $event['applicationId'] . '|' . $date . '|' . ($event['start'] ?? '');
@@ -223,6 +239,7 @@ if (!function_exists('scheduleCalendarFetch')) {
             if (!scheduleCalendarIsDate($date)) {
                 continue;
             }
+            $scheduledApplications[(int) $row['application_id']] = true;
             $add($date, scheduleCalendarEvent(
                 'sch_' . (int) $row['schedule_id'],
                 (int) $row['application_id'],
@@ -233,6 +250,47 @@ if (!function_exists('scheduleCalendarFetch')) {
                 (string) $row['schedule_status'],
                 scheduleCalendarParseTime($row['start_time']),
                 scheduleCalendarParseTime($row['end_time'])
+            ));
+        }
+
+        // Keep older workflow-only schedules visible while the schedule table
+        // remains the source of truth for newly saved or edited records.
+        $workflowRows = scheduleCalendarQuery(
+            $pdo,
+            "SELECT a.application_id, a.workflow_state, a.paper_title, a.presentation_stage,
+                    {$nameSql} AS student_name
+             FROM applications a
+             JOIN users u ON u.user_id = a.user_id
+             LEFT JOIN students s ON s.user_id = u.user_id
+             WHERE a.archived_at IS NULL
+               AND a.status = 'scheduled'
+               AND NOT EXISTS (
+                    SELECT 1 FROM schedules sc WHERE sc.application_id = a.application_id
+               )"
+        );
+        foreach ($workflowRows as $row) {
+            $applicationId = (int) $row['application_id'];
+            if ($applicationId <= 0 || isset($scheduledApplications[$applicationId])) {
+                continue;
+            }
+            $workflow = json_decode((string) ($row['workflow_state'] ?? ''), true);
+            if (!is_array($workflow)) {
+                continue;
+            }
+            $date = scheduleCalendarParseDate($workflow['presentation_date'] ?? '');
+            if ($date === null || $date < $start || $date > $end) {
+                continue;
+            }
+            $add($date, scheduleCalendarEvent(
+                'app_' . $applicationId,
+                $applicationId,
+                $row['student_name'],
+                $row['paper_title'],
+                $row['presentation_stage'],
+                $workflow['presentation_venue'] ?? '',
+                'scheduled',
+                scheduleCalendarParseTime($workflow['presentation_time'] ?? ''),
+                null
             ));
         }
 

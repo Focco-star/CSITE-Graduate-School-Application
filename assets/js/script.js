@@ -1076,3 +1076,247 @@
 })();
 
 })();
+
+(function () {
+    'use strict';
+
+    function initScheduleCalendar(root) {
+        const endpoint = root.dataset.endpoint;
+        const grid = root.querySelector('[data-psc-grid]');
+        const monthLabel = root.querySelector('[data-psc-month]');
+        const summary = root.querySelector('[data-psc-summary]');
+        const progress = root.querySelector('[data-psc-progress]');
+        const alertBox = root.querySelector('[data-psc-alert]');
+        const alertMessage = root.querySelector('[data-psc-alert-msg]');
+        const calendar = root.querySelector('.psc-calendar');
+        const overlay = root.querySelector('[data-psc-overlay]');
+        const dialog = root.querySelector('.psc-dialog');
+        const dialogTitle = root.querySelector('[data-psc-dlg-title]');
+        const dialogSub = root.querySelector('[data-psc-dlg-sub]');
+        const dialogBody = root.querySelector('[data-psc-dlg-body]');
+        const pollMs = Number(root.dataset.poll) || 0;
+        let today = root.dataset.today || '';
+        let month = today ? new Date(`${today}T00:00:00Z`) : new Date();
+        let lastSignature = '';
+        let activeController = null;
+        let loading = false;
+        let requestSequence = 0;
+        let pollTimer = 0;
+        let returnFocus = null;
+
+        if (!endpoint || !grid || !monthLabel || !calendar) return;
+        month = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), 1));
+
+        function dateKey(date) {
+            return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+        }
+
+        function addDays(date, days) {
+            const result = new Date(date);
+            result.setUTCDate(result.getUTCDate() + days);
+            return result;
+        }
+
+        function makeElement(tag, className, text) {
+            const element = document.createElement(tag);
+            if (className) element.className = className;
+            if (text !== undefined) element.textContent = text;
+            return element;
+        }
+
+        function setBusy(value) {
+            calendar.setAttribute('aria-busy', value ? 'true' : 'false');
+            progress?.classList.toggle('is-active', value);
+        }
+
+        function closeDialog() {
+            overlay.hidden = true;
+            document.body.classList.remove('psc-dialog-open');
+            returnFocus?.focus();
+        }
+
+        function showEvent(event, date, trigger) {
+            returnFocus = trigger;
+            dialogTitle.textContent = event.student || 'Presentation';
+            const prettyDate = new Intl.DateTimeFormat(undefined, {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC'
+            }).format(new Date(`${date}T00:00:00Z`));
+            dialogSub.textContent = [prettyDate, event.startLabel, event.endLabel ? `to ${event.endLabel}` : ''].filter(Boolean).join(' · ');
+            dialogBody.replaceChildren();
+            [
+                ['Title', event.title],
+                ['Stage', event.stage],
+                ['Venue', event.venue],
+                ['Status', event.status]
+            ].forEach(([label, value]) => {
+                if (!value) return;
+                const row = makeElement('div', 'psc-detail-row');
+                row.append(makeElement('span', 'psc-detail-label', label), makeElement('span', 'psc-detail-value', value));
+                dialogBody.appendChild(row);
+            });
+            if (event.duration) {
+                const row = makeElement('div', 'psc-detail-row');
+                row.append(makeElement('span', 'psc-detail-label', 'Duration'), makeElement('span', 'psc-detail-value', event.duration));
+                dialogBody.appendChild(row);
+            }
+            overlay.hidden = false;
+            document.body.classList.add('psc-dialog-open');
+            dialog.focus();
+        }
+
+        function createEventButton(event, date) {
+            const button = makeElement('button', 'psc-event');
+            button.type = 'button';
+            button.title = [event.student, event.title, event.startLabel].filter(Boolean).join(' · ');
+            if (event.startLabel) button.appendChild(makeElement('span', 'psc-event-time', event.startLabel));
+            button.appendChild(makeElement('span', 'psc-event-name', event.student || event.title || 'Presentation'));
+            button.addEventListener('click', () => showEvent(event, date, button));
+            return button;
+        }
+
+        function render(dates) {
+            const monthName = new Intl.DateTimeFormat(undefined, {
+                month: 'long', year: 'numeric', timeZone: 'UTC'
+            }).format(month);
+            monthLabel.textContent = monthName;
+            const firstDay = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), 1));
+            const start = addDays(firstDay, -firstDay.getUTCDay());
+            const fragment = document.createDocumentFragment();
+            let eventCount = 0;
+
+            for (let index = 0; index < 42; index++) {
+                const date = addDays(start, index);
+                const key = dateKey(date);
+                const events = Array.isArray(dates[key]) ? dates[key] : [];
+                if (date.getUTCMonth() === month.getUTCMonth()) eventCount += events.length;
+
+                const cell = makeElement('div', 'psc-day');
+                cell.setAttribute('role', 'gridcell');
+                if (date.getUTCMonth() !== month.getUTCMonth()) cell.classList.add('is-outside');
+                if (key === today) cell.classList.add('is-today');
+                if (events.length) cell.classList.add('has-events');
+
+                const heading = makeElement('div', 'psc-day-heading');
+                heading.append(
+                    makeElement('span', 'psc-day-number', String(date.getUTCDate())),
+                    makeElement('span', 'psc-day-count', events.length ? `${events.length} ${events.length === 1 ? 'schedule' : 'schedules'}` : '')
+                );
+                cell.appendChild(heading);
+
+                events.slice(0, 3).forEach(event => cell.appendChild(createEventButton(event, key)));
+                if (events.length > 3) {
+                    const more = makeElement('button', 'psc-more-events', `+${events.length - 3} more`);
+                    more.type = 'button';
+                    more.addEventListener('click', () => {
+                        more.remove();
+                        events.slice(3).forEach(event => cell.appendChild(createEventButton(event, key)));
+                    });
+                    cell.appendChild(more);
+                }
+                fragment.appendChild(cell);
+            }
+
+            grid.replaceChildren(fragment);
+            summary.textContent = `${eventCount} ${eventCount === 1 ? 'presentation' : 'presentations'} this month`;
+        }
+
+        async function loadSchedules() {
+            if (loading) return;
+            loading = true;
+            const requestId = ++requestSequence;
+            const controller = new AbortController();
+            activeController = controller;
+            const firstDay = new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth(), 1));
+            const gridStart = addDays(firstDay, -firstDay.getUTCDay());
+            const gridEnd = addDays(gridStart, 41);
+            const requestUrl = new URL(endpoint, window.location.href);
+            requestUrl.searchParams.set('start', dateKey(gridStart));
+            requestUrl.searchParams.set('end', dateKey(gridEnd));
+
+            setBusy(true);
+            alertBox.hidden = true;
+            try {
+                const response = await fetch(requestUrl.toString(), {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    signal: controller.signal
+                });
+                const payload = await response.json();
+                if (!response.ok || payload.ok !== true || !payload.dates || typeof payload.dates !== 'object') {
+                    throw new Error(payload.error || 'We couldn’t load the schedule. Please try again.');
+                }
+                if (payload.today) {
+                    if (today !== payload.today) lastSignature = '';
+                    today = payload.today;
+                    root.dataset.today = payload.today;
+                }
+                if (payload.signature !== lastSignature || !grid.childElementCount) {
+                    render(payload.dates);
+                    lastSignature = payload.signature;
+                }
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    alertMessage.textContent = error.message || 'We couldn’t load the schedule. Please try again.';
+                    alertBox.hidden = false;
+                    summary.textContent = 'Schedule could not be loaded.';
+                }
+            } finally {
+                if (requestId === requestSequence) {
+                    loading = false;
+                    activeController = null;
+                    setBusy(false);
+                }
+            }
+        }
+
+        function changeMonth(nextMonth) {
+            activeController?.abort();
+            loading = false;
+            month = new Date(Date.UTC(nextMonth.getUTCFullYear(), nextMonth.getUTCMonth(), 1));
+            lastSignature = '';
+            loadSchedules();
+        }
+
+        root.querySelector('[data-psc-prev]')?.addEventListener('click', () => {
+            changeMonth(new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() - 1, 1)));
+        });
+        root.querySelector('[data-psc-next]')?.addEventListener('click', () => {
+            changeMonth(new Date(Date.UTC(month.getUTCFullYear(), month.getUTCMonth() + 1, 1)));
+        });
+        root.querySelector('[data-psc-today]')?.addEventListener('click', () => {
+            const currentToday = root.dataset.today || today;
+            const date = currentToday ? new Date(`${currentToday}T00:00:00Z`) : new Date();
+            changeMonth(date);
+        });
+        root.querySelector('[data-psc-retry]')?.addEventListener('click', loadSchedules);
+        root.querySelectorAll('[data-psc-close]').forEach(button => button.addEventListener('click', closeDialog));
+        overlay?.addEventListener('click', event => {
+            if (event.target === overlay) closeDialog();
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && overlay && !overlay.hidden) closeDialog();
+        });
+
+        loadSchedules();
+        if (pollMs > 0) {
+            pollTimer = window.setInterval(() => {
+                if (!document.hidden && !loading) loadSchedules();
+            }, pollMs);
+        }
+        window.addEventListener('pagehide', () => {
+            window.clearInterval(pollTimer);
+            activeController?.abort();
+        }, { once: true });
+    }
+
+    function bootScheduleCalendars() {
+        document.querySelectorAll('[data-schedule-calendar]').forEach(initScheduleCalendar);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootScheduleCalendars);
+    } else {
+        bootScheduleCalendars();
+    }
+})();
