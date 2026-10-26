@@ -8,8 +8,8 @@
 --
 -- The database ran on host 127.0.0.1, meaning the local machine.
 -- Host: 127.0.0.1
--- Export date: September 30, 2026 at 12:45 PM.
--- Generation Time: Sep 30, 2026 at 12:45 PM
+-- Export date: Oct 26, 2026 at 04:10 PM
+-- Generation Time: Oct 26, 2026 at 04:10 PM
 -- The database server was MariaDB version 10.4.32.
 -- Server version: 10.4.32-MariaDB
 -- The server was running PHP version 8.0.30.
@@ -353,10 +353,6 @@ CREATE TABLE `payments` (
   `payment_date` date NOT NULL,
   -- amount stores the money paid, with two decimal places.
   `amount` decimal(10,2) NOT NULL,
-  -- proof_document_id optionally points to an uploaded proof file.
-  `proof_document_id` int(11) DEFAULT NULL,
-  -- notes holds optional remarks about the payment.
-  `notes` text DEFAULT NULL,
   -- created_at records when the payment row was inserted.
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   -- updated_at refreshes automatically whenever the row changes.
@@ -371,10 +367,10 @@ CREATE TABLE `payments` (
 -- Comment divider closing the payments data header.
 --
 
--- Inserts one demo payment and lists its ten columns.
-INSERT INTO `payments` (`payment_id`, `application_id`, `recorded_by_user_id`, `receipt_number`, `payment_date`, `amount`, `proof_document_id`, `notes`, `created_at`, `updated_at`) VALUES
+-- Inserts one demo payment and lists its eight columns.
+INSERT INTO `payments` (`payment_id`, `application_id`, `recorded_by_user_id`, `receipt_number`, `payment_date`, `amount`, `created_at`, `updated_at`) VALUES
 -- Payment 1: receipt 231231 for application 20, amount 1.00.
-(1, 20, 2, '231231', '2026-09-30', 1.00, NULL, NULL, '2026-09-30 10:26:04', '2026-09-30 10:26:04');
+(1, 20, 2, '231231', '2026-09-30', 1.00, '2026-09-30 10:26:04', '2026-09-30 10:26:04');
 
 -- Visual divider before the programs table section.
 -- --------------------------------------------------------
@@ -1086,9 +1082,7 @@ ALTER TABLE `payments`
   -- Forces every receipt number to be unique.
   ADD UNIQUE KEY `uq_payments_receipt_number` (`receipt_number`),
   -- Indexes recorded_by_user_id to find payments by coordinator.
-  ADD KEY `idx_payments_recorder` (`recorded_by_user_id`),
-  -- Indexes proof_document_id to find payments using a proof file.
-  ADD KEY `idx_payments_proof_document` (`proof_document_id`);
+  ADD KEY `idx_payments_recorder` (`recorded_by_user_id`);
 
 -- Comment divider introducing the programs indexes.
 --
@@ -1429,8 +1423,6 @@ ALTER TABLE `application_documents`
 ALTER TABLE `payments`
   -- application_id links to applications; deleting one deletes its payment.
   ADD CONSTRAINT `fk_payments_application` FOREIGN KEY (`application_id`) REFERENCES `applications` (`application_id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  -- proof_document_id links to a document; deleting the file sets it to NULL.
-  ADD CONSTRAINT `fk_payments_proof_document` FOREIGN KEY (`proof_document_id`) REFERENCES `application_documents` (`document_id`) ON DELETE SET NULL ON UPDATE CASCADE,
   -- recorded_by_user_id must exist in users; user id updates cascade.
   ADD CONSTRAINT `fk_payments_recorder` FOREIGN KEY (`recorded_by_user_id`) REFERENCES `users` (`user_id`) ON UPDATE CASCADE;
 
