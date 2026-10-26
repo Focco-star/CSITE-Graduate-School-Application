@@ -1,24 +1,46 @@
+-- Comment banner that opens the header of this repair script.
 -- =============================================================================
+-- Names the file that repairs the orphaned applications table.
 -- 20260916_repair_orphaned_applications_table.sql
+-- Divider line under the file name.
 -- -----------------------------------------------------------------------------
+-- Starts the purpose section, marked as user-approved.
 -- Purpose (user-approved):
+-- Notes the live database has an orphaned InnoDB entry.
 --   The live `csite_grad_school` database has an orphaned InnoDB entry for the
+-- Explains the data and form files for applications are missing.
 --   `applications` table: its data file (applications.ibd) and .frm are missing,
+-- Says the data dictionary still lists the table name anyway.
 --   but the InnoDB data dictionary still lists the name. As a result:
+-- Notes SHOW TABLES does not list the table.
 --     * SHOW TABLES does not list it,
+-- Says SELECT and CREATE both fail with errors.
 --     * SELECT/CREATE both fail (1146 doesn't exist / 1050 already exists).
+-- Explains the official fix is to drop the ghost entry.
 --   The official fix is to DROP the ghost entry (removes only the stale
+-- Notes this only removes a stale dictionary row and loses no data.
 --   dictionary row; there is no data file to lose) and re-create the table
+-- Then the table is recreated from the updated schema dump.
 --   from the updated schema dump.
+-- Separates the purpose from the run order.
 --
+-- Starts the ordered list of commands to run.
 -- Run order:
+-- First step: run this repair script on the database.
 --   1. mysql -u root csite_grad_school < 20260916_repair_orphaned_applications_table.sql
+-- Second step: add the workflow columns with that migration.
 --   2. mysql -u root csite_grad_school < 20260916_add_application_workflow_fields.sql
+-- Third step: re-import the seed rows or the full dump.
 --   3. Re-import the seed rows (or run csite_grad_school.sql on a fresh DB).
+-- Closes the header comment banner.
 -- =============================================================================
 
+-- Drops the ghost applications table so it can be recreated.
 DROP TABLE IF EXISTS `applications`;
 
+-- Explains the table is recreated by importing the updated dump.
 -- The table is recreated by importing the updated csite_grad_school.sql
+-- Notes that dump already contains the full workflow columns.
 -- (which now carries the full workflow columns). On this machine the seed
+-- Says seed inserts on this machine come from the same file.
 -- INSERTs are applied from that same file.

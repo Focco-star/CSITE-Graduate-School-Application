@@ -1,203 +1,123 @@
+<?php /* Opens the PHP block for the coordinator dashboard. */ ?>
 <?php
+// Loads the shared config with helpers and demo data.
 require_once __DIR__ . '/../includes/config.php';
+// Loads the DB class for database access.
 require_once __DIR__ . '/../includes/db.php';
+// Loads the helper that draws the program population chart.
 require_once __DIR__ . '/../includes/program_chart.php';
+// Loads the helper that renders the schedule calendar.
 require_once __DIR__ . '/../includes/calendar.php';
 
+// Checks whether a session is not running yet.
 if (session_status() === PHP_SESSION_NONE) {
+    // Starts the session so the logged-in user can be read.
     session_start();
+// Closes the session check block.
 }
 
+// Reads the logged-in user array, or an empty array if none.
 $sessionUser = $_SESSION['user'] ?? [];
+// Picks the display name from the session or the demo coordinator.
 $userName    = !empty($sessionUser['full_name']) ? $sessionUser['full_name'] : ($mockCoordinator['name'] ?? 'Coordinator');
+// Sets the browser tab title to Dashboard.
 $pageTitle   = 'Dashboard';
+// Marks the page as part of the coordinator area.
 $role        = 'coordinator';
+// Highlights the Dashboard link in the sidebar.
 $currentPage = 'dashboard';
 
 
+// Checks that no database connection exists yet.
 if (!isset($pdo) || !($pdo instanceof PDO)) {
+    // Opens a try block to build the connection safely.
     try {
+        // Reads the DB host constant, defaulting to localhost.
         $dbHost = defined('DB_HOST') ? DB_HOST : 'localhost';
+        // Reads the DB name constant, defaulting to csite_grad_school.
         $dbName = defined('DB_NAME') ? DB_NAME : 'csite_grad_school';
+        // Reads the DB user constant, defaulting to root.
         $dbUser = defined('DB_USER') ? DB_USER : 'root';
+        // Reads the DB password constant, defaulting to empty.
         $dbPass = defined('DB_PASS') ? DB_PASS : '';
+        // Creates the PDO connection to MySQL using UTF-8.
         $pdo = new PDO("mysql:host={$dbHost};dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, [
+            // Makes PDO throw exceptions when queries fail.
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            // Fetches rows as associative arrays by default.
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        // Closes the PDO option array and connection call.
         ]);
+    // Catches a failed connection attempt.
     } catch (PDOException $e) {
+        // Leaves the connection empty so the page can still load.
         $pdo = null;
+    // Closes the connection catch block.
     }
+// Closes the block that only ran when no connection existed.
 }
 
 
-$activeStudentsCount = 0;
-$students = function_exists('storeGet') ? (array) (storeGet('students') ?? []) : [];
-$completedStudentsCount = count(array_filter($students, static function ($student) {
-    return in_array($student['status'] ?? '', ['completed', 'approved'], true);
-}));
-$activePanelMembersCount = 0;
+// Works out the academic year start, with July as the new year.
 $academicYearStart = (int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 1;
-$academicYearStartDate = strtotime($academicYearStart . '-07-01');
-$academicYearEndDate = strtotime(($academicYearStart + 1) . '-07-01');
+// Builds the academic year label such as 2025-2026.
 $academicYearLabel = $academicYearStart . '-' . ($academicYearStart + 1);
-$upcomingPresentations = [];
 
-// Merge saved schedules with workflow-only schedules so the academic-year
-// summary counts each presentation once.
-if (function_exists('databaseSchedules')) {
-    try {
-        $upcomingPresentations = databaseSchedules();
-    } catch (Throwable $e) {
-        $upcomingPresentations = [];
-    }
-}
-
-// Merge database-backed scheduled applications (schedule/add.php records the
-// presentation date/time/venue/panel in applications.workflow_state), so the
-// count also works across sessions where the session-only schedule list is
-// empty. Session rows win on duplicates (same application).
-if ($pdo && class_exists('DB')) {
-    try {
-        $scheduledStmt = $pdo->prepare(
-            "SELECT a.application_id AS applicationId,
-                    COALESCE(
-                        NULLIF(TRIM(CONCAT(s.last_name, ', ', s.first_name, IF(s.middle_initial IS NULL OR TRIM(REPLACE(s.middle_initial, '.', '')) = '', '', CONCAT(' ', TRIM(REPLACE(s.middle_initial, '.', '')))))), ''),
-                        u.full_name
-                    ) AS studentName,
-                    u.email AS studentEmail,
-                    a.presentation_stage AS stage,
-                    a.workflow_state AS workflowState,
-                    a.status
-             FROM applications a
-             JOIN users u ON u.user_id = a.user_id
-             LEFT JOIN students s ON s.user_id = u.user_id
-             WHERE a.archived_at IS NULL AND a.status = 'scheduled'"
-        );
-        $scheduledStmt->execute();
-        $coveredAppIds = [];
-        foreach ($upcomingPresentations as $existing) {
-            $candidate = (int) ($existing['applicationId'] ?? $existing['application_id'] ?? 0);
-            if ($candidate > 0) {
-                $coveredAppIds[$candidate] = true;
-            }
-        }
-        foreach ($scheduledStmt->fetchAll() as $row) {
-            $appId = (int) ($row['applicationId'] ?? 0);
-            if ($appId <= 0 || isset($coveredAppIds[$appId])) {
-                continue;
-            }
-            $wf = json_decode((string) ($row['workflowState'] ?? ''), true) ?: [];
-            if (empty($wf['presentation_date'])) {
-                continue;
-            }
-            $upcomingPresentations[] = [
-                'id' => 'db_' . $appId,
-                'applicationId' => $appId,
-                'studentEmail' => $row['studentEmail'] ?? '',
-                'studentName' => $row['studentName'] ?? '',
-                'stage' => $row['stage'] ?? '',
-                'date' => (string) ($wf['presentation_date'] ?? ''),
-                'time' => (string) ($wf['presentation_time'] ?? ''),
-                'venue' => (string) ($wf['presentation_venue'] ?? ''),
-                'panel' => (string) ($wf['presentation_panel'] ?? 'TBD'),
-                'status' => $row['status'] ?? 'scheduled',
-            ];
-        }
-    } catch (Throwable $e) {
-    }
-}
-
-if ($pdo) {
-    try {
-        $studentStatuses = $pdo->query(
-            "SELECT
-                (SELECT a.status
-                 FROM applications a
-                 WHERE a.user_id = s.user_id AND a.archived_at IS NULL
-                 ORDER BY a.submitted_at DESC, a.application_id DESC
-                 LIMIT 1) AS latest_status
-             FROM students s
-             WHERE s.archived_at IS NULL"
-        )->fetchAll(PDO::FETCH_COLUMN);
-        $completedStudentsCount = count(array_filter($studentStatuses, static function ($status) {
-            return in_array($status, ['completed', 'approved'], true);
-        }));
-
-        $stmt = $pdo->query("SELECT COUNT(*) FROM students WHERE archived_at IS NULL");
-        $activeStudentsCount = (int) $stmt->fetchColumn();
-
-    } catch (PDOException $e) {
-
-    }
-}
-
-$panelMembers = function_exists('databasePanelMembers') ? databasePanelMembers() : [];
-$activePanelMembersCount = count(array_filter($panelMembers, static function ($member) {
-    return ($member['availability'] ?? '') === 'available';
-}));
-
-$presentationsThisAcademicYear = count(array_filter($upcomingPresentations, static function ($presentation) use ($academicYearStartDate, $academicYearEndDate) {
-    $date = strtotime((string) ($presentation['date'] ?? ''));
-    return $date !== false
-        && $date >= $academicYearStartDate
-        && $date < $academicYearEndDate
-        && ($presentation['status'] ?? '') !== 'cancelled';
-}));
-
-if (!$activeStudentsCount && !$pdo) {
-    $activeStudentsCount = count($students);
-}
-
+// Loads the shared header with sidebar.
 require_once __DIR__ . '/../includes/header.php';
+// Closes PHP so the HTML below is printed.
 ?>
 
-<div class="page-header">
-    <h2>Welcome, <?= htmlspecialchars($userName) ?>!</h2>
-    <p>Overview of applications, submissions, and upcoming presentations requiring your attention.</p>
-</div>
-
-<section class="quick-summary">
-    <div class="quick-summary-header">
-        <h3>Quick Summary</h3>
-        <span>Current academic year: <?= htmlspecialchars($academicYearLabel) ?></span>
-    </div>
-    <div class="quick-summary-body">
-        <div class="quick-summary-grid">
-            <a href="<?= url('coordinator/students/manage.php') ?>" class="quick-summary-stat">
-                <span class="quick-summary-icon"><i class="fas fa-check-circle"></i></span>
-                <span>
-                    <span class="quick-summary-value"><?= $completedStudentsCount ?></span>
-                    <span class="quick-summary-label">Completed This Year</span>
-                </span>
-            </a>
-            <a href="<?= url('coordinator/panel/manage.php') ?>" class="quick-summary-stat">
-                <span class="quick-summary-icon"><i class="fas fa-chalkboard-teacher"></i></span>
-                <span>
-                    <span class="quick-summary-value"><?= $activePanelMembersCount ?></span>
-                    <span class="quick-summary-label">Active Panel Members</span>
-                </span>
-            </a>
-            <a href="<?= url('coordinator/schedule/manage.php') ?>" class="quick-summary-stat">
-                <span class="quick-summary-icon"><i class="fas fa-chalkboard"></i></span>
-                <span>
-                    <span class="quick-summary-value"><?= $presentationsThisAcademicYear ?></span>
-                    <span class="quick-summary-label">Presentations, SY <?= htmlspecialchars($academicYearLabel) ?></span>
-                </span>
-            </a>
-            <a href="<?= url('coordinator/students/manage.php') ?>" class="quick-summary-stat">
-                <span class="quick-summary-icon"><i class="fas fa-user-graduate"></i></span>
-                <span>
-                    <span class="quick-summary-value"><?= $activeStudentsCount ?></span>
-                    <span class="quick-summary-label">Active Students</span>
-                </span>
-            </a>
+<?php /* Opens the welcome hero section of the dashboard. */ ?>
+<section class="dash-hero" aria-labelledby="dashHeroTitle">
+<?php /*     Opens the main area of the hero section. */ ?>
+    <div class="dash-hero-main">
+<?php /*         Shows a university icon in the hero badge. */ ?>
+        <span class="dash-hero-mark" aria-hidden="true"><i class="fas fa-university"></i></span>
+<?php /*         Opens the text block inside the hero. */ ?>
+        <div class="dash-hero-copy">
+<?php /*             Small label naming the CSITE Graduate School. */ ?>
+            <span class="dash-hero-eyebrow"><i class="fas fa-graduation-cap" aria-hidden="true"></i> CSITE Graduate School</span>
+<?php /*             Big welcome heading with the coordinator's name. */ ?>
+            <h2 class="dash-hero-title" id="dashHeroTitle">Welcome Back, Coordinator Precious Opinion</h2>
+<?php /*             Subtitle showing the coordinator role and university. */ ?>
+            <p class="dash-hero-subtitle">Graduate Program Coordinator <span class="dash-hero-dot" aria-hidden="true">&middot;</span> Ateneo de Zamboanga University</p>
+<?php /*         Closes the hero text block. */ ?>
         </div>
+<?php /*     Closes the hero main area. */ ?>
     </div>
+<?php /*     Opens the side area of the hero. */ ?>
+    <div class="dash-hero-aside">
+<?php /*         Shows the current academic year with a calendar icon. */ ?>
+        <span class="dash-hero-ay"><i class="fas fa-calendar-days" aria-hidden="true"></i> Academic Year <?= htmlspecialchars($academicYearLabel) ?></span>
+<?php /*     Closes the hero side area. */ ?>
+    </div>
+<?php /* Closes the hero section. */ ?>
 </section>
 
+<?php /* Draws the schedule calendar for the coordinator. */ ?>
 <?php renderScheduleCalendar(); ?>
 
-<?php renderProgramPopulationChart($pdo ?? null); ?>
+<?php /* Opens the box that holds the program chart. */ ?>
+<div class="dash-chart">
+<?php /*     Opens PHP to call the chart helper. */ ?>
+    <?php
+    // Starts the student population chart with the database connection.
+    renderProgramPopulationChart($pdo ?? null, [
+        // Sets the small label above the chart title.
+        'eyebrow'  => 'Enrollment Overview',
+        // Sets the chart title.
+        'title'    => 'Student Population by Program',
+        // Sets the chart subtitle.
+        'subtitle' => 'Active graduate students across academic programs',
+        // Sets the icon used in the chart header.
+        'icon'     => 'fa-chart-column',
+    // Closes the chart options array and the helper call.
+    ]);
+    // Closes the PHP block that rendered the chart.
+    ?>
+<?php /* Closes the chart box. */ ?>
+</div>
 
+<?php /* Loads the shared footer scripts and closes PHP. */ ?>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
