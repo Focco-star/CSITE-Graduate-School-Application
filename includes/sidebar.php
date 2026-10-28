@@ -783,8 +783,6 @@ $showCoordinatorSection = $isCoordinator;
   #sidebar.myadzu-sidebar .myadzu-root-left > i { width: 18px; font-size: 0.85rem; color: #FFB82B; }
 <?php /*   Colours the root chevron muted grey. */ ?>
   #sidebar.myadzu-sidebar .myadzu-root .nav-chevron { color: #8a94a6; }
-<?php /*   Adds a little vertical padding inside the child menu area. */ ?>
-  #sidebar.myadzu-sidebar .myadzu-children { padding: 0.1rem 0 0.25rem; }
 <?php /*   Starts the themed rule shared by links and toggles. */ ?>
   #sidebar.myadzu-sidebar .myadzu-link,
 <?php /*   Continues the selector for submenu toggles. */ ?>
@@ -879,17 +877,92 @@ $showCoordinatorSection = $isCoordinator;
   }
 <?php /*   Colours the toggle chevron a muted grey. */ ?>
   #sidebar.myadzu-sidebar .myadzu-sub-toggle .nav-chevron { color: #8a94a6; }
-<?php /*   Starts the themed rule for nested submenus. */ ?>
-  #sidebar.myadzu-sidebar .myadzu-nested {
-<?php /*     Indents the nested block and adds space. */ ?>
-    margin: 0.1rem 0 0.25rem 1.5rem;
-<?php /*     Adds a little space before the nested list. */ ?>
-    padding-left: 0.15rem;
-<?php /*     Draws a faint vertical guide line for nesting. */ ?>
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
-<?php /*   Closes the nested submenu rule. */ ?>
+<?php /*   ===== Navigation tree: connectors from the CSITE tab to its menus ===== */ ?>
+  /* ===== Navigation tree: connectors from the CSITE tab to its menus =====
+     One slate trunk drops from the tab icon; each menu hangs from it on a soft
+     elbow that stops at the item edge, so lines never run under hover or
+     active backgrounds. The route to the current page is lit in gold. */
+<?php /*   Design tokens for the connector lines, kept in one place for easy tuning. */ ?>
+  #sidebar.myadzu-sidebar {
+<?php /*     Resting colour of every connector line. */ ?>
+    --tree-line: #465467;
+<?php /*     Colour of a connector when its row is hovered. */ ?>
+    --tree-hover: #8fa0b5;
+<?php /*     Colour of the route leading to the current page. */ ?>
+    --tree-gold: #FFB82B;
+<?php /*     Length of the horizontal arm between the trunk and an item. */ ?>
+    --tree-arm: 0.5rem;
+<?php /*     Corner radius of each elbow. */ ?>
+    --tree-curve: 6px;
+<?php /*     Vertical gap above and below each menu row. */ ?>
+    --tree-gap: 0.05rem;
+<?php /*   Closes the token rule. */ ?>
   }
-<?php /*   Indents the nested links and makes their text smaller. */ ?>
+<?php /*   Places the main trunk under the centre of the CSITE tab icon. */ ?>
+  #sidebar.myadzu-sidebar .myadzu-children { --tree-x: calc(0.75rem + 10px); position: relative; padding: 0.1rem 0 0.25rem; }
+<?php /*   Places the sub-menu trunk under the centre of its parent icon. */ ?>
+  #sidebar.myadzu-sidebar .myadzu-nested { --tree-x: calc(0.75rem + 9px); position: relative; margin: 0 0 0.1rem; padding: 0; border: 0; }
+<?php /*   Resets the lists and indents them just past the trunk and arm. */ ?>
+  #sidebar.myadzu-sidebar :is(.myadzu-children, .myadzu-nested) > ul {
+    margin: 0; list-style: none;
+    padding: 0 0 0 calc(var(--tree-x) + 1px + var(--tree-arm) - 0.1rem);
+<?php /*   Closes the list reset rule. */ ?>
+  }
+<?php /*   Lets each item own its vertical space so trunk segments meet exactly. */ ?>
+  #sidebar.myadzu-sidebar :is(.myadzu-children, .myadzu-nested) > ul > li { position: relative; display: flow-root; }
+<?php /*   Keeps items hidden by the search filter hidden. */ ?>
+  #sidebar.myadzu-sidebar :is(.myadzu-children, .myadzu-nested) > ul > li[hidden] { display: none; }
+<?php /*   Gives each row a fixed vertical gap so the elbow can reach the item above. */ ?>
+  #sidebar.myadzu-sidebar :is(.myadzu-children, .myadzu-nested) > ul > li > :is(.myadzu-link, .myadzu-sub-toggle) {
+    margin: var(--tree-gap) 0.1rem;
+<?php /*   Closes the row spacing rule. */ ?>
+  }
+<?php /*   Draws the short stub joining the CSITE tab to the first menu. */ ?>
+  #sidebar.myadzu-sidebar .myadzu-children::before {
+    content: ''; position: absolute; top: -0.35rem; height: 0.45rem;
+    left: var(--tree-x); width: 1px; background: var(--tree-line);
+<?php /*   Closes the tab stub rule. */ ?>
+  }
+<?php /*   Draws the short stub joining a parent row to its first sub-menu. */ ?>
+  #sidebar.myadzu-sidebar .myadzu-nested::before {
+    content: ''; position: absolute; top: calc(-1 * var(--tree-gap)); height: var(--tree-gap);
+    left: var(--tree-x); width: 1px; background: var(--tree-line);
+<?php /*   Closes the parent stub rule. */ ?>
+  }
+<?php /*   Draws the trunk that passes behind every item that has another after it. */ ?>
+  #sidebar.myadzu-sidebar :is(.myadzu-children, .myadzu-nested) > ul > li:not(:last-child)::before {
+    content: ''; position: absolute; top: 0; bottom: 0;
+    left: calc(0.1rem - 1px - var(--tree-arm)); width: 1px; background: var(--tree-line);
+<?php /*   Closes the trunk rule. */ ?>
+  }
+<?php /*   Ends the trunk at the last visible item while the search filter is active. */ ?>
+  #sidebar.myadzu-sidebar :is(.myadzu-children, .myadzu-nested) > ul > li:not(:has(~ li:not([hidden])))::before { display: none; }
+<?php /*   Draws the elbow: down from the item above, curving into this row. */ ?>
+  #sidebar.myadzu-sidebar :is(.myadzu-children, .myadzu-nested) > ul > li > :is(.myadzu-link, .myadzu-sub-toggle)::after {
+    content: ''; position: absolute; pointer-events: none; box-sizing: border-box;
+    top: calc(-1 * var(--tree-gap)); height: calc(50% + var(--tree-gap));
+    left: calc(-1 * (var(--tree-arm) + 1px)); width: calc(var(--tree-arm) + 1px);
+    border: solid transparent; border-width: 0 0 1px 1px;
+    border-left-color: var(--tree-line); border-bottom-color: var(--tree-line);
+    border-bottom-left-radius: var(--tree-curve);
+    transition: border-color 0.18s ease;
+<?php /*   Closes the elbow rule. */ ?>
+  }
+<?php /*   Brightens the arm of the row the pointer is on. */ ?>
+  #sidebar.myadzu-sidebar :is(.myadzu-children, .myadzu-nested) > ul > li > :is(.myadzu-link, .myadzu-sub-toggle):hover::after { border-bottom-color: var(--tree-hover); }
+<?php /*   Lights the elbow of the current page, or of the group that contains it. */ ?>
+  #sidebar.myadzu-sidebar :is(.myadzu-children, .myadzu-nested) > ul > li.is-active-path > :is(.myadzu-link, .myadzu-sub-toggle)::after {
+    border-left-color: var(--tree-gold); border-bottom-color: var(--tree-gold);
+<?php /*   Closes the active elbow rule. */ ?>
+  }
+<?php /*   Lights the trunk stub leading into a menu that holds the current page. */ ?>
+  #sidebar.myadzu-sidebar .myadzu-children:has(> ul > li.is-active-path)::before,
+  #sidebar.myadzu-sidebar .myadzu-nested:has(> ul > li.is-active-path)::before { background: var(--tree-gold); }
+<?php /*   Carries the gold route down the trunk through every item above the current page. */ ?>
+  #sidebar.myadzu-sidebar :is(.myadzu-children, .myadzu-nested) > ul > li:has(~ li.is-active-path)::before { background: var(--tree-gold); }
+<?php /*   Carries the gold route down the upper half of each elbow above the current page. */ ?>
+  #sidebar.myadzu-sidebar :is(.myadzu-children, .myadzu-nested) > ul > li:has(~ li.is-active-path) > :is(.myadzu-link, .myadzu-sub-toggle)::after { border-left-color: var(--tree-gold); }
+<?php /*   Keeps the nested link text slightly smaller than the main menu. */ ?>
   #sidebar.myadzu-sidebar .myadzu-nested .myadzu-link { padding-left: 0.6rem; font-size: 0.82rem; }
 <?php /*   Starts the themed rule for the red update badge. */ ?>
   #sidebar.myadzu-sidebar .myadzu-badge {
@@ -1003,7 +1076,7 @@ $showCoordinatorSection = $isCoordinator;
 <?php /*               Loops over every student menu link. */ ?>
               <?php foreach ($studentLinks as $item): ?>
 <?php /*                 Starts a list item and stores its label for the search filter. */ ?>
-                <li data-menu-item data-menu-label="<?= htmlspecialchars(strtolower($item['label'])) ?>">
+                <li class="<?= $item['key'] === $currentPage || (!empty($item['submenu']) && $isSubmenuChildActive($item['submenu'], $currentPage)) ? 'is-active-path' : '' ?>" data-menu-item data-menu-label="<?= htmlspecialchars(strtolower($item['label'])) ?>">
 <?php /*                   Checks whether this menu item has a submenu. */ ?>
                   <?php if (!empty($item['submenu'])): ?>
 <?php /*                     Works out whether this submenu should start open. */ ?>
@@ -1029,7 +1102,7 @@ $showCoordinatorSection = $isCoordinator;
 <?php /*                         Loops over every link inside the submenu. */ ?>
                         <?php foreach ($item['submenu'] as $sub): ?>
 <?php /*                           Starts a submenu list item with its search label. */ ?>
-                          <li data-menu-item data-menu-label="<?= htmlspecialchars(strtolower($sub['label'])) ?>">
+                          <li class="<?= $sub['key'] === $currentPage ? 'is-active-path' : '' ?>" data-menu-item data-menu-label="<?= htmlspecialchars(strtolower($sub['label'])) ?>">
 <?php /*                             Starts a submenu link and marks it active when it matches the page. */ ?>
                             <a class="myadzu-link <?= navActive($sub['key'], $currentPage) ?>"
 <?php /*                                Sets the link address. */ ?>
@@ -1120,7 +1193,7 @@ $showCoordinatorSection = $isCoordinator;
 <?php /*               Loops over every coordinator menu link. */ ?>
               <?php foreach ($coordinatorLinks as $item): ?>
 <?php /*                 Starts a list item and stores its label for the search filter. */ ?>
-                <li data-menu-item data-menu-label="<?= htmlspecialchars(strtolower($item['label'])) ?>">
+                <li class="<?= $item['key'] === $currentPage || (!empty($item['submenu']) && $isSubmenuChildActive($item['submenu'], $currentPage)) ? 'is-active-path' : '' ?>" data-menu-item data-menu-label="<?= htmlspecialchars(strtolower($item['label'])) ?>">
 <?php /*                   Checks whether this menu item has a submenu. */ ?>
                   <?php if (!empty($item['submenu'])): ?>
 <?php /*                     Works out whether this submenu should start open. */ ?>
@@ -1146,7 +1219,7 @@ $showCoordinatorSection = $isCoordinator;
 <?php /*                         Loops over every link inside the submenu. */ ?>
                         <?php foreach ($item['submenu'] as $sub): ?>
 <?php /*                           Starts a submenu list item with its search label. */ ?>
-                          <li data-menu-item data-menu-label="<?= htmlspecialchars(strtolower($sub['label'])) ?>">
+                          <li class="<?= $sub['key'] === $currentPage ? 'is-active-path' : '' ?>" data-menu-item data-menu-label="<?= htmlspecialchars(strtolower($sub['label'])) ?>">
 <?php /*                             Starts a submenu link and marks it active when it matches the page. */ ?>
                             <a class="myadzu-link <?= navActive($sub['key'], $currentPage) ?>"
 <?php /*                                Sets the link address. */ ?>
