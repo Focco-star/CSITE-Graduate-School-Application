@@ -67,10 +67,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($password !== $confirm) {
         // Sets an error saying the passwords do not match.
         $registerError = 'Passwords do not match.';
-    // Requires 8+ characters plus one uppercase letter and one number.
-    } elseif (strlen($password) < 8 || !preg_match('/[A-Z]/', $password) || !preg_match('/\d/', $password)) {
+    // Requires at least 5 characters and one number.
+    } elseif (strlen($password) < 5 || !preg_match('/\d/', $password)) {
         // Sets an error explaining the password rules.
-        $registerError = 'Password must be at least 8 characters and include one uppercase letter and one number.';
+        $registerError = 'Password must be at least 5 characters and include one number.';
     // All checks passed, so start the database work.
     } else {
         // Starts a try block so errors can roll the database back.
@@ -522,8 +522,8 @@ $trackHints = [
                     <div class="input-icon-wrap">
 <?php /*                         Lock icon inside the password box. */ ?>
                         <i class="fas fa-lock"></i>
-<?php /*                         Password input requiring at least eight characters. */ ?>
-                        <input type="password" id="regPassword" name="password" class="has-toggle" placeholder="Min. 8 chars" required minlength="8">
+<?php /*                         Password input requiring at least five characters and one number. */ ?>
+                        <input type="password" id="regPassword" name="password" class="has-toggle" placeholder="Min. 5 chars + 1 number" required minlength="5" pattern="(?=.*[0-9]).{5,}" title="Use at least 5 characters and include at least 1 number.">
 <?php /*                         Eye button that reveals or hides the typed password. */ ?>
                         <button type="button" class="pw-toggle" data-toggle-password="regPassword" tabindex="-1"><i class="fas fa-eye"></i></button>
 <?php /*                     Closes the password wrapper. */ ?>
@@ -553,7 +553,7 @@ $trackHints = [
 <?php /*                 Shield icon in front of the password note. */ ?>
                 <i class="fas fa-shield-alt" style="margin-right:5px;color:var(--adzu-gold);"></i>
 <?php /*                 Text explaining the password requirements. */ ?>
-                Password must be at least 8 characters and include one uppercase letter and one number.
+                Password must be at least 5 characters and include at least 1 number. Longer passwords are accepted.
 <?php /*             Closes the password note paragraph. */ ?>
             </p>
 <?php /*             Big submit button that sends the whole form. */ ?>

@@ -1818,7 +1818,8 @@ select.doc-review-select:focus {
 /* Starts the comment about the lock icon on read-only inputs. */
 /* Small lock icon on the right side of read-only inputs */
 /* Adds a lock icon inside read-only text inputs. */
-.form-field input[readonly] {
+.form-field input[readonly],
+.form-field select.locked-select {
     /* Leaves room on the right for the lock icon. */
     padding-right: 2.5rem;
     /* Draws a small gray padlock icon as the field background image. */
@@ -1829,6 +1830,9 @@ select.doc-review-select:focus {
     background-position: right 0.85rem center;
 /* Closes the lock icon rule. */
 }
+
+/* Hides the native arrow so it does not overlap the lock icon. */
+.form-field select.locked-select { appearance: none; }
 
 /* Starts the comment about removing focus styling on locked fields. */
 /* No navy focus highlight, since the field can't be edited */
