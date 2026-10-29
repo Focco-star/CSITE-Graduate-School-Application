@@ -383,6 +383,22 @@ $appError      = '';
 // Reads the logged-in user id, or 0 when it is unknown.
 $userId        = (int) ($sessionUser['user_id'] ?? $_SESSION['user_id'] ?? 0);
 
+// Loads available advisers from the coordinator-managed pool.
+$adviserOpts = [];
+$adviserPoolError = '';
+try {
+    $adviserStmt = DB::query(
+        "SELECT DISTINCT TRIM(name) AS name
+         FROM advisor_pool
+         WHERE availability = 'available' AND TRIM(name) <> ''
+         ORDER BY name ASC"
+    );
+    $adviserOpts = array_map('strval', $adviserStmt->fetchAll(PDO::FETCH_COLUMN));
+} catch (Throwable $e) {
+    error_log('[student application adviser pool] ' . $e->getMessage());
+    $adviserPoolError = 'The adviser pool could not be loaded. Please refresh the page or contact the coordinator.';
+}
+
 // Loads the milestone progress of this student for the track.
 $progress = getStudentProgress($mockStudent['email'], $track);
 // Starts from the stage saved on the student profile.
@@ -831,7 +847,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
     }
 
     // Starts the validation chain: the stage key must exist first.
-    if (!isset($stages[$stageKey])) {
+    if ($adviserPoolError !== '') {
+        $appError = $adviserPoolError;
+    } elseif (!in_array(trim((string) $formValues['adviser']), $adviserOpts, true)) {
+        $appError = 'Please select an available adviser from the adviser pool.';
+    } elseif (!isset($stages[$stageKey])) {
         // Error message for an unknown presentation stage.
         $appError = 'Please select a valid presentation stage.';
     // Next, the stage order must allow this submission.
@@ -892,6 +912,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
         try {
             // Opens the shared MySQL connection.
             $pdo = DB::getConnection();
+            $adviserCheck = $pdo->prepare(
+                "SELECT 1
+                 FROM advisor_pool
+                 WHERE TRIM(name) = :name AND availability = 'available'
+                 LIMIT 1"
+            );
+            $adviserCheck->execute(['name' => trim((string) $formValues['adviser'])]);
+            if (!$adviserCheck->fetchColumn()) {
+                throw new RuntimeException('Please select an available adviser from the adviser pool.');
+            }
             // Prepares a query to find the student row of this user.
             $studentLookup = $pdo->prepare(
                 // Selects the student id for the logged-in user.
@@ -1601,8 +1631,17 @@ require_once __DIR__ . '/../includes/layout/header.php';
                 <div class="form-field">
 <?php /*                     Label marking the adviser name as required. */ ?>
                     <label>Adviser Name <span class="required">*</span></label>
-<?php /*                     Text input where the student types the adviser name. */ ?>
-                    <input type="text" name="adviser" value="<?= htmlspecialchars($formValues['adviser']) ?>" placeholder="Full name of your adviser">
+<?php /*                     Adviser choices come from the available adviser pool. */ ?>
+                    <select name="adviser" required <?= $adviserOpts ? '' : 'disabled' ?>>
+                        <option value="">Select an available adviser</option>
+                        <?php foreach ($adviserOpts as $adviserName): ?>
+                            <option value="<?= htmlspecialchars($adviserName, ENT_QUOTES, 'UTF-8') ?>" <?= strcasecmp(trim($formValues['adviser']), $adviserName) === 0 ? 'selected' : '' ?>><?= htmlspecialchars($adviserName, ENT_QUOTES, 'UTF-8') ?></option>
+                        <?php endforeach; ?>
+                        <?php if (!$adviserOpts): ?>
+                            <option value="" disabled selected><?= $adviserPoolError !== '' ? 'Adviser pool unavailable' : 'No available advisers in the pool' ?></option>
+                        <?php endif; ?>
+                    </select>
+                    <p class="field-hint">Choose an available adviser from the current adviser pool.</p>
 <?php /*                 Closes the adviser field. */ ?>
                 </div>
 <?php /*                 Field wrapper for the enrollment date. */ ?>
@@ -2102,8 +2141,8 @@ require_once __DIR__ . '/../includes/layout/header.php';
         if (hasDetails && !hasExistingApplication) {
 <?php /*             Shows an error when the title is empty. */ ?>
             if (!values.title) { fieldError(title, 'Enter your research / paper title.'); e.preventDefault(); }
-<?php /*             Shows an error when the adviser name is empty. */ ?>
-            if (!values.adviser) { fieldError(adviser, 'Enter the name of your adviser.'); e.preventDefault(); }
+<?php /*             Shows an error when no adviser was selected. */ ?>
+            if (!values.adviser) { fieldError(adviser, 'Select an adviser from the available adviser pool.'); e.preventDefault(); }
 <?php /*             Shows an error when the abstract is shown but empty. */ ?>
             if (abstract && !values.abstract) { fieldError(abstract, 'Write a brief description of your research.'); e.preventDefault(); }
 <?php /*             Shows an error when the enrollment date is empty. */ ?>
