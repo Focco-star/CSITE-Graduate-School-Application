@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block for the student templates page. */ ?>
 <?php
 // Loads the shared config with session, constants, and helpers.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the DB helper used by the template helpers.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 
 // Loads the logged-in student's profile into $mockStudent.
 $mockStudent = currentStudentProfile($mockStudent);
@@ -25,7 +25,7 @@ $trackLabel  = getTrackLabel($track);
 $workflow    = getWorkflow($track);
 
 // Includes the shared header with styles and navigation.
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/layout/header.php';
 // Closes the PHP block before the page HTML.
 ?>
 
@@ -229,7 +229,7 @@ foreach ($templateLibrary as $libraryTrack) {
 <?php /* Grid container that holds all template cards. */ ?>
 <div id="studentTplGrid">
 <?php /* Includes the shared library that draws the template cards. */ ?>
-<?php require_once __DIR__ . '/../includes/template_library.php'; ?>
+<?php require_once __DIR__ . '/../includes/components/template_library.php'; ?>
 <?php /* Closes the template grid container. */ ?>
 </div>
 
@@ -330,4 +330,4 @@ foreach ($templateLibrary as $libraryTrack) {
 </div>
 
 <?php /* Includes the shared footer that ends the page. */ ?>
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/layout/footer.php'; ?>

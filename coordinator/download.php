@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block that streams a stored document file to the browser. */ ?>
 <?php
 // Loads shared settings and helper functions from the includes folder.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the database connection class used to look up the document.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 
 // Checks whether a session is already running before starting one.
 if (session_status() === PHP_SESSION_NONE) {

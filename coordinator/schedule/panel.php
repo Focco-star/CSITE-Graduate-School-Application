@@ -1,9 +1,9 @@
 <?php /* Starts the PHP code for the panel assignment page. */ ?>
 <?php
 // Loads config settings, helpers, and the demo data arrays.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database helper for panel member data.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Sets the page title used in the browser tab.
 $pageTitle   = 'Panel Assignment';
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_avail'])) {
 }
 
 // Loads the shared header and navigation.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML below is printed.
 ?>
 
@@ -183,4 +183,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </div>
 
 <?php /* Loads the shared footer and closes the page. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

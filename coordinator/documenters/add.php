@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block that builds the add-documenter page. */ ?>
 <?php
 // Loads shared settings and helper functions such as redirectTo and url().
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database connection code used by the documenter functions.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Checks whether a session is already running before starting one.
 if (session_status() === PHP_SESSION_NONE) {
@@ -98,7 +98,7 @@ $currentPage = 'documenters';
 $userName = currentCoordinatorName();
 
 // Includes the shared header with menu and styles.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP and switches to HTML output.
 ?>
 
@@ -196,4 +196,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </form>
 
 <?php /* Includes the shared footer that closes the page layout. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

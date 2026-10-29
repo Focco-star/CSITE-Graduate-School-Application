@@ -1,9 +1,9 @@
 <?php /* Opens the PHP file and switches the server into PHP mode. */ ?>
 <?php
 // Loads shared config: session, helper functions and mock data.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database connection code used by the app.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Sets the page title shown in the browser tab to 'Student Applications'.
 $pageTitle   = 'Student Applications';
@@ -96,7 +96,7 @@ if ($selected) {
 }
 
 // Loads the shared header, sidebar and navigation HTML.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP mode so the HTML below is sent to the browser.
 ?>
 
@@ -553,4 +553,4 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php endif; ?>
 
 <?php /* Loads the shared footer and its closing scripts. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

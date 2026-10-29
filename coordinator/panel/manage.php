@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block that builds the panel member list page. */ ?>
 <?php
 // Loads shared settings and helper functions such as url() and redirectTo().
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database connection and panel helper functions.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Sets the browser page title to Panel Members.
 $pageTitle   = 'Panel Members';
@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['toggle_avail'])) {
 $panelMembers = databasePanelMembers();
 
 // Includes the shared header with menu and styles.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP and switches to HTML output.
 ?>
 
@@ -162,4 +162,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </div>
 
 <?php /* Includes the shared footer that closes the page layout. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

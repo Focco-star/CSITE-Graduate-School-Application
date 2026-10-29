@@ -14,9 +14,9 @@
  */
 
 // Loads config.php once for settings and helper functions.
-require_once __DIR__ . '/includes/config.php';
+require_once __DIR__ . '/includes/config/config.php';
 // Loads db.php once for database access.
-require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/config/db.php';
 
 // Tells the browser that the response is JSON.
 header('Content-Type: application/json; charset=utf-8');

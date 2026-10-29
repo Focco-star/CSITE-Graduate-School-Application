@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block for the archived applications page. */ ?>
 <?php
 // Loads shared settings and helper functions.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database connection helper class DB.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Starts the session when none is active so flash messages work.
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -144,7 +144,7 @@ try {
 }
 
 // Loads the shared header, sidebar, and styles.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML can be written.
 ?>
 <?php /* Starts page-specific CSS for the confirmation modal. */ ?>
@@ -429,4 +429,4 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php /* Ends the JavaScript block. */ ?>
 </script>
 <?php /* Loads the shared footer and closing scripts. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

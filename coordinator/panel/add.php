@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block that builds the add-panel-member page. */ ?>
 <?php
 // Loads shared settings and helper functions such as url() and redirectTo().
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database connection and panel helper functions.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Starts the session only if one is not running yet.
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Includes the shared header with menu and styles.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP and switches to HTML output.
 ?>
 
@@ -205,4 +205,4 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php endif; ?>
 
 <?php /* Includes the shared footer that closes the page layout. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

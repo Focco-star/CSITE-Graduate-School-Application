@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block for the Edit Documenter page. */ ?>
 <?php
 // Loads shared config helpers such as url() and redirectTo().
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the DB class that opens the MySQL connection.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Checks if a session has already been started.
 if (session_status() === PHP_SESSION_NONE) {
@@ -133,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $documenter) {
 }
 
 // Loads the shared header with sidebar and navigation.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML below is printed.
 ?>
 
@@ -247,4 +247,4 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php endif; ?>
 
 <?php /* Loads the shared footer scripts and closes the PHP block. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

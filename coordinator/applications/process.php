@@ -1,9 +1,9 @@
 <?php /* Starts the PHP script for the coordinator Process Application page. */ ?>
 <?php
 // Loads the shared config file with constants, helpers and session setup.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database helper so MySQL queries can run through DB.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Sets the page title used in the browser tab and page header.
 $pageTitle   = 'Process Application';
@@ -221,19 +221,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         // Uses the posted result, or keeps the saved one when the field was absent.
         $effectiveResult = $resultWasPosted ? $postedResult : (string) ($app['result'] ?? '');
 
-        // Comment: requirements only block a real status change, not document work.
-        // The coordinator is only moving the student to another status when
-        // Comment: changing a document is a different kind of work.
-        // the status itself is different. Changing a document is a different
-        // Comment: document edits are not blocked by an unrelated status.
-        // kind of work, and it may not be blocked by the requirements of a
-        // Comment: the requirements only apply to the status being moved to.
-        // status the student is not being moved to.
-        // True when the coordinator is actually changing the application status.
-        $statusChanged = ($status !== (string) ($app['status'] ?? ''));
+        // Reads whether the readiness checkbox is set in this save.
+        $readyPosted = array_key_exists('readyForPresentation', $stagePosted)
+            ? ($stagePosted['readyForPresentation'] === '1')
+            : !empty($app['readyForPresentation']);
+        // Checks every milestone that must be done before readiness.
+        $preReadyDone = true;
+        // Loops over the milestones leading to the readiness step.
+        foreach (['paper', 'adviser_endorsement', 'coord_review', 'grad_school_endorsement', 'payment'] as $requiredKey) {
+            // Starts this milestone as pending.
+            $requiredState = 'pending';
+            // Finds the milestone state in the tracker.
+            foreach ($statusMilestones as $milestone) {
+                // Checks whether this is the required milestone.
+                if (($milestone['key'] ?? '') === $requiredKey) {
+                    // Reads its current state.
+                    $requiredState = $milestone['state']['status'] ?? 'pending';
+                    // Stops looking once the milestone is found.
+                    break;
+                // Closes the milestone match.
+                }
+            // Closes the milestone search.
+            }
+            // Marks readiness as blocked when this milestone is not done.
+            if ($requiredState !== 'done') {
+                // Stops checking at the first unfinished prerequisite.
+                $preReadyDone = false;
+                // Stops the prerequisite loop.
+                break;
+            // Closes the required milestone check.
+            }
+        // Closes the prerequisite loop.
+        }
+
+        // An approved result completes the stage automatically.
+        $effectiveStatus = $status;
+        // Checks whether the coordinator just recorded an approved result.
+        if ($resultWasPosted && $effectiveResult === 'approved') {
+            // Moves the application to Presentation Complete.
+            $effectiveStatus = 'completed';
+        // Otherwise, checking readiness moves the stage to Ready for Presentation.
+        } elseif ($readyPosted && $preReadyDone && in_array($effectiveStatus, ['submitted', 'under_review'], true)) {
+            // Sets the ready status from the readiness milestone.
+            $effectiveStatus = 'ready_for_presentation';
+        // Closes the readiness branch.
+        }
+
+        // Advanced statuses always keep readiness on record.
+        if (in_array($effectiveStatus, ['ready_for_presentation', 'scheduled', 'completed'], true)) {
+            // Marks the readiness milestone as done when saving an advanced status.
+            $readyPosted = true;
+        // Closes the advanced status check.
+        }
+
+        // True when the saved status differs from the stored status.
+        $statusChanged = ($effectiveStatus !== (string) ($app['status'] ?? ''));
 
         // Asks the helper whether the new status is blocked by missing requirements.
-        $blockedReason = applicationStatusBlockedReason($status, $statusMilestones, $effectiveResult, $statusChanged);
+        $blockedReason = applicationStatusBlockedReason($effectiveStatus, $statusMilestones, $effectiveResult, $statusChanged, (string) ($app['status'] ?? ''));
+
+        // Blocks marking ready while a prerequisite is still open.
+        if ($blockedReason === null && $readyPosted && !$preReadyDone && $effectiveStatus === 'ready_for_presentation') {
+            // Explains which requirements are still needed.
+            $blockedReason = 'The student cannot be marked as Ready for Presentation until the paper, adviser endorsement, coordinator review, Graduate School endorsement, and payment are complete.';
+        // Closes the readiness prerequisite check.
+        }
         // If the move is not allowed, show the reason instead of saving.
         if ($blockedReason !== null) {
             // Shows why the status cannot be changed yet.
@@ -339,17 +391,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         // verified the receipt.
         // Payment counts as recorded if the receipt is verified or details were sent.
         $paymentRecorded = $receiptVerified || trim((string) ($app['receiptNumber'] ?? '')) !== '';
-        // Uses the posted readiness checkbox when provided, otherwise the saved value.
-        $readyForPresentation = array_key_exists('readyForPresentation', $stagePosted)
-            // Reads the checkbox as true only when it posted the value 1.
-            ? ($stagePosted['readyForPresentation'] === '1')
-            // Keeps the saved readiness flag when the field was not posted.
-            : !empty($app['readyForPresentation']);
+        // Uses the readiness value already resolved for the automatic status.
+        $readyForPresentation = $readyPosted;
 
         // Builds the array of application fields to save.
         $updatedFields = [
-            // Saves the chosen application status.
-            'status' => $status,
+            // Saves the status after the automatic milestone transitions.
+            'status' => $effectiveStatus,
             // Saves the stage key this application belongs to.
             'stageKey' => $stageKey,
             // Saves the stage label looked up from the track.
@@ -390,8 +438,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
                 );
                 // Runs the UPDATE with the values bound to each placeholder.
                 $saveStatus->execute([
-                    // Binds the new application status.
-                    'status' => $status,
+                    // Binds the status after the automatic milestone transitions.
+                    'status' => $effectiveStatus,
                     // Binds the stage label used as the presentation stage.
                     'presentation_stage' => $updatedFields['stage'],
                     // Binds the coordinator comment.
@@ -425,6 +473,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
 
             // Refreshes the in-memory application so the page shows the saved values.
             $app = array_merge($app, $updatedFields);
+            // Marks the linked schedule completed when the application is complete.
+            if ($updatedFields['status'] === 'completed' && $updatedFields['result'] === 'approved') {
+                // Synchronizes the schedule card and calendar with the application.
+                setScheduleStatusForApplication((int) $app['id'], 'completed');
+            // Closes the completed-application sync.
+            }
             // Shows the success message after saving.
             $processSuccess = 'Application progress has been saved successfully.';
         // Catches any save error so the page can show a friendly message.
@@ -505,6 +559,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
                 } else {
                     // Marks the stage completed and stores the approved result.
                     updateApplicationRecord($actionAppId, ['status' => 'completed', 'result' => $actionResult]);
+                    // Completes the linked presentation schedule as well.
+                    setScheduleStatusForApplication($actionAppId, 'completed');
                     // Confirms the approval was saved.
                     $processSuccess = 'Application progress has been saved successfully.';
                 // Closes the approval branch.
@@ -513,6 +569,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             } else {
                 // Sends the stage back to ready_for_presentation, locking the next stage.
                 updateApplicationRecord($actionAppId, ['status' => 'ready_for_presentation']);
+                // Returns the linked schedule to confirmed when approval is revoked.
+                setScheduleStatusForApplication($actionAppId, 'confirmed');
                 // Confirms the revoke was saved.
                 $processSuccess = 'Application progress has been saved successfully.';
             // Closes the revoke branch.
@@ -647,6 +705,35 @@ foreach ($stages as $key => $stage) {
     // Closes the milestone loop.
     }
 
+    // Assumes readiness is unlocked until a prerequisite fails.
+    $readyUnlocked = true;
+    // Checks the milestones that must be done before the readiness checkbox.
+    foreach (['paper', 'adviser_endorsement', 'coord_review', 'grad_school_endorsement', 'payment'] as $readyKey) {
+        // Starts this prerequisite as pending.
+        $readyState = 'pending';
+        // Finds the prerequisite in the milestone list.
+        foreach ($milestoneSteps as $readyStep) {
+            // Checks whether this is the prerequisite being checked.
+            if (($readyStep['key'] ?? '') === $readyKey) {
+                // Reads its current state.
+                $readyState = $readyStep['state']['status'] ?? 'pending';
+                // Stops looking once the milestone is found.
+                break;
+            // Closes the milestone match.
+            }
+        // Closes the milestone search.
+        }
+        // Locks readiness when the prerequisite is still open.
+        if ($readyState !== 'done') {
+            // Marks readiness as locked.
+            $readyUnlocked = false;
+            // Stops checking at the first unfinished prerequisite.
+            break;
+        // Closes the prerequisite check.
+        }
+    // Closes the prerequisite loop.
+    }
+
     // Opens a comment block: when the Presentation Result control opens.
     /*
      * The Presentation Result control belongs to 'Presentation Conducted &
@@ -718,6 +805,8 @@ foreach ($stages as $key => $stage) {
         'locked'     => $lockStates[$key]['locked'] ?? false,
         // Panel requirementsComplete: whether required milestones are done.
         'requirementsComplete' => $requirementsComplete,
+        // Panel readyUnlocked: whether the readiness action may be used.
+        'readyUnlocked' => $readyUnlocked,
         // Panel resultReached: whether the result control may open.
         'resultReached' => $resultReached,
         // Panel unlocked: true when nothing is missing.
@@ -758,7 +847,7 @@ foreach ($panels as $panel) {
 }
 
 // Loads the shared page header, sidebar and opening HTML.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML below can be printed.
 ?>
 
@@ -1027,9 +1116,14 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php /*                             Placeholder option asking the coordinator to select a status. */ ?>
                             <option value="">Select status</option>
 <?php /*                             Loops over the statuses a coordinator may set. */ ?>
-                            <?php foreach (COORDINATOR_STATUSES as $statusKey): ?>
-<?php /*                             Prints each status option and marks the saved one as selected. */ ?>
-                            <option value="<?= $statusKey ?>" <?= $panel['status'] === $statusKey ? 'selected' : '' ?>><?= htmlspecialchars(STATUSES[$statusKey]['label']) ?></option>
+                            <?php foreach (COORDINATOR_STATUSES as $statusKey):
+                                // Works out whether this status is still locked for the stage.
+                                $statusLock = applicationStatusBlockedReason($statusKey, $panel['milestones'], $panel['result'], true, $panel['status']);
+                                // Marks the saved status as the selected option.
+                                $isCurrentStatus = $panel['status'] === $statusKey;
+                            ?>
+<?php /*                             Prints each status option and locks it until its milestone is reached. */ ?>
+                            <option value="<?= $statusKey ?>" <?= $isCurrentStatus ? 'selected' : '' ?> <?= ($statusLock !== null && !$isCurrentStatus) ? 'disabled' : '' ?> title="<?= htmlspecialchars($statusLock ?? '') ?>"><?= htmlspecialchars(STATUSES[$statusKey]['label']) ?></option>
 <?php /*                             Ends the status options loop. */ ?>
                             <?php endforeach; ?>
 <?php /*                         Closes the status dropdown. */ ?>
@@ -1166,7 +1260,7 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php /*                                         Hidden field sends 0 so an unchecked box still saves a value. */ ?>
                                         <input type="hidden" name="stage_data[<?= htmlspecialchars($key) ?>][readyForPresentation]" value="0">
 <?php /*                                         Checkbox that marks the student ready for the presentation. */ ?>
-                                        <input type="checkbox" name="stage_data[<?= htmlspecialchars($key) ?>][readyForPresentation]" value="1" style="width:auto;" <?= !empty($stageApp['readyForPresentation']) ? 'checked' : '' ?>>
+                                        <input type="checkbox" name="stage_data[<?= htmlspecialchars($key) ?>][readyForPresentation]" value="1" style="width:auto;" <?= !empty($stageApp['readyForPresentation']) ? 'checked' : '' ?> <?= (!$panel['readyUnlocked'] && empty($stageApp['readyForPresentation'])) ? 'disabled title="Complete the documents, endorsements, and payment before marking the student ready."' : '' ?>>
 <?php /*                                         Label text switches between Ready and Mark Ready. */ ?>
                                         <span><?= !empty($stageApp['readyForPresentation']) ? 'Ready' : 'Mark Ready' ?></span>
 <?php /*                                     Closes the readiness label. */ ?>
@@ -2183,4 +2277,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </script>
 
 <?php /* Loads the shared footer that closes the page layout. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

@@ -1,11 +1,11 @@
 <?php /* Opens PHP mode so the server can run the schedule list logic. */ ?>
 <?php
 // Loads config.php, which holds site settings and the url() helper.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads db.php, the DB class used for database queries.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 // Loads calendar.php, which draws the presentation calendar.
-require_once __DIR__ . '/../../includes/calendar.php';
+require_once __DIR__ . '/../../includes/components/calendar.php';
 
 // Checks whether a session is already running.
 if (session_status() === PHP_SESSION_NONE) {
@@ -363,7 +363,7 @@ usort($scheduleGroups, static fn($a, $b) => strcasecmp($a['name'], $b['name']));
 $scheduleTotal = count($schedules);
 
 // Loads the shared header, which prints the page top and sidebar.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP mode and switches back to HTML output.
 ?>
 
@@ -444,6 +444,28 @@ require_once __DIR__ . '/../../includes/header.php';
 .psched-actions { display: flex; align-items: center; gap: 0.5rem; margin-top: auto; padding-top: 0.5rem; }
 <?php /* Styles the empty message shown when nothing is scheduled. */ ?>
 .psched-empty { margin: 0; padding: 2rem 1rem; text-align: center; color: var(--gray-400); }
+<?php /* Lays the student search bar and its status text on one row. */ ?>
+.psched-search { display: flex; align-items: center; flex-wrap: wrap; gap: 0.65rem 0.9rem; margin-bottom: 1rem; }
+<?php /* Styles the small label before the search field. */ ?>
+.psched-search-label { font-size: 0.78rem; font-weight: 700; color: var(--gray-600); }
+<?php /* Sizes the search field and gives it a relative anchor for the icons. */ ?>
+.psched-search-box { position: relative; flex: 1 1 260px; max-width: 420px; }
+<?php /* Positions the search icon inside the field. */ ?>
+.psched-search-box > i { position: absolute; left: 0.9rem; top: 50%; transform: translateY(-50%); color: var(--gray-400); pointer-events: none; }
+<?php /* Styles the rounded search input. */ ?>
+.psched-search-box input { width: 100%; padding: 0.6rem 2.5rem; border: 1px solid var(--gray-200); border-radius: 999px; background: var(--white); font: inherit; font-size: 0.86rem; color: var(--gray-800); }
+<?php /* Highlights the search field while it is focused. */ ?>
+.psched-search-box input:focus { outline: none; border-color: var(--adzu-navy); box-shadow: 0 0 0 3px rgba(6, 2, 151, 0.1); }
+<?php /* Hides the browser's native clear icon so only the page button is shown. */ ?>
+.psched-search-box input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+<?php /* Positions the clear button at the right edge of the field. */ ?>
+.psched-search-clear { position: absolute; right: 0.35rem; top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: transparent; color: var(--gray-400); cursor: pointer; }
+<?php /* Darkens the clear button on hover. */ ?>
+.psched-search-clear:hover { background: var(--gray-100); color: var(--gray-700); }
+<?php /* Styles the live result count text. */ ?>
+.psched-search-status { font-size: 0.78rem; color: var(--gray-500); }
+<?php /* Hides student groups that do not match the search. */ ?>
+.psched-group--hidden { display: none !important; }
 <?php /* On small screens, drops the team grid to a single column. */ ?>
 @media (max-width: 640px) { .psched-team { grid-template-columns: 1fr; } }
 <?php /* Closes the style block. */ ?>
@@ -467,8 +489,24 @@ require_once __DIR__ . '/../../includes/header.php';
         <p class="psched-empty">No presentations scheduled yet.</p>
 <?php /*         Else branch: groups exist, so draw the list. */ ?>
         <?php else: ?>
+<?php /*         Search bar that filters the student groups by name. */ ?>
+        <div class="psched-search" role="search">
+<?php /*             Small visible label for the search field. */ ?>
+            <label class="psched-search-label" for="pschedSearch">Search student</label>
+<?php /*             Wrapper that holds the icon, input and clear button. */ ?>
+            <div class="psched-search-box">
+<?php /*                 Search icon shown inside the field. */ ?>
+                <i class="fas fa-search" aria-hidden="true"></i>
+<?php /*                 Live search field for a student name, email or program. */ ?>
+                <input type="search" id="pschedSearch" placeholder="Type a student name..." autocomplete="off" aria-controls="pschedGroups">
+<?php /*                 Clear button hidden until the field has text. */ ?>
+                <button type="button" class="psched-search-clear" id="pschedSearchClear" aria-label="Clear student search" hidden><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+<?php /*             Live count of matching students. */ ?>
+            <span class="psched-search-status" id="pschedSearchStatus" aria-live="polite"></span>
+        </div>
 <?php /*         Wrapper that stacks the student groups. */ ?>
-        <div class="psched-groups">
+        <div class="psched-groups" id="pschedGroups">
 <?php /*             Loops over each student group. */ ?>
             <?php foreach ($scheduleGroups as $group): ?>
 <?php /*             Section element for one student's schedules. */ ?>
@@ -613,6 +651,8 @@ require_once __DIR__ . '/../../includes/header.php';
             <?php endforeach; ?>
 <?php /*         Closes the groups wrapper. */ ?>
         </div>
+<?php /*         Message shown when no student matches the search. */ ?>
+        <p class="psched-empty" id="pschedSearchEmpty" hidden>No students match your search.</p>
 <?php /*         Closes the if/else that chose between the empty message and the list. */ ?>
         <?php endif; ?>
 <?php /*     Closes the card body. */ ?>
@@ -620,5 +660,71 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php /* Closes the main card. */ ?>
 </div>
 
+<?php /* Starts the script that filters the scheduled presentations by student. */ ?>
+<script>
+// Runs the student search without affecting the calendar or the schedule cards.
+(function () {
+    // Gets the search field and stops when this page does not have one.
+    var search = document.getElementById('pschedSearch');
+    if (!search) return;
+
+    // Collects the student groups and the messages used by the filter.
+    var groups = Array.prototype.slice.call(document.querySelectorAll('.psched-group'));
+    var empty = document.getElementById('pschedSearchEmpty');
+    var status = document.getElementById('pschedSearchStatus');
+    var clear = document.getElementById('pschedSearchClear');
+    var total = groups.length;
+
+    // Shows only the groups whose header matches the typed text.
+    function applyFilter() {
+        // Reads and normalizes the search text.
+        var query = search.value.trim().toLowerCase();
+        // Counts the groups that stay visible.
+        var shown = 0;
+
+        // Loops over every student group.
+        groups.forEach(function (group) {
+            // Reads the student name, program and email from the group header.
+            var header = group.querySelector('.psched-group-head');
+            var haystack = header ? header.textContent.toLowerCase() : '';
+            // Keeps the group when it matches, or when the search is empty.
+            var match = query === '' || haystack.indexOf(query) !== -1;
+            // Hides or shows the group without touching its contents.
+            group.classList.toggle('psched-group--hidden', !match);
+            // Counts the visible group.
+            if (match) shown++;
+        });
+
+        // Shows the no-results message only when a search returns nothing.
+        if (empty) empty.hidden = !(query !== '' && shown === 0);
+        // Shows the clear button only while there is search text.
+        if (clear) clear.hidden = query === '';
+        // Reports how many students are visible.
+        if (status) status.textContent = query === '' ? '' : 'Showing ' + shown + ' of ' + total + ' student' + (total === 1 ? '' : 's');
+    }
+
+    // Filters as the coordinator types.
+    search.addEventListener('input', applyFilter);
+    // Clears the search and returns focus to the field.
+    if (clear) {
+        clear.addEventListener('click', function () {
+            search.value = '';
+            applyFilter();
+            search.focus();
+        });
+    }
+    // Clears the search when Escape is pressed.
+    search.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+            search.value = '';
+            applyFilter();
+        }
+    });
+
+    // Applies the initial state when the page loads.
+    applyFilter();
+})();
+</script>
+
 <?php /* Loads the shared footer, which prints closing tags and scripts. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

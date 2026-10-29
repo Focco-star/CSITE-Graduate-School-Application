@@ -1,9 +1,9 @@
 <?php /* Starts the PHP block for the coordinator archived students page. */ ?>
 <?php
 // Loads the shared configuration, helper functions, and constants.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the shared database connection class used by this page.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Starts the session only when no session is already running.
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -150,7 +150,7 @@ try {
 }
 
 // Loads the shared header, sidebar, and page shell.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML below is printed to the browser.
 ?>
 <?php /* Starts the page stylesheet for the confirmation dialogs. */ ?>
@@ -698,4 +698,4 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php /* Ends the JavaScript block. */ ?>
 </script>
 <?php /* Loads the shared footer and closes the page. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

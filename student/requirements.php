@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block for the student Process Tracker page. */ ?>
 <?php
 // Loads the shared config with session, constants, and helpers.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the DB helper for the student and progress lookups.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 
 // Loads the logged-in student's profile into $mockStudent.
 $mockStudent = currentStudentProfile($mockStudent);
@@ -50,7 +50,7 @@ if ($openKey === '') {
 }
 
 // Includes the shared header with styles and navigation.
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/layout/header.php';
 // Closes the PHP block before the page HTML.
 ?>
 
@@ -445,4 +445,4 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <?php /* Includes the shared footer that ends the page. */ ?>
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/layout/footer.php'; ?>

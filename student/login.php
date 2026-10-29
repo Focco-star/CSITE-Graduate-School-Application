@@ -4,11 +4,11 @@
 session_start();
 
 // Loads config.php, which holds site settings plus the url() and asset() helpers.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads db.php, the small DB class used to look up users and students.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 // Loads google.php, which has the Google sign-in helper functions.
-require_once __DIR__ . '/../includes/google.php';
+require_once __DIR__ . '/../includes/integrations/google.php';
 
 // Checks whether the Google sign-in keys are set, giving true or false.
 $googleConfigured = googleSignInConfigured();
@@ -85,9 +85,9 @@ $role = 'public';
 // Adds a body CSS class used for the login page styling.
 $bodyClass = 'login-body';
 // Includes the shared header with the styles and navigation.
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/layout/header.php';
 // Includes the background slideshow shown behind the login card.
-require_once __DIR__ . '/../includes/slideshow.php';
+require_once __DIR__ . '/../includes/layout/slideshow.php';
 // Closes PHP mode and switches back to normal HTML output.
 ?>
 
@@ -424,4 +424,4 @@ require_once __DIR__ . '/../includes/slideshow.php';
 </script>
 
 <?php /* Includes the shared footer with the scripts and closing tags. */ ?>
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/layout/footer.php'; ?>

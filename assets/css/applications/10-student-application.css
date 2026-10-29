@@ -1,0 +1,507 @@
+/* Starts the comment block that explains the application page workflow. */
+/* ------------------------------------------------------------------
+ * Application page workflow
+ *
+ * The student fills the form, uploads a document, then submits. The
+ * action buttons live under the document step and stay locked until a
+ * document has been uploaded.
+ * ------------------------------------------------------------------ */
+
+/* Styles the numbered upload and submit steps list. */
+.submit-steps {
+    /* Removes the bullet points from the steps list. */
+    list-style: none;
+    /* Clears the top margin and adds space below the steps. */
+    margin: 0 0 1.5rem;
+    /* Removes the default list padding. */
+    padding: 0;
+    /* Lays the submit steps out in a grid. */
+    display: grid;
+    /* Shows the three steps side by side in equal columns. */
+    grid-template-columns: repeat(3, 1fr);
+    /* Spaces the step boxes apart. */
+    gap: 0.75rem;
+/* Closes the submit steps list rule. */
+}
+
+/* Styles one step box in the submit progress list. */
+.submit-step {
+    /* Places the step number and text side by side. */
+    display: flex;
+    /* Aligns the number and text at the top of the box. */
+    align-items: flex-start;
+    /* Spaces the step number from its text. */
+    gap: 0.6rem;
+    /* Adds inner padding to the step box. */
+    padding: 0.75rem;
+    /* Draws a light border around the step box. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the step box corners. */
+    border-radius: var(--radius);
+    /* Gives inactive steps a light gray background. */
+    background: var(--gray-100);
+    /* Fades steps that are not yet active. */
+    opacity: 0.75;
+/* Closes the submit step rule. */
+}
+
+/* Styles the round number badge of a submit step. */
+.submit-step-num {
+    /* Sets the badge width to 26 pixels. */
+    width: 26px;
+    /* Sets the badge height to 26 pixels. */
+    height: 26px;
+    /* Stops the badge from shrinking when space is tight. */
+    flex-shrink: 0;
+    /* Gives the badge a muted gray circle. */
+    background: var(--gray-300);
+    /* Sets the color of the number inside the badge. */
+    color: var(--gray-600);
+    /* Makes the badge a perfect circle. */
+    border-radius: 50%;
+    /* Turns the badge into a flex container for centering. */
+    display: flex;
+    /* Centers the step number vertically in the circle. */
+    align-items: center;
+    /* Centers the step number horizontally in the circle. */
+    justify-content: center;
+    /* Sets the step number text size. */
+    font-size: 0.75rem;
+    /* Makes the step number bold. */
+    font-weight: 700;
+/* Closes the submit step number rule. */
+}
+
+/* Holds the title and description of a submit step. */
+.submit-step-text {
+    /* Turns the step text into a flex container. */
+    display: flex;
+    /* Stacks the step title above its description. */
+    flex-direction: column;
+    /* Adds a small gap between title and description. */
+    gap: 0.15rem;
+    /* Sets the step description text size. */
+    font-size: 0.78rem;
+    /* Shows the step description in gray. */
+    color: var(--gray-500);
+/* Closes the submit step text rule. */
+}
+
+/* Styles the bold step title inside a submit step. */
+.submit-step-text strong {
+    /* Sets the step title text size. */
+    font-size: 0.82rem;
+    /* Shows the step title in darker gray. */
+    color: var(--gray-700);
+/* Closes the submit step title rule. */
+}
+
+/* Highlights the step the student is working on right now. */
+.submit-step.is-current {
+    /* Gives the current step a navy border. */
+    border-color: var(--adzu-navy);
+    /* Makes the current step stand out with a white background. */
+    background: var(--white);
+    /* Shows the current step at full strength. */
+    opacity: 1;
+/* Closes the current submit step rule. */
+}
+
+/* Styles the number badge of the current step. */
+.submit-step.is-current .submit-step-num {
+    /* Fills the current step badge with ADZU navy. */
+    background: var(--adzu-navy);
+    /* Shows the current step number in white. */
+    color: var(--white);
+/* Closes the current step badge rule. */
+}
+
+/* Styles the title text of the current step. */
+.submit-step.is-current .submit-step-text strong {
+    /* Turns the current step title navy. */
+    color: var(--adzu-navy);
+/* Closes the current step title rule. */
+}
+
+/* Marks a submit step the student has already finished. */
+.submit-step.is-done {
+    /* Gives a finished step a green border. */
+    border-color: var(--success);
+    /* Uses a white background for finished steps. */
+    background: var(--white);
+    /* Shows finished steps at full strength. */
+    opacity: 1;
+/* Closes the finished submit step rule. */
+}
+
+/* Styles the badge of a completed submit step. */
+.submit-step.is-done .submit-step-num {
+    /* Fills the finished badge green. */
+    background: var(--success);
+    /* Shows the finished step number in white. */
+    color: var(--white);
+/* Closes the finished step badge rule. */
+}
+
+/* Styles the title of a finished step. */
+.submit-step.is-done .submit-step-text strong {
+    /* Turns the finished step title green. */
+    color: var(--success);
+/* Closes the finished step title rule. */
+}
+
+/* Styles the title of a step the student cannot open yet. */
+.submit-step.is-locked .submit-step-text strong {
+    /* Grays out the locked step title. */
+    color: var(--gray-400);
+/* Closes the locked step title rule. */
+}
+
+/* Starts the comment about locked action buttons. */
+/* Locked action buttons: dimmed, and they refuse to be clicked. */
+/* Dims buttons disabled until a document has been uploaded. */
+.btn[disabled],
+/* Also dims buttons marked disabled for screen readers. */
+.btn[aria-disabled="true"] {
+    /* Makes disabled buttons look faded. */
+    opacity: 0.45;
+    /* Shows a blocked cursor over disabled buttons. */
+    cursor: not-allowed;
+    /* Reduces the button colors to show it is inactive. */
+    filter: grayscale(0.5);
+/* Closes the disabled button rule. */
+}
+
+/* Keeps a disabled button looking the same on hover. */
+.btn[disabled]:hover {
+    /* Keeps the gold background when hovering a disabled button. */
+    background: var(--adzu-gold);
+    /* Keeps dark navy text on the disabled button. */
+    color: var(--adzu-navy-dark);
+/* Closes the disabled button hover rule. */
+}
+
+/* Styles hover on a disabled outline button. */
+.btn-outline[disabled]:hover,
+/* Styles hover on an outline button marked disabled. */
+.btn-outline[aria-disabled="true"]:hover {
+    /* Keeps the gray border on the disabled outline button. */
+    border-color: var(--gray-300);
+    /* Keeps muted text on the disabled outline button. */
+    color: var(--gray-600);
+/* Closes the disabled outline button hover rule. */
+}
+
+/* Wraps the submit controls under the upload step. */
+.submit-actions {
+    /* Pushes the submit controls down from the upload area. */
+    margin-top: 1.5rem;
+    /* Adds space above the controls inside the divider. */
+    padding-top: 1.25rem;
+    /* Draws a thicker divider above the submit actions. */
+    border-top: 2px solid var(--gray-200);
+/* Closes the submit actions rule. */
+}
+
+/* Styles the note that explains why actions are locked. */
+.action-lock-hint {
+    /* Lays out the lock hint icon and text in a row. */
+    display: flex;
+    /* Centers the hint items vertically. */
+    align-items: center;
+    /* Spaces the hint icon from its text. */
+    gap: 0.5rem;
+    /* Adds space above the lock hint. */
+    margin-top: 0.75rem;
+    /* Sets the lock hint text size. */
+    font-size: 0.8rem;
+    /* Shows the lock hint in gray. */
+    color: var(--gray-500);
+/* Closes the action lock hint rule. */
+}
+
+/* Colors the hint green once the action is unlocked. */
+.action-lock-hint.is-unlocked {
+    /* Shows the unlocked hint in green. */
+    color: var(--success);
+/* Closes the unlocked hint rule. */
+}
+
+/* Styles the hint when it shakes to warn the student. */
+.action-lock-hint.is-nudging {
+    /* Turns the nudge warning text red. */
+    color: var(--danger);
+    /* Runs the shake animation for 0.4 seconds. */
+    animation: csite-nudge 0.4s ease-in-out;
+/* Closes the nudging hint rule. */
+}
+
+/* Defines the shake animation used by the lock hint. */
+@keyframes csite-nudge {
+    /* Starts and ends the shake in the original position. */
+    0%, 100% { transform: translateX(0); }
+    /* Moves the hint 4 pixels left halfway through the shake. */
+    25% { transform: translateX(-4px); }
+    /* Moves the hint 4 pixels right near the end of the shake. */
+    75% { transform: translateX(4px); }
+/* Closes the shake animation definition. */
+}
+
+/* Applies phone layout changes below 768 pixels wide. */
+@media (max-width: 768px) {
+    /* Stacks the three submit steps in one column on phones. */
+    .submit-steps { grid-template-columns: 1fr; }
+/* Closes the phone media query for submit steps. */
+}
+
+/* Styles the dashed box where students drop or choose a file. */
+.file-upload-area {
+    /* Draws a dashed border so the box looks like a drop zone. */
+    border: 2px dashed var(--gray-300);
+    /* Rounds the upload box corners. */
+    border-radius: var(--radius-lg);
+    /* Adds generous padding inside the upload box. */
+    padding: 2rem;
+    /* Centers the icon and text in the upload box. */
+    text-align: center;
+    /* Shows a hand cursor so the box looks clickable. */
+    cursor: pointer;
+    /* Animates hover changes on the upload box smoothly. */
+    transition: all var(--transition);
+    /* Gives the upload box a light gray background. */
+    background: var(--gray-50);
+/* Closes the file upload area rule. */
+}
+
+/* Highlights the upload box when the mouse is over it. */
+.file-upload-area:hover,
+/* Also highlights the box while a file is dragged over it. */
+.file-upload-area.dragover {
+    /* Turns the dashed border navy when active. */
+    border-color: var(--adzu-navy);
+    /* Adds a faint navy tint while hovering or dragging. */
+    background: rgba(6, 2, 151, 0.03);
+/* Closes the upload box hover rule. */
+}
+
+/* Styles the upload icon inside the drop zone. */
+.file-upload-area i { font-size: 2rem; color: var(--gray-400); margin-bottom: 0.5rem; }
+/* Styles the instruction text in the upload box. */
+.file-upload-area p { font-size: 0.875rem; color: var(--gray-500); }
+/* Styles the name of the chosen file. */
+.file-upload-area .file-name { font-weight: 600; color: var(--adzu-navy); margin-top: 0.5rem; }
+
+/* Hides the raw file input behind the styled drop zone. */
+.file-upload-area input[type="file"] { display: none; }
+
+/* Wraps the page title and subtitle at the top. */
+.page-header {
+    /* Adds space below the page header. */
+    margin-bottom: 1.5rem;
+/* Closes the page header rule. */
+}
+
+/* Styles the main heading of a page. */
+.page-header h2 {
+    /* Sets the page heading text size. */
+    font-size: 1.35rem;
+    /* Makes the page heading bold. */
+    font-weight: 700;
+    /* Shows the page heading in ADZU navy. */
+    color: var(--adzu-navy);
+    /* Adds a little space under the page heading. */
+    margin-bottom: 0.25rem;
+/* Closes the page heading rule. */
+}
+
+/* Styles the small description under the page heading. */
+.page-header p { font-size: 0.875rem; color: var(--gray-500); }
+
+/* Lays out the dashboard statistic cards in a grid. */
+.stats-grid {
+    /* Turns the stats container into a grid. */
+    display: grid;
+    /* Fits as many 200 pixel stat cards per row as possible. */
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    /* Spaces the stat cards apart. */
+    gap: 1rem;
+    /* Adds space below the stats grid. */
+    margin-bottom: 1.5rem;
+/* Closes the stats grid rule. */
+}
+
+/* Styles one statistic card on a dashboard. */
+.stat-card {
+    /* Gives the stat card a white background. */
+    background: var(--white);
+    /* Draws a thin gray border around the stat card. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the stat card corners. */
+    border-radius: var(--radius-lg);
+    /* Adds padding inside the stat card. */
+    padding: 1.25rem;
+    /* Adds a soft shadow to lift the card off the page. */
+    box-shadow: var(--shadow);
+/* Closes the stat card rule. */
+}
+
+/* Styles the colored icon badge on a statistic card. */
+.stat-card .stat-icon {
+    /* Sets the icon badge to 40 by 40 pixels. */
+    width: 40px; height: 40px;
+    /* Rounds the icon badge corners. */
+    border-radius: var(--radius);
+    /* Turns the icon badge into a flex container. */
+    display: flex;
+    /* Centers the icon vertically in its badge. */
+    align-items: center;
+    /* Centers the icon horizontally in its badge. */
+    justify-content: center;
+    /* Sets the size of the icon inside the badge. */
+    font-size: 1rem;
+    /* Adds space below the icon badge. */
+    margin-bottom: 0.75rem;
+/* Closes the stat icon rule. */
+}
+
+/* Gives the blue stat icon its blue background and text color. */
+.stat-card .stat-icon.blue { background: var(--info-bg); color: var(--info); }
+/* Gives the gold stat icon a gold tint. */
+.stat-card .stat-icon.gold { background: rgba(255, 184, 43, 0.15); color: #b8860b; }
+/* Gives the green stat icon its green background and color. */
+.stat-card .stat-icon.green { background: var(--success-bg); color: var(--success); }
+/* Gives the red stat icon its red background and color. */
+.stat-card .stat-icon.red { background: var(--danger-bg); color: var(--danger); }
+/* Gives the purple stat icon its purple background and color. */
+.stat-card .stat-icon.purple { background: var(--purple-bg); color: var(--purple); }
+
+/* Styles the big number shown on a statistic card. */
+.stat-card .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--adzu-navy); }
+/* Styles the small label under the stat number. */
+.stat-card .stat-label { font-size: 0.8rem; color: var(--gray-500); margin-top: 0.15rem; }
+
+/* Styles the white panel used to group page content. */
+.card {
+    /* Gives the card a white background. */
+    background: var(--white);
+    /* Draws a thin gray border around the card. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the card corners. */
+    border-radius: var(--radius-lg);
+    /* Adds a soft shadow around the card. */
+    box-shadow: var(--shadow);
+    /* Adds space below each card. */
+    margin-bottom: 1.5rem;
+/* Closes the card rule. */
+}
+
+/* Lays out a card title row with its action buttons. */
+.card-header {
+    /* Adds padding inside the card header. */
+    padding: 1rem 1.25rem;
+    /* Draws a divider line under the card header. */
+    border-bottom: 1px solid var(--gray-200);
+    /* Turns the card header into a flex row. */
+    display: flex;
+    /* Centers the header items vertically. */
+    align-items: center;
+    /* Pushes the header actions to the far right. */
+    justify-content: space-between;
+    /* Spaces the header title from its actions. */
+    gap: 1rem;
+    /* Lets the header items wrap on small screens. */
+    flex-wrap: wrap;
+/* Closes the card header rule. */
+}
+
+/* Styles the heading inside a card header. */
+.card-header h3 {
+    /* Sets the card heading text size. */
+    font-size: 1rem;
+    /* Makes the card heading semi bold. */
+    font-weight: 600;
+    /* Shows the card heading in ADZU navy. */
+    color: var(--adzu-navy);
+/* Closes the card header heading rule. */
+}
+
+/* Adds padding inside the card body. */
+.card-body { padding: 1.25rem; }
+
+/* Styles the footer strip at the bottom of a card. */
+.card-footer {
+    /* Adds padding inside the card footer. */
+    padding: 0.85rem 1.25rem;
+    /* Draws a divider line above the card footer. */
+    border-top: 1px solid var(--gray-200);
+    /* Gives the card footer a light gray background. */
+    background: var(--gray-50);
+    /* Rounds only the bottom corners of the card footer. */
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+/* Closes the card footer rule. */
+}
+
+/* Lets wide tables scroll sideways instead of overflowing. */
+.table-responsive { overflow-x: auto; }
+
+/* Styles the main data tables in the system. */
+.data-table {
+    /* Makes the table use the full width of its container. */
+    width: 100%;
+    /* Joins table cell borders into single lines. */
+    border-collapse: collapse;
+    /* Sets the table text size. */
+    font-size: 0.875rem;
+/* Closes the data table rule. */
+}
+
+/* Styles the header cells of a data table. */
+.data-table th {
+    /* Gives table headers a light gray background. */
+    background: var(--gray-50);
+    /* Adds padding inside each header cell. */
+    padding: 0.75rem 1rem;
+    /* Aligns table header text to the left. */
+    text-align: left;
+    /* Makes table header text semi bold. */
+    font-weight: 600;
+    /* Shows table header text in medium gray. */
+    color: var(--gray-600);
+    /* Sets the header text to a small size. */
+    font-size: 0.8rem;
+    /* Shows column headings in uppercase letters. */
+    text-transform: uppercase;
+    /* Adds slight spacing between header letters. */
+    letter-spacing: 0.03em;
+    /* Draws a thicker line under the header row. */
+    border-bottom: 2px solid var(--gray-200);
+    /* Keeps each column heading on one line. */
+    white-space: nowrap;
+/* Closes the data table header rule. */
+}
+
+/* Styles the body cells of a data table. */
+.data-table td {
+    /* Adds padding inside each table cell. */
+    padding: 0.75rem 1rem;
+    /* Draws a faint line under each table row. */
+    border-bottom: 1px solid var(--gray-100);
+    /* Centers cell content vertically. */
+    vertical-align: middle;
+/* Closes the data table cell rule. */
+}
+
+/* Highlights a table row when the mouse is over it. */
+.data-table tbody tr:hover { background: var(--gray-50); }
+
+/* Holds the action buttons inside a table cell. */
+.data-table .actions {
+    /* Lays the row action buttons out in a row. */
+    display: flex;
+    /* Adds a small gap between action buttons. */
+    gap: 0.35rem;
+    /* Lets action buttons wrap when space is tight. */
+    flex-wrap: wrap;
+/* Closes the table actions rule. */
+}
+

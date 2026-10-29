@@ -1,0 +1,329 @@
+/* Starts the comment block about the sliding stage tracker. */
+/* ------------------------------------------------------------------
+ * Sliding progress tracker (coordinator > applications > edit)
+ *
+ * The stages of the student's track are shown as cards in a track that
+ * slides horizontally. The selected stage drives every section below.
+ * ------------------------------------------------------------------ */
+/* Lays out the sliding stage cards and their arrows in a row. */
+.stage-slider {
+    /* Turns the stage slider into a flex row. */
+    display: flex;
+    /* Stretches the stage cards to equal height. */
+    align-items: stretch;
+    /* Centers the stage slider contents horizontally. */
+    justify-content: center;
+    /* Spaces the slider arrows from the cards. */
+    gap: 0.75rem;
+    /* Makes the stage slider fill its container width. */
+    width: 100%;
+    /* Centers the slider and adds space below it. */
+    margin: 0 auto 0.75rem;
+    /* Caps the stage slider width at 1180 pixels. */
+    max-width: 1180px;
+    /* Adds a little vertical padding inside the slider. */
+    padding: 0.35rem 0;
+/* Closes the stage slider rule. */
+}
+
+/* Styles the left and right arrow buttons of the stage slider. */
+.stage-slider-nav {
+    /* Stops the arrow buttons from shrinking. */
+    flex-shrink: 0;
+    /* Sets the arrow button width to 42 pixels. */
+    width: 42px;
+    /* Centers the arrow vertically beside the cards. */
+    align-self: center;
+    /* Draws a light gray border around the arrow. */
+    border: 1px solid var(--gray-200);
+    /* Gives the arrow a white background. */
+    background: var(--white);
+    /* Shows the arrow icon in medium gray. */
+    color: var(--gray-500);
+    /* Makes each arrow button a circle. */
+    border-radius: 999px;
+    /* Shows a hand cursor over the arrow. */
+    cursor: pointer;
+    /* Sets the arrow icon size. */
+    font-size: 0.9rem;
+    /* Adds a soft shadow under the arrow button. */
+    box-shadow: var(--shadow);
+    /* Animates arrow hover changes smoothly. */
+    transition: all var(--transition);
+/* Closes the stage slider arrow rule. */
+}
+
+/* Turns the arrow navy when the mouse is over it. */
+.stage-slider-nav:hover { border-color: var(--adzu-navy); color: var(--adzu-navy); }
+/* Fades and disables the arrow when it cannot scroll further. */
+.stage-slider-nav:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+/* Shows a gold focus ring on the arrow for keyboard users. */
+.stage-slider-nav:focus-visible { outline: 2px solid var(--adzu-gold); outline-offset: 2px; }
+
+/* Clips the stage card track so only visible cards show. */
+.stage-slider-viewport {
+    /* Lets the viewport grow to fill the space between arrows. */
+    flex: 1 1 0%;
+    /* Allows the viewport to shrink below its content width. */
+    min-width: 0;
+    /* Caps the stage viewport width at 1000 pixels. */
+    max-width: 1000px;
+    /* Hides cards that slide outside the viewport. */
+    overflow: hidden;
+    /* Reserves space for card shadows inside the viewport. */
+    padding: 2px 0 6px;
+/* Closes the stage slider viewport rule. */
+}
+
+/* Holds the stage cards that slide horizontally. */
+.stage-slider-track {
+    /* Lays the stage cards out in a row. */
+    display: flex;
+    /* Centers the stage cards in the track. */
+    justify-content: center;
+    /* Spaces the stage cards 16 pixels apart. */
+    gap: 16px;
+    /* Animates the slide when the selected stage changes. */
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Tells the browser to prepare for the sliding transform. */
+    will-change: transform;
+/* Closes the stage slider track rule. */
+}
+
+/* Styles one clickable stage card in the slider. */
+.stage-slider-card {
+    /* Lays out the card number and text in a row. */
+    display: flex;
+    /* Centers the card contents vertically. */
+    align-items: center;
+    /* Spaces the stage number from its text. */
+    gap: 0.85rem;
+    /* Gives each card a base width of 280 pixels. */
+    flex: 0 1 280px;
+    /* Stops the card from getting narrower than 210 pixels. */
+    min-width: 210px;
+    /* Adds padding inside the stage card. */
+    padding: 1rem 1.15rem;
+    /* Draws a thin gray border around the card. */
+    border: 1px solid var(--gray-200);
+    /* Adds a thick left edge used to show stage status. */
+    border-left: 4px solid var(--gray-300);
+    /* Rounds the stage card corners. */
+    border-radius: var(--radius-lg);
+    /* Gives the stage card a white background. */
+    background: var(--white);
+    /* Adds a soft shadow around the stage card. */
+    box-shadow: var(--shadow);
+    /* Aligns the stage card text to the left. */
+    text-align: left;
+    /* Uses the page font for the stage card button. */
+    font: inherit;
+    /* Shows a hand cursor over the stage card. */
+    cursor: pointer;
+    /* Animates border, shadow and lift changes smoothly. */
+    transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+/* Closes the stage slider card rule. */
+}
+
+/* Lifts and outlines the stage card on hover. */
+.stage-slider-card:hover { border-color: var(--adzu-navy); transform: translateY(-2px); }
+
+/* Highlights the stage card that is currently selected. */
+.stage-slider-card.is-selected {
+    /* Turns the selected card border navy. */
+    border-color: var(--adzu-navy);
+    /* Adds a soft navy ring around the selected card. */
+    box-shadow: 0 0 0 3px rgba(6, 2, 151, 0.12), var(--shadow-md);
+    /* Lifts the selected card up 2 pixels. */
+    transform: translateY(-2px);
+/* Closes the selected stage card rule. */
+}
+
+/* Styles the round number badge on a stage card. */
+.stage-slider-num {
+    /* Sets the stage number badge width. */
+    width: 38px;
+    /* Sets the stage number badge height. */
+    height: 38px;
+    /* Stops the number badge from shrinking. */
+    flex-shrink: 0;
+    /* Makes the number badge a circle. */
+    border-radius: 50%;
+    /* Gives the number badge a gray background. */
+    background: var(--gray-200);
+    /* Shows the stage number in medium gray. */
+    color: var(--gray-600);
+    /* Turns the number badge into a flex container. */
+    display: flex;
+    /* Centers the stage number vertically. */
+    align-items: center;
+    /* Centers the stage number horizontally. */
+    justify-content: center;
+    /* Sets the stage number text size. */
+    font-size: 0.95rem;
+    /* Makes the stage number bold. */
+    font-weight: 700;
+/* Closes the stage slider number rule. */
+}
+
+/* Stacks the stage label and badge inside a card. */
+.stage-slider-text { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+/* Styles the stage name text on a card. */
+.stage-slider-label { font-size: 0.95rem; font-weight: 700; color: var(--gray-700); }
+/* Sizes the status badge shown on a stage card. */
+.stage-slider-badge { font-size: 0.72rem; padding: 2px 8px; align-self: flex-start; }
+
+/* Turns the card left edge green when the stage is complete. */
+.stage-slider-card.is-completed { border-left-color: var(--success); }
+/* Fills the completed stage number green. */
+.stage-slider-card.is-completed .stage-slider-num { background: var(--success); color: var(--white); }
+/* Shows the completed stage name in green. */
+.stage-slider-card.is-completed .stage-slider-label { color: var(--success); }
+
+/* Marks the current stage with a navy edge and light tint. */
+.stage-slider-card.is-active { border-left-color: var(--adzu-navy); background: rgba(6, 2, 151, 0.03); }
+/* Fills the active stage number navy. */
+.stage-slider-card.is-active .stage-slider-num { background: var(--adzu-navy); color: var(--white); }
+/* Shows the active stage name in navy. */
+.stage-slider-card.is-active .stage-slider-label { color: var(--adzu-navy); }
+
+/* Shows an approved stage with a blue left edge. */
+.stage-slider-card.is-approved { border-left-color: var(--info); }
+/* Shows the approved stage number in blue. */
+.stage-slider-card.is-approved .stage-slider-num { background: var(--info-bg); color: var(--info); }
+
+/* Fades a locked stage card and grays its left edge. */
+.stage-slider-card.is-locked { border-left-color: var(--gray-300); opacity: 0.7; }
+/* Grays the number badge of a locked stage. */
+.stage-slider-card.is-locked .stage-slider-num { background: var(--gray-100); color: var(--gray-500); }
+/* Grays the name of a locked stage. */
+.stage-slider-card.is-locked .stage-slider-label { color: var(--gray-500); }
+
+/* Styles the small summary strip under the stage slider. */
+.stage-slider-summary {
+    /* Lays the summary items out in a row. */
+    display: flex;
+    /* Lets summary items wrap onto new lines. */
+    flex-wrap: wrap;
+    /* Spaces the summary items apart. */
+    gap: 1.25rem;
+    /* Adds space below the summary strip. */
+    margin-bottom: 1rem;
+    /* Adds padding inside the summary strip. */
+    padding: 0.6rem 0.85rem;
+    /* Gives the summary strip a light gray background. */
+    background: var(--gray-50);
+    /* Draws a light border around the summary strip. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the summary strip corners. */
+    border-radius: var(--radius);
+    /* Sets the summary text size. */
+    font-size: 0.8rem;
+    /* Shows the summary text in medium gray. */
+    color: var(--gray-600);
+/* Closes the stage slider summary rule. */
+}
+
+/* Shows the summary values in navy bold text. */
+.stage-slider-summary strong { color: var(--adzu-navy); }
+
+/* Starts the comment about showing only the selected stage panel. */
+/* The stage panels: only the selected one is shown. */
+/* Hides stage panels that are not currently selected. */
+.stage-panel[hidden] { display: none; }
+
+/* Starts the comment about the stage approval controls. */
+/* The stage progression controls of the Milestone Tracker. */
+/* Lays out the buttons that move a stage forward. */
+.stage-approval {
+    /* Turns the approval area into a flex row. */
+    display: flex;
+    /* Centers the approval controls vertically. */
+    align-items: center;
+    /* Lets the approval controls wrap on small screens. */
+    flex-wrap: wrap;
+    /* Spaces the approval controls apart. */
+    gap: 0.6rem;
+    /* Pushes the approval controls down from the content. */
+    margin-top: 1rem;
+    /* Adds space above the controls inside the divider. */
+    padding-top: 1rem;
+    /* Draws a faint divider above the approval controls. */
+    border-top: 1px solid var(--gray-100);
+/* Closes the stage approval rule. */
+}
+
+/* Styles the small uppercase label above the approval buttons. */
+.stage-approval-label {
+    /* Keeps the approval label sized to its content. */
+    display: inline-flex;
+    /* Centers the label icon and text vertically. */
+    align-items: center;
+    /* Spaces the label icon from its text. */
+    gap: 0.35rem;
+    /* Sets the approval label text size. */
+    font-size: 0.72rem;
+    /* Makes the approval label bold. */
+    font-weight: 700;
+    /* Shows the approval label in uppercase letters. */
+    text-transform: uppercase;
+    /* Adds spacing between the label letters. */
+    letter-spacing: 0.05em;
+    /* Shows the approval label in gray. */
+    color: var(--gray-500);
+/* Closes the stage approval label rule. */
+}
+
+/* Styles the helper text beside the approval buttons. */
+.stage-approval-hint {
+    /* Sets the approval hint text size. */
+    font-size: 0.8rem;
+    /* Shows the approval hint in gray. */
+    color: var(--gray-500);
+    /* Lets the hint grow and wrap in tight spaces. */
+    flex: 1 1 240px;
+/* Closes the stage approval hint rule. */
+}
+
+/* Highlights the important word in the approval hint. */
+.stage-approval-hint strong { color: var(--adzu-navy); }
+
+/* Starts the comment about a decision waiting to be saved. */
+/* A decision that is waiting for Save Process. */
+/* Marks a decision button that is waiting for Save Process. */
+.btn.is-pending {
+    /* Fills the pending decision button with gold. */
+    background: var(--adzu-gold);
+    /* Gives the pending button a gold border. */
+    border-color: var(--adzu-gold);
+    /* Uses dark navy text on the gold button. */
+    color: var(--adzu-navy-dark);
+    /* Adds a gold glow around the pending button. */
+    box-shadow: 0 0 0 3px rgba(255, 184, 43, 0.28);
+/* Closes the pending decision button rule. */
+}
+
+/* Darkens the pending decision button on hover. */
+.btn.is-pending:hover {
+    /* Uses the darker gold on hover. */
+    background: var(--adzu-gold-hover);
+    /* Uses the darker gold border on hover. */
+    border-color: var(--adzu-gold-hover);
+/* Closes the pending button hover rule. */
+}
+
+/* Applies smaller stage slider sizes on narrow screens. */
+@media (max-width: 768px) {
+    /* Shrinks the stage cards on phones. */
+    .stage-slider-card { min-width: 190px; padding: 0.75rem 0.85rem; }
+    /* Shrinks the stage number badge on phones. */
+    .stage-slider-num { width: 30px; height: 30px; font-size: 0.8rem; }
+    /* Reduces the stage name text size on phones. */
+    .stage-slider-label { font-size: 0.85rem; }
+    /* Tightens the summary strip spacing on phones. */
+    .stage-slider-summary { gap: 0.75rem; }
+    /* Makes the slider arrows narrower on phones. */
+    .stage-slider-nav { width: 34px; }
+/* Closes the phone media query for the stage slider. */
+}
+

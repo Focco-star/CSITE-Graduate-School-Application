@@ -1,0 +1,232 @@
+/* Section header for the success pop-up with its animated check mark. */
+/* ==========================================================================
+   Success pop-up (animated giant check, auto-closes after 5 seconds)
+   Used by the student application page and the coordinator add pages.
+   ========================================================================== */
+/* Full-screen overlay behind the success pop-up. */
+.success-popup-overlay {
+    /* Fixes the overlay to the browser viewport. */
+    position: fixed;
+    /* Stretches the overlay to all four screen edges. */
+    inset: 0;
+    /* Keeps the overlay above the page (z-index 2100). */
+    z-index: 2100;
+    /* Uses flex layout to centre the pop-up. */
+    display: flex;
+    /* Centres the pop-up vertically. */
+    align-items: center;
+    /* Centres the pop-up horizontally. */
+    justify-content: center;
+    /* Adds padding so the pop-up never touches the screen edge. */
+    padding: 1rem;
+    /* Dims the page behind the pop-up with a dark translucent layer. */
+    background: rgba(15, 23, 42, 0.55);
+    /* Fades the overlay in when it appears. */
+    animation: sp-fade-in 0.2s ease-out;
+/* Closes the overlay rule. */
+}
+/* Fades the overlay out when it is closing. */
+.success-popup-overlay.closing { animation: sp-fade-out 0.22s ease-in forwards; }
+
+/* The white success card that holds the animated check mark. */
+.success-popup {
+    /* Positions the card relative so the close button can be pinned. */
+    position: relative;
+    /* Lets the card shrink on narrow screens. */
+    width: 100%;
+    /* Caps the card width at 420 pixels. */
+    max-width: 420px;
+    /* Adds generous padding inside the card. */
+    padding: 2.25rem 2rem 0;
+    /* Gives the card a white background. */
+    background: var(--white);
+    /* Rounds the card corners with the large radius. */
+    border-radius: var(--radius-lg);
+    /* Adds a deep soft shadow around the card. */
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+    /* Centres all text inside the card. */
+    text-align: center;
+    /* Clips the countdown bar to the rounded corners. */
+    overflow: hidden;
+    /* Pops the card in with a slight overshoot animation. */
+    animation: sp-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+/* Closes the success card rule. */
+}
+
+/* Styles the round close button at the top right of the pop-up. */
+.success-popup-close {
+    /* Pins the close button inside the card. */
+    position: absolute;
+    /* Places the close button 0.65rem from the top. */
+    top: 0.65rem;
+    /* Places the close button 0.65rem from the right edge. */
+    right: 0.65rem;
+    /* Sets the close button to 34 by 34 pixels. */
+    width: 34px; height: 34px;
+    /* Removes the default button border. */
+    border: 0;
+    /* Makes the close button perfectly round. */
+    border-radius: 50%;
+    /* Keeps the close button background transparent. */
+    background: transparent;
+    /* Colours the close icon light gray. */
+    color: var(--gray-400);
+    /* Sets the close icon size to 1.1rem. */
+    font-size: 1.1rem;
+    /* Shows a pointer cursor on the close button. */
+    cursor: pointer;
+    /* Animates the close button colours on hover. */
+    transition: background var(--transition), color var(--transition);
+/* Closes the close button rule. */
+}
+/* Greys the close button background when hovered. */
+.success-popup-close:hover { background: var(--gray-100); color: var(--gray-700); }
+/* Adds a navy focus ring for keyboard users on the close button. */
+.success-popup-close:focus-visible { outline: 2px solid var(--adzu-navy); outline-offset: 1px; }
+
+/* Sets the animated check mark box to 150 by 150 pixels and centres it. */
+.success-check { width: 150px; height: 150px; margin: 0 auto 1rem; }
+/* Makes the SVG inside the check box fill it completely. */
+.success-check svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+/* The soft circle behind the check mark in the success pop-up. */
+.sc-bg {
+    /* Fills the circle with the soft success background colour. */
+    fill: var(--success-bg);
+    /* Makes transforms scale from the shape's own box. */
+    transform-box: fill-box;
+    /* Scales the circle from its centre. */
+    transform-origin: center;
+    /* Pops the circle in shortly after the overlay appears. */
+    animation: sc-bg-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s both;
+/* Closes the circle rule. */
+}
+/* The ring that draws itself around the check mark. */
+.sc-ring {
+    /* Makes the ring a hollow outline instead of a filled shape. */
+    fill: none;
+    /* Sets the ring stroke colour to the success green. */
+    stroke: var(--success);
+    /* Sets the ring stroke thickness to 5 pixels. */
+    stroke-width: 5;
+    /* Rounds the ends of the ring stroke. */
+    stroke-linecap: round;
+    /* Sets the dash length used for the drawing effect. */
+    stroke-dasharray: 100;
+    /* Hides the ring at first so it can be drawn in. */
+    stroke-dashoffset: 100;
+    /* Makes transforms scale from the shape's own box. */
+    transform-box: fill-box;
+    /* Rotates the ring around the centre of the shape. */
+    transform-origin: center;
+    /* Starts the ring drawing from the top of the circle. */
+    transform: rotate(-90deg);
+    /* Animates the ring drawing itself in with a short delay. */
+    animation: sc-draw 0.6s ease-out 0.15s forwards;
+/* Closes the ring rule. */
+}
+/* The check mark tick that is drawn after the ring. */
+.sc-tick {
+    /* Makes the tick a hollow stroke instead of a filled shape. */
+    fill: none;
+    /* Sets the tick stroke colour to the success green. */
+    stroke: var(--success);
+    /* Sets the tick stroke thickness to 9 pixels. */
+    stroke-width: 9;
+    /* Rounds the ends of the tick stroke. */
+    stroke-linecap: round;
+    /* Rounds the corners where the tick lines meet. */
+    stroke-linejoin: round;
+    /* Sets the dash length used for the drawing effect. */
+    stroke-dasharray: 100;
+    /* Hides the tick at first so it can be drawn in. */
+    stroke-dashoffset: 100;
+    /* Draws the tick after the ring finishes. */
+    animation: sc-draw 0.4s ease-out 0.65s forwards;
+/* Closes the tick rule. */
+}
+/* The soft pulse ring that expands after the tick appears. */
+.sc-pulse {
+    /* Makes the pulse ring a hollow stroke. */
+    fill: none;
+    /* Sets the pulse stroke colour to the success green. */
+    stroke: var(--success);
+    /* Sets the pulse stroke thickness to 3 pixels. */
+    stroke-width: 3;
+    /* Starts the pulse invisible. */
+    opacity: 0;
+    /* Makes transforms scale from the shape's own box. */
+    transform-box: fill-box;
+    /* Expands the pulse from the centre of the shape. */
+    transform-origin: center;
+    /* Runs the pulse animation once after the tick is drawn. */
+    animation: sc-pulse 0.7s ease-out 0.95s;
+/* Closes the pulse rule. */
+}
+
+/* Styles the success heading inside the pop-up. */
+.success-popup h3 {
+    /* Uses the heading font for the success title. */
+    font-family: var(--font-heading);
+    /* Sets the success title size to 1.3rem. */
+    font-size: 1.3rem;
+    /* Makes the success title bold. */
+    font-weight: 700;
+    /* Colours the success title dark gray. */
+    color: var(--gray-800);
+    /* Adds a small gap below the success title. */
+    margin-bottom: 0.4rem;
+/* Closes the success title rule. */
+}
+/* Styles the explanatory sentence under the success title. */
+.success-popup p {
+    /* Sets the message text size to 0.9rem. */
+    font-size: 0.9rem;
+    /* Colours the message text mid gray. */
+    color: var(--gray-500);
+    /* Leaves room below the message for the countdown bar. */
+    padding-bottom: 1.6rem;
+/* Closes the message rule. */
+}
+
+/* The thin gray countdown track at the bottom of the pop-up. */
+.success-popup-timer { height: 5px; margin: 0 -2rem; background: var(--gray-200); }
+/* The gold bar that shrinks as the 5-second timer runs out. */
+.success-popup-timer span {
+    /* Makes the countdown bar a block that fills its track. */
+    display: block;
+    /* Sets the countdown bar height to the full track height. */
+    height: 100%;
+    /* Colours the countdown bar gold. */
+    background: #FFB82B;
+    /* Shrinks the countdown bar from its left side. */
+    transform-origin: left center;
+    /* Runs the 5-second countdown animation once. */
+    animation: sp-countdown 5s linear forwards;
+/* Closes the countdown bar rule. */
+}
+
+/* Keyframes that fade the overlay in. */
+@keyframes sp-fade-in  { from { opacity: 0; } to { opacity: 1; } }
+/* Keyframes that fade the overlay out. */
+@keyframes sp-fade-out { from { opacity: 1; } to { opacity: 0; } }
+/* Keyframes that scale the pop-up card from 80% to full size. */
+@keyframes sp-pop      { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+/* Keyframes that draw the ring and tick by clearing the dash offset. */
+@keyframes sc-draw     { to { stroke-dashoffset: 0; } }
+/* Keyframes that pop the background circle from zero size. */
+@keyframes sc-bg-pop   { from { transform: scale(0); } to { transform: scale(1); } }
+/* Keyframes that make the pulse ring grow and fade away. */
+@keyframes sc-pulse    { 0% { opacity: 0.5; transform: scale(1); } 100% { opacity: 0; transform: scale(1.35); } }
+/* Keyframes that shrink the countdown bar to zero width. */
+@keyframes sp-countdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* Honours the reduced-motion setting by turning pop-up animations off. */
+@media (prefers-reduced-motion: reduce) {
+    /* Disables pop-up and calendar entrance animations for these users. */
+    .success-popup, .success-popup-overlay, .sc-bg, .sc-pulse, .dp-popover.open { animation: none; }
+    /* Shows the ring and tick fully drawn without animating. */
+    .sc-ring, .sc-tick { animation: none; stroke-dashoffset: 0; }
+/* Closes the reduced-motion block. */
+}
+

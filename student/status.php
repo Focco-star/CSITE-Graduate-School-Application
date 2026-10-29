@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/../includes/config.php';
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/config.php';
+require_once __DIR__ . '/../includes/config/db.php';
 
 $mockStudent = currentStudentProfile($mockStudent);
 
@@ -17,7 +17,7 @@ $currentIndex = workflowCurrentIndex($progress, $stages);
 $currentProgress = $progress[$currentIndex] ?? ['stageStatus' => 'pending'];
 $currentStage = $stages[$currentIndex] ?? null;
 
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/layout/header.php';
 ?>
 
 <div class="page-header">
@@ -131,4 +131,4 @@ require_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/layout/footer.php'; ?>

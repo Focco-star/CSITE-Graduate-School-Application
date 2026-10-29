@@ -1,9 +1,9 @@
 <?php /* Starts the PHP code that shows a document in the browser. */ ?>
 <?php
 // Loads the shared config one folder up from the coordinator folder.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the database helper to look up the document record.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 
 // Checks whether no session has been started yet.
 if (session_status() === PHP_SESSION_NONE) {

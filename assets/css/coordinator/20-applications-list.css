@@ -1,0 +1,345 @@
+/* Starts the comment block about expandable student groups. */
+/* ==========================================================================
+   Expandable student groups (coordinator > applications list)
+   One row per student by default; clicking the name reveals the student's
+   other applications on that stage.
+   ========================================================================== */
+/* Styles the clickable student name that expands extra rows. */
+.student-cell-toggle {
+    /* Makes the toggle shrink to fit its content like a link. */
+    display: inline-flex;
+    /* Centers the caret and name vertically. */
+    align-items: center;
+    /* Spaces the caret from the student name. */
+    gap: 0.45rem;
+    /* Removes the default button background. */
+    background: none;
+    /* Removes the button border so it looks like plain text. */
+    border: none;
+    /* Removes the default button padding. */
+    padding: 0;
+    /* Uses the table font for the toggle button. */
+    font: inherit;
+    /* Shows the student name in ADZU navy. */
+    color: var(--adzu-navy);
+    /* Shows a hand cursor over the student name. */
+    cursor: pointer;
+    /* Aligns the button text to the left. */
+    text-align: left;
+/* Closes the student cell toggle rule. */
+}
+/* Underlines the student name on hover. */
+.student-cell-toggle:hover { text-decoration: underline; }
+/* Shows a clear focus ring for keyboard users. */
+.student-cell-toggle:focus-visible {
+    /* Draws a gold outline around the focused toggle. */
+    outline: 2px solid var(--adzu-gold);
+    /* Pushes the outline slightly away from the text. */
+    outline-offset: 2px;
+    /* Rounds the focus outline corners. */
+    border-radius: 3px;
+/* Closes the student toggle focus rule. */
+}
+/* Styles the small arrow that shows the group can expand. */
+.student-cell-toggle .toggle-caret {
+    /* Sets the caret arrow to a small size. */
+    font-size: 0.62rem;
+    /* Shows the caret in light gray. */
+    color: var(--gray-400);
+    /* Animates the caret as it rotates. */
+    transition: transform 0.15s ease;
+    /* Reserves a small width for the caret. */
+    width: 0.7rem;
+/* Closes the toggle caret rule. */
+}
+/* Rotates the caret to point down when the group is open. */
+.student-cell-toggle[aria-expanded="true"] .toggle-caret { transform: rotate(90deg); }
+/* Styles the badge showing how many applications a student has. */
+.student-group-count {
+    /* Keeps the count badge sized to its content. */
+    display: inline-block;
+    /* Gives the count badge a minimum width. */
+    min-width: 1.35rem;
+    /* Adds small padding inside the count badge. */
+    padding: 0.05rem 0.4rem;
+    /* Makes the count badge fully rounded. */
+    border-radius: 999px;
+    /* Gives the count badge a light gray background. */
+    background: var(--gray-100);
+    /* Shows the count number in medium gray. */
+    color: var(--gray-600);
+    /* Sets the count number to a small size. */
+    font-size: 0.68rem;
+    /* Makes the count number bold. */
+    font-weight: 700;
+    /* Centers the count number in its badge. */
+    text-align: center;
+    /* Sets a compact line height for the badge. */
+    line-height: 1.5;
+/* Closes the student group count rule. */
+}
+/* Styles the count badge while the student group is open. */
+.student-cell-toggle[aria-expanded="true"] .student-group-count {
+    /* Turns the open group count badge gold. */
+    background: var(--adzu-gold);
+    /* Uses dark gray text on the gold badge. */
+    color: #1f2937;
+/* Closes the open group count rule. */
+}
+/* Hides the extra application rows until a group is opened. */
+tr.app-child-row { display: none; }
+/* Shows the child rows when their student group is expanded. */
+tr.app-child-row.is-shown { display: table-row; }
+
+/* Starts the comment about the coordinator applications table. */
+/* Coordinator > applications menu: one row per registered student. */
+/* Holds the toggle and count badge in the student column. */
+.student-cell {
+    /* Lays the student cell contents out in a row. */
+    display: flex;
+    /* Centers the student cell contents vertically. */
+    align-items: center;
+    /* Spaces the name toggle from the count badge. */
+    gap: 0.45rem;
+/* Closes the student cell rule. */
+}
+
+/* Styles the student name link in the applications table. */
+.student-name-link {
+    /* Makes the student name semi bold. */
+    font-weight: 600;
+    /* Shows the student name link in ADZU navy. */
+    color: var(--adzu-navy);
+/* Closes the student name link rule. */
+}
+
+/* Underlines the student name link on hover. */
+.student-name-link:hover { text-decoration: underline; }
+
+/* Limits how wide an application title cell can get. */
+.app-title-cell {
+    /* Caps the application title cell at 220 pixels. */
+    max-width: 220px;
+    /* Hides any title text that overflows the cell. */
+    overflow: hidden;
+    /* Shows an ellipsis when the application title is too long. */
+    text-overflow: ellipsis;
+    /* Keeps the application title on one line. */
+    white-space: nowrap;
+/* Closes the application title cell rule. */
+}
+
+/* Styles the small chip that shows the student's track. */
+.track-chip {
+    /* Keeps the track chip sized to its content. */
+    display: inline-block;
+    /* Sets the track chip text size. */
+    font-size: 0.75rem;
+    /* Gives the track chip a light gray background. */
+    background: var(--gray-100);
+    /* Shows the track name in medium gray. */
+    color: var(--gray-600);
+    /* Adds small padding inside the track chip. */
+    padding: 2px 8px;
+    /* Makes the track chip fully rounded. */
+    border-radius: 99px;
+/* Closes the track chip rule. */
+}
+
+/* Shows soft italic gray text for minor details. */
+.text-muted-soft { color: var(--gray-400); font-style: italic; }
+
+/* Starts the comment about filtering out mismatched student rows. */
+/* A student whose newest application does not pass the current filter: its
+   details are neutralised so the table never shows a filtered-out record. */
+/* Hides cell values that do not match the active table filter. */
+tr.app-group-row.is-parent-mismatch td[data-app-cell] > .cell-value { display: none; }
+/* Replaces hidden cell values with a dash placeholder. */
+tr.app-group-row.is-parent-mismatch td[data-app-cell]::after {
+    /* Puts an em dash where the hidden value used to be. */
+    content: '—';
+    /* Draws the placeholder dash in light gray. */
+    color: var(--gray-400);
+/* Closes the mismatch placeholder rule. */
+}
+
+/* Styles the cells of the expanded child application rows. */
+tr.app-child-row > td {
+    /* Gives child row cells a light gray background. */
+    background: var(--gray-50);
+    /* Sets child row text to a smaller size. */
+    font-size: 0.8rem;
+    /* Shows child row text in medium gray. */
+    color: var(--gray-600);
+/* Closes the child row cell rule. */
+}
+/* Indents child rows to show whose applications they are. */
+tr.app-child-row > td:first-child { padding-left: 2.2rem; }
+/* Styles the label in the first cell of a child row. */
+tr.app-child-row > td:first-child .child-label {
+    /* Lays out the child label contents in a row. */
+    display: inline-flex;
+    /* Centers the child label contents vertically. */
+    align-items: center;
+    /* Spaces the label icon from its text. */
+    gap: 0.35rem;
+    /* Sets the child label text to a small size. */
+    font-size: 0.72rem;
+    /* Shows the child label in gray. */
+    color: var(--gray-500);
+/* Closes the child label rule. */
+}
+/* Darkens a child row slightly on hover. */
+tr.app-child-row:hover > td { background: var(--gray-100); }
+/* Colors the application title text in child rows. */
+tr.app-child-row .child-title { color: var(--gray-700); }
+/* Starts the comment about keeping filtered rows hidden. */
+/* A row the table filter has hidden must stay hidden even when its group is open.
+   Declared after .is-shown so it wins on equal specificity. */
+/* Keeps filtered child rows hidden even when the group is open. */
+tr.app-child-row[hidden] { display: none; }
+/* Styles the small LATEST tag marking the newest application. */
+.app-group-latest {
+    /* Sets the LATEST tag to a very small size. */
+    font-size: 0.66rem;
+    /* Shows the LATEST tag in uppercase letters. */
+    text-transform: uppercase;
+    /* Adds slight spacing between the tag letters. */
+    letter-spacing: 0.04em;
+    /* Shows the LATEST tag in light gray. */
+    color: var(--gray-400);
+    /* Makes the LATEST tag bold. */
+    font-weight: 700;
+/* Closes the latest application tag rule. */
+}
+
+/* Styles the pill shaped status labels used in tables. */
+.status-badge {
+    /* Keeps the status badge sized to its text. */
+    display: inline-block;
+    /* Adds padding inside the status badge. */
+    padding: 0.2rem 0.65rem;
+    /* Makes the status badge fully rounded. */
+    border-radius: 999px;
+    /* Sets the status text size. */
+    font-size: 0.75rem;
+    /* Makes the status text semi bold. */
+    font-weight: 600;
+    /* Keeps status labels on one line. */
+    white-space: nowrap;
+/* Closes the status badge rule. */
+}
+
+/* Colors the Pending status badge yellow. */
+.status-pending { background: var(--warning-bg); color: var(--warning); }
+/* Colors the Submitted status badge blue. */
+.status-submitted { background: var(--info-bg); color: var(--info); }
+/* Colors the Under Review status badge yellow. */
+.status-review { background: var(--warning-bg); color: var(--warning); }
+/* Colors the Approved status badge green. */
+.status-approved { background: var(--success-bg); color: var(--success); }
+/* Colors the Confirmed status badge navy. */
+.status-confirmed { background: rgba(6, 2, 151, 0.12); color: var(--adzu-navy); }
+
+/* Starts the comment about the gray Pending badge in the schedule table. */
+/* Scheduled Presentations: Pending is gray so it matches the gray Pending
+   card and legend swatch in the Presentation Schedule Calendar. */
+/* Makes Pending gray in the scheduled presentations table. */
+#scheduledPresentationsTable .status-pending { background: #e7e9ed; color: #4b5563; }
+/* Colors the Revision status badge red. */
+.status-revision { background: var(--danger-bg); color: var(--danger); }
+/* Colors the Completed status badge dark green. */
+.status-completed { background: var(--success); color: var(--white); }
+
+/* Starts the comment listing the application status colors. */
+/* Application status palette of the coordinator's Applications menu.
+   Gray — Not Yet Submitted (automatic indicator, never editable)
+   Blue — Submitted
+   Yellow — Under Review
+   Green — Ready for Presentation
+   Purple — Scheduled for Presentation
+   Dark green — Presentation Complete */
+/* Colors the Not Yet Submitted badge gray. */
+.status-not-submitted { background: var(--gray-100); color: var(--gray-600); }
+/* Colors the Ready for Presentation badge green. */
+.status-ready { background: var(--success-bg); color: var(--success); }
+/* Colors the Scheduled for Presentation badge purple. */
+.status-scheduled { background: var(--purple-bg); color: var(--purple); }
+
+/* Starts the comment about the locked stage badge. */
+/* A stage the student may not work on yet. */
+/* Colors the Locked stage badge gray. */
+.status-locked { background: var(--gray-200); color: var(--gray-600); }
+
+/* Fades a locked step in the stage stepper. */
+.stage-stepper-item.is-locked { opacity: 0.75; }
+/* Grays out the number of a locked stage stepper step. */
+.stage-stepper-item.is-locked .stage-stepper-num { background: var(--gray-200); color: var(--gray-500); }
+
+/* Fades locked items in the progress timeline. */
+.timeline-item.locked { opacity: 0.75; }
+/* Grays the dot of a locked timeline item. */
+.timeline-item.locked .timeline-dot { background: var(--gray-300); }
+/* Grays the heading of a locked timeline item. */
+.timeline-item.locked h4 { color: var(--gray-500); }
+
+/* Gives a locked milestone stage a dashed, faded look. */
+.ms-stage.is-locked { background: var(--gray-50); border-style: dashed; }
+/* Grays the number badge of a locked milestone stage. */
+.ms-stage.is-locked .ms-stage-num { background: var(--gray-200); color: var(--gray-600); }
+/* Grays the title of a locked milestone stage. */
+.ms-stage.is-locked .ms-stage-title { color: var(--gray-500); }
+
+/* Styles the note explaining that a milestone stage is locked. */
+.ms-locked-note {
+    /* Lays out the locked note icon and text in a row. */
+    display: flex;
+    /* Centers the locked note items vertically. */
+    align-items: center;
+    /* Spaces the locked note icon from its text. */
+    gap: 0.45rem;
+    /* Sets the spacing around the locked note. */
+    margin: 0.6rem 0 0.2rem;
+    /* Sets the locked note text size. */
+    font-size: 0.8rem;
+    /* Shows the locked note in gray. */
+    color: var(--gray-500);
+/* Closes the milestone locked note rule. */
+}
+
+/* Starts the comment about the attachment status line. */
+/* Attach status line of the Application page, in the same style as the
+   Milestone Tracker notifications on the Student Dashboard. */
+/* Lays out the attachment status message under the upload step. */
+.attach-status {
+    /* Turns the attachment status into a flex row. */
+    display: flex;
+    /* Centers the status items vertically. */
+    align-items: center;
+    /* Spaces the items in the attachment status line. */
+    gap: 0.55rem;
+    /* Adds space below the attachment status line. */
+    margin: 0 0 0.9rem;
+/* Closes the attachment status rule. */
+}
+
+/* Sizes the small tag shown in the attachment status line. */
+.attach-status .ms-step-tag {
+    /* Sets the attachment status tag text size. */
+    font-size: 0.7rem;
+    /* Adds compact padding inside the status tag. */
+    padding: 0.15rem 0.5rem;
+    /* Keeps the status tag text on one line. */
+    white-space: nowrap;
+/* Closes the attachment status tag rule. */
+}
+
+/* Styles the gray note text in the attachment status line. */
+.attach-status-note {
+    /* Sets the attachment note text size. */
+    font-size: 0.8rem;
+    /* Shows the attachment note in gray. */
+    color: var(--gray-500);
+/* Closes the attachment status note rule. */
+}
+

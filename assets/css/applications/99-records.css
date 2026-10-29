@@ -1,0 +1,187 @@
+/* Opens the comment header for the Application Records table. */
+/* ==========================================================================
+   Coordinator > Student Applications > Application Records
+   The Edit control mirrors the one in Students & Applications: a labeled
+   gold button in the Actions column. On narrower screens the records table
+   becomes stacked cards so the Actions column is never clipped.
+   ========================================================================== */
+/* Stacks the buttons in the Application Records actions column. */
+#applicationRecordsTable .actions {
+    /* Places the action buttons one under another. */
+    flex-direction: column;
+    /* Stops the action buttons from wrapping sideways. */
+    flex-wrap: nowrap;
+    /* Stretches the action buttons to full column width. */
+    align-items: stretch;
+    /* Adds space between the action buttons. */
+    gap: 0.4rem;
+/* Closes the records actions column rule. */
+}
+
+/* Styles every button inside the records actions column. */
+#applicationRecordsTable .actions .btn {
+    /* Makes each button fill the actions column width. */
+    width: 100%;
+    /* Keeps the button labels on one line. */
+    white-space: nowrap;
+/* Closes the records action button rule. */
+}
+
+/* Styles the Edit button in the Application Records table. */
+#applicationRecordsTable .app-edit-btn {
+    /* Keeps the records Edit button at least 38 pixels tall. */
+    min-height: 38px;
+    /* Sets the records Edit button padding. */
+    padding: 0.55rem 0.9rem;
+    /* Rounds the records Edit button corners. */
+    border-radius: 9px;
+    /* Adds a soft navy shadow under the records Edit button. */
+    box-shadow: 0 2px 6px rgba(6, 2, 151, 0.16);
+/* Closes the records Edit button rule. */
+}
+
+/* Starts the hover style for the records Edit button. */
+#applicationRecordsTable .app-edit-btn:hover {
+    /* Deepens the shadow when the records button is hovered. */
+    box-shadow: 0 4px 12px rgba(6, 2, 151, 0.24);
+    /* Lifts the records button one pixel on hover. */
+    transform: translateY(-1px);
+/* Closes the records Edit button hover rule. */
+}
+
+/* Starts the tablet media query for the records table. */
+@media (max-width: 1200px) {
+    /* Turns the records table into stacked blocks. */
+    #applicationRecordsTable { display: block; }
+    /* Hides the records table header on tablets. */
+    #applicationRecordsTable thead { display: none; }
+    /* Makes the records table body a plain block container. */
+    #applicationRecordsTable tbody { display: block; }
+
+    /* Turns each records row into a card. */
+    #applicationRecordsTable tbody tr {
+        /* Treats each records row as a block. */
+        display: block;
+        /* Adds space below each records card. */
+        margin: 0 0 0.85rem;
+        /* Gives each records card a white background. */
+        background: var(--white);
+        /* Adds a light grey border around each records card. */
+        border: 1px solid var(--gray-200);
+        /* Rounds the records card corners. */
+        border-radius: var(--radius-lg);
+        /* Adds a soft shadow under each records card. */
+        box-shadow: 0 1px 2px rgba(6, 2, 151, 0.04), 0 8px 20px rgba(6, 2, 151, 0.05);
+        /* Clips card contents to the rounded corners. */
+        overflow: hidden;
+    /* Closes the records card rule. */
+    }
+
+    /* Removes the gap under the last records card. */
+    #applicationRecordsTable tbody tr:last-child { margin-bottom: 0; }
+    /* Keeps the records card white on hover. */
+    #applicationRecordsTable tbody tr:hover { background: var(--white); }
+
+    /* Turns each records cell into a label and value grid. */
+    #applicationRecordsTable tbody td {
+        /* Makes the records cell a two-column grid. */
+        display: grid;
+        /* Gives the label column 7 rem and the value the rest. */
+        grid-template-columns: 7rem minmax(0, 1fr);
+        /* Aligns the label and value to the top of the cell. */
+        align-items: start;
+        /* Spaces the label column from the value column. */
+        gap: 0.55rem;
+        /* Sets the records cell padding. */
+        padding: 0.55rem 0.95rem;
+        /* Draws a divider under each records cell. */
+        border-bottom: 1px solid var(--gray-100);
+        /* Aligns cell contents to the top. */
+        vertical-align: top;
+    /* Closes the records cell rule. */
+    }
+
+    /* Creates the small uppercase label before each records value. */
+    #applicationRecordsTable tbody td::before {
+        /* Uses the data-label attribute as the label text. */
+        content: attr(data-label);
+        /* Lifts the label slightly to line up with the value. */
+        padding-top: 0.12rem;
+        /* Sets the small label text size. */
+        font-size: 0.63rem;
+        /* Makes the cell label bold. */
+        font-weight: 700;
+        /* Sets the cell label line height. */
+        line-height: 1.5;
+        /* Spreads the cell label letters. */
+        letter-spacing: 0.06em;
+        /* Shows the cell label in capital letters. */
+        text-transform: uppercase;
+        /* Shows the cell label in light grey. */
+        color: var(--gray-400);
+    /* Closes the records cell label rule. */
+    }
+
+    /* Lets the application title cell use the full card width. */
+    #applicationRecordsTable tbody td.app-title-cell {
+        /* Removes the width limit on the title cell. */
+        max-width: none;
+        /* Allows the title to show without clipping. */
+        overflow: visible;
+        /* Lets the title wrap onto several lines. */
+        white-space: normal;
+        /* Removes the ellipsis from the title cell. */
+        text-overflow: clip;
+    /* Closes the records title cell rule. */
+    }
+
+    /* Turns the records actions cell into a button column. */
+    #applicationRecordsTable tbody td.actions {
+        /* Uses a flex layout for the actions cell. */
+        display: flex;
+        /* Stacks the action buttons vertically. */
+        flex-direction: column;
+        /* Stretches the action buttons to full width. */
+        align-items: stretch;
+        /* Adds space between the action buttons. */
+        gap: 0.5rem;
+        /* Sets the actions cell padding. */
+        padding: 0.75rem 0.95rem 0.9rem;
+        /* Removes the divider under the actions cell. */
+        border-bottom: none;
+    /* Closes the records actions cell rule. */
+    }
+
+    /* Hides the generated label for the records actions cell. */
+    #applicationRecordsTable tbody td.actions::before { content: none; }
+    /* Makes the records Edit button taller on cards. */
+    #applicationRecordsTable .app-edit-btn { min-height: 40px; }
+/* Closes the tablet media query for the records table. */
+}
+
+/* Starts the phone media query for the records table. */
+@media (max-width: 560px) {
+    /* Stacks every records label above its value on phones. */
+    #applicationRecordsTable tbody td {
+        /* Gives each records cell one full-width column. */
+        grid-template-columns: minmax(0, 1fr);
+        /* Reduces the gap between the label and value. */
+        gap: 0.2rem;
+        /* Tightens the records cell padding on phones. */
+        padding: 0.55rem 0.85rem;
+    /* Closes the phone records cell rule. */
+    }
+
+    /* Tightens the records actions cell padding on phones. */
+    #applicationRecordsTable tbody td.actions { padding: 0.65rem 0.85rem 0.85rem; }
+/* Closes the phone media query. */
+}
+
+/* Starts the reduced-motion query for the records table. */
+@media (prefers-reduced-motion: reduce) {
+    /* Removes the records Edit button transition. */
+    #applicationRecordsTable .app-edit-btn { transition: none; }
+    /* Removes the records button lift for reduced motion users. */
+    #applicationRecordsTable .app-edit-btn:hover { transform: none; }
+/* Closes the reduced-motion media query. */
+}

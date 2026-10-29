@@ -1,9 +1,9 @@
 <?php /* Starts the PHP page that builds the student Application form. */ ?>
 <?php
 // Loads the shared config file with paths, session setup and helper functions.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the database helper file so DB::getConnection() is available.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 
 /* ------------------------------------------------------------------
  * Helpers shared by the Application form
@@ -151,12 +151,12 @@ function csiteDateValue($raw): string
 // Closes the csiteDateValue helper.
 }
 
-/** Editable (typeable) date input with a calendar button. The calendar itself lives in script.js. */
+/** Editable (typeable) date input with a calendar button. The calendar itself lives in shared/app.js. */
 // Defines a helper that builds a typeable date input with a calendar button.
 function csiteDateField(string $name, $value): string
 // Opens the body of the csiteDateField helper.
 {
-    // Starts the date picker wrapper that script.js hooks into.
+    // Starts the date picker wrapper that shared/app.js hooks into.
     return '<div class="date-picker" data-date-picker>'
         // Creates the text input, escaping the field name and the current date value.
         . '<input type="text" name="' . htmlspecialchars($name) . '" value="' . htmlspecialchars(csiteDateValue($value)) . '"'
@@ -1481,7 +1481,7 @@ if ($flaggedMilestone) {
 }
 
 // Loads the shared page header and navigation.
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/layout/header.php';
 // Closes PHP mode and starts the HTML output.
 ?>
 
@@ -2267,4 +2267,4 @@ require_once __DIR__ . '/../includes/header.php';
 </script>
 
 <?php /* Loads the shared page footer. */ ?>
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/layout/footer.php'; ?>

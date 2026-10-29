@@ -1,7 +1,7 @@
 <?php /* Opens the PHP block for the final approval page. */ ?>
 <?php
 // Loads shared config helpers and demo data stores.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 
 // Sets the browser tab title to Final Approval.
 $pageTitle   = 'Final Approval';
@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
 }
 
 // Loads the shared header with sidebar and top bar.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML below is printed.
 ?>
 
@@ -247,4 +247,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </form>
 
 <?php /* Loads the shared footer scripts and closes PHP. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

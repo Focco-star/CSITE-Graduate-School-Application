@@ -1,0 +1,41 @@
+/* Opens the comment header for the shared coordinator Edit button. */
+/* ==========================================================================
+   Coordinator-wide Edit control
+   Gold primary button with icon + label. Its geometry mirrors the compact
+   btn-sm Delete button it sits beside in the Academic Assessment Team and
+   Presentation Schedule tables, so the two controls read as one size.
+   ========================================================================== */
+/* Styles the shared gold Edit button used across coordinator tables. */
+.coord-edit-btn {
+    /* Sets the Edit button inner padding. */
+    padding: 0.4rem 0.85rem;
+    /* Sets the Edit button text size. */
+    font-size: 0.8rem;
+    /* Rounds the Edit button with the standard radius token. */
+    border-radius: var(--radius);
+    /* Adds a soft navy shadow under the Edit button. */
+    box-shadow: 0 2px 6px rgba(6, 2, 151, 0.16);
+/* Closes the shared Edit button rule. */
+}
+
+/* Sizes the icon inside the shared Edit button. */
+.coord-edit-btn i { font-size: 0.8rem; }
+
+/* Starts the shared Edit button hover style. */
+.coord-edit-btn:hover {
+    /* Deepens the shadow when the button is hovered. */
+    box-shadow: 0 4px 12px rgba(6, 2, 151, 0.24);
+    /* Lifts the button one pixel on hover. */
+    transform: translateY(-1px);
+/* Closes the shared Edit button hover rule. */
+}
+
+/* Starts the reduced-motion query for the shared Edit button. */
+@media (prefers-reduced-motion: reduce) {
+    /* Removes the Edit button transition for reduced motion. */
+    .coord-edit-btn { transition: none; }
+    /* Removes the Edit button lift for reduced motion users. */
+    .coord-edit-btn:hover { transform: none; }
+/* Closes the reduced-motion media query. */
+}
+

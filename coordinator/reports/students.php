@@ -1,9 +1,9 @@
 <?php /* Starts the PHP code for the coordinator's student report page. */ ?>
 <?php
 // Loads the shared config file with paths, helpers, and session setup.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database class so this page can query MySQL.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Sets the page title used in the browser tab and header.
 $pageTitle   = 'Student Reports';
@@ -105,7 +105,7 @@ try {
 }
 
 // Loads the shared header, sidebar, and top navigation.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML below is printed to the browser.
 ?>
 
@@ -247,4 +247,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </div>
 
 <?php /* Loads the shared footer and closes the HTML page. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

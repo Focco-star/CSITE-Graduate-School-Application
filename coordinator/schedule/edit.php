@@ -1,9 +1,9 @@
 <?php /* Opens PHP mode so the server can run the edit form logic. */ ?>
 <?php
 // Loads config.php, which holds site settings and the url() helper.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads db.php, the DB class used for database queries here.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Checks whether a session is already running.
 if (session_status() === PHP_SESSION_NONE) {
@@ -122,6 +122,12 @@ if ($documentorWords) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $sch) {
     // Joins the chosen panel members into one comma-separated text.
     $panel = implode(', ', array_filter([$_POST['panel1'] ?? '', $_POST['panel2'] ?? '', $_POST['panel3'] ?? '']));
+    // Reads the saved schedule status before the edit.
+    $storedStatus = (string) ($sch['status'] ?? 'pending');
+    // A completed schedule keeps its completed status when other details change.
+    $newStatus = $storedStatus === 'completed'
+        ? 'completed'
+        : (($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending');
     // Updates the schedule row through updateScheduleRecord().
     updateScheduleRecord($sch['id'], [
         // Saves the date from the form, or the old one when it is missing.
@@ -130,8 +136,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $sch) {
         'time' => trim($_POST['time'] ?? $sch['time']),
         // Saves the venue from the form, or the old one when it is missing.
         'venue' => trim($_POST['venue'] ?? ($sch['venue'] ?? '')),
-        // Stores confirmed only when chosen, otherwise pending.
-        'status' => ($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
+        // Keeps a completed schedule completed; otherwise stores the chosen status.
+        'status' => $newStatus,
         // Formats the adviser name, or keeps the stored adviser.
         'adviser' => formatPersonName($_POST['adviser'] ?? ($sch['adviser'] ?? '')),
         // Stores the panel text, or keeps the old panel when it is blank.
@@ -146,7 +152,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $sch) {
 }
 
 // Loads the shared header, which prints the page top and sidebar.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP mode and switches back to HTML output.
 ?>
 
@@ -214,13 +220,22 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php /*                 Label for the status field. */ ?>
                 <label>Schedule Status</label>
 <?php /*                 Drop-down that chooses pending or confirmed status. */ ?>
-                <select name="status">
+                <select name="status" <?= $sch['status'] === 'completed' ? 'disabled' : '' ?>>
+<?php /*                     Completed option, shown only for a finished presentation. */ ?>
+                    <?php if ($sch['status'] === 'completed'): ?>
+                    <option value="completed" selected>Completed</option>
+                    <?php else: ?>
 <?php /*                     Pending option, preselected when the schedule is pending. */ ?>
                     <option value="pending" <?= $sch['status'] === 'pending' ? 'selected' : '' ?>>Pending Confirmation</option>
 <?php /*                     Confirmed option, preselected when the schedule is confirmed. */ ?>
                     <option value="confirmed" <?= $sch['status'] === 'confirmed' ? 'selected' : '' ?>>Confirmed</option>
+                    <?php endif; ?>
 <?php /*                 Closes the status drop-down. */ ?>
                 </select>
+<?php /*                 Explains that completed presentations keep their status. */ ?>
+                <?php if ($sch['status'] === 'completed'): ?>
+                <p class="field-hint">A completed presentation keeps its status when other details are edited.</p>
+                <?php endif; ?>
 <?php /*             Closes the status field wrapper. */ ?>
             </div>
 <?php /*             Info panel listing what must be done before a presentation. */ ?>
@@ -416,4 +431,4 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php endif; ?>
 
 <?php /* Loads the shared footer, which prints closing tags and scripts. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

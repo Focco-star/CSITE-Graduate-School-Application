@@ -1,11 +1,11 @@
 <?php /* Opens the PHP block for the student profile setup page. */ ?>
 <?php
 // Loads the shared config with session, constants, and helpers.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the DB helper used to insert users and students.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 // Loads the Google sign-in helpers used for prefilling the form.
-require_once __DIR__ . '/../includes/google.php';
+require_once __DIR__ . '/../includes/integrations/google.php';
 
 // A profile verified by Google a moment ago (student/google_auth.php). It only
 // fills the name and email; the student still chooses the password and the
@@ -276,9 +276,9 @@ $role = 'public';
 // Adds the login page body class for the dark background.
 $bodyClass = 'login-body';
 // Includes the shared header markup and styles.
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/layout/header.php';
 // Includes the login slideshow panel.
-require_once __DIR__ . '/../includes/slideshow.php';
+require_once __DIR__ . '/../includes/layout/slideshow.php';
 
 // Starts a map of helper text shown for each track.
 $trackHints = [
@@ -594,4 +594,4 @@ window.CSITE_TRACK_LABELS = <?= json_encode([
 </script>
 
 <?php /* Includes the shared footer that ends the page. */ ?>
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/layout/footer.php'; ?>

@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block for the endorsement form page. */ ?>
 <?php
 // Loads shared config helpers and demo data stores.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the DB class for database access.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Sets the browser tab title to Graduate School Endorsement.
 $pageTitle   = 'Graduate School Endorsement';
@@ -39,7 +39,7 @@ if (!$endorsementPanel) {
 }
 
 // Loads the shared header with sidebar.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML below is printed.
 ?>
 
@@ -154,4 +154,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </div>
 
 <?php /* Loads the shared footer scripts and closes PHP. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

@@ -5,7 +5,7 @@ $pageTitle = 'Home';
 // Marks this page as public so the header shows the guest navigation links.
 $role = 'public';
 // Includes the shared header file with the CSS, fonts and top navigation bar.
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/layout/header.php';
 // Closes the PHP block so the HTML below is sent to the browser as-is.
 ?>
 
@@ -297,4 +297,4 @@ require_once __DIR__ . '/../includes/header.php';
 </section>
 
 <?php /* Includes the shared footer file with the closing scripts, then ends the page. */ ?>
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/layout/footer.php'; ?>

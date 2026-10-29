@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block that builds the edit-panel-member page. */ ?>
 <?php
 // Loads shared settings and helper functions such as url() and redirectTo().
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database connection and panel helper functions.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Sets the browser page title to Edit Panel Member.
 $pageTitle   = 'Edit Panel Member';
@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $pm) {
 }
 
 // Includes the shared header with menu and styles.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP and switches to HTML output.
 ?>
 
@@ -150,4 +150,4 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php endif; ?>
 
 <?php /* Includes the shared footer that closes the page layout. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

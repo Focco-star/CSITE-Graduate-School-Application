@@ -1,9 +1,9 @@
 <?php /* Starts the PHP code for the add template page. */ ?>
 <?php
 // Loads config settings, helpers, and demo data arrays.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database helper used when saving templates.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Sets the page title used in the browser tab.
 $pageTitle   = 'Add Template';
@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Loads the shared header and navigation.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML form below is printed.
 ?>
 
@@ -148,4 +148,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </form>
 
 <?php /* Loads the shared footer and closes the page. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

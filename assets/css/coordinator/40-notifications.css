@@ -1,0 +1,496 @@
+/* Starts the comment block about in-page notifications. */
+/* ------------------------------------------------------------------
+ * In-system notifications (coordinator > applications > edit)
+ *
+ * A small container at the top of the content area. It never blocks the
+ * page and temporary notices dismiss themselves.
+ * ------------------------------------------------------------------ */
+/* Holds the notification messages at the top of the content area. */
+.page-notifications {
+    /* Stacks the notifications vertically. */
+    display: flex;
+    /* Arranges notifications in a column. */
+    flex-direction: column;
+    /* Spaces the stacked notifications apart. */
+    gap: 0.5rem;
+    /* Adds space below the notification area. */
+    margin-bottom: 1rem;
+/* Closes the page notifications rule. */
+}
+
+/* Hides the notification area when there are no messages. */
+.page-notifications:empty { display: none; }
+
+/* Styles a single in-page notification message. */
+.page-notice {
+    /* Lays out the notice icon, text and buttons in a row. */
+    display: flex;
+    /* Centers the notice items vertically. */
+    align-items: center;
+    /* Spaces the notice items apart. */
+    gap: 0.6rem;
+    /* Adds padding inside the notice. */
+    padding: 0.75rem 0.95rem;
+    /* Draws a transparent border so each notice keeps its size. */
+    border: 1px solid transparent;
+    /* Rounds the notice corners. */
+    border-radius: var(--radius);
+    /* Sets the notice text size. */
+    font-size: 0.85rem;
+    /* Slides each new notice into view. */
+    animation: page-notice-in 0.25s ease;
+/* Closes the page notice rule. */
+}
+
+/* Colors a success notice green. */
+.page-notice.is-success { background: #ecfdf5; border-color: #a7f3d0; color: #166534; }
+/* Colors an info notice blue. */
+.page-notice.is-info { background: var(--info-bg); border-color: #bfdbfe; color: #1e40af; }
+/* Colors a warning notice yellow. */
+.page-notice.is-warning { background: var(--warning-bg); border-color: #fde68a; color: #854d0e; }
+/* Colors an error notice red. */
+.page-notice.is-error { background: var(--danger-bg); border-color: #fecaca; color: #991b1b; }
+
+/* Lets the notice text take the remaining width. */
+.page-notice .page-notice-text { flex: 1; }
+
+/* Puts the notice action buttons on the right side. */
+.page-notice .page-notice-actions {
+    /* Pushes the notice actions to the far right. */
+    margin-left: auto;
+    /* Lays the notice actions out in a row. */
+    display: flex;
+    /* Spaces the notice action buttons apart. */
+    gap: 0.4rem;
+    /* Stops the notice actions from shrinking. */
+    flex-shrink: 0;
+/* Closes the notice actions rule. */
+}
+
+/* Makes the buttons inside notices smaller. */
+.page-notice .btn { padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+
+/* Defines the fade and slide animation for new notices. */
+@keyframes page-notice-in {
+    /* Starts the notice slightly above and transparent. */
+    from { opacity: 0; transform: translateY(-4px); }
+    /* Ends the notice in place and fully visible. */
+    to { opacity: 1; transform: translateY(0); }
+/* Closes the notice animation definition. */
+}
+
+/* Sets up the timeline with room for dots on the left. */
+.progress-timeline { position: relative; padding-left: 2rem; }
+
+/* Styles one item on the progress timeline. */
+.timeline-item {
+    /* Lets the item position its dot and connecting line. */
+    position: relative;
+    /* Adds space below each timeline item. */
+    padding-bottom: 1.75rem;
+/* Closes the timeline item rule. */
+}
+
+/* Removes the bottom spacing from the last timeline item. */
+.timeline-item:last-child { padding-bottom: 0; }
+
+/* Draws the vertical line connecting timeline items. */
+.timeline-item::before {
+    /* Creates an empty element for the connecting line. */
+    content: '';
+    /* Positions the connecting line against the item. */
+    position: absolute;
+    /* Places the line to the left of the timeline item. */
+    left: -1.55rem;
+    /* Starts the line near the top of the item. */
+    top: 8px;
+    /* Extends the line past the bottom of the item. */
+    bottom: -8px;
+    /* Makes the connecting line 2 pixels wide. */
+    width: 2px;
+    /* Draws the connecting line in light gray. */
+    background: var(--gray-200);
+/* Closes the connecting line rule. */
+}
+
+/* Hides the connecting line after the last timeline item. */
+.timeline-item:last-child::before { display: none; }
+
+/* Styles the round dot on each timeline item. */
+.timeline-dot {
+    /* Positions the dot against its timeline item. */
+    position: absolute;
+    /* Places the dot to the left of the item. */
+    left: -2rem;
+    /* Sets how far down the item the dot sits. */
+    top: 4px;
+    /* Sets the dot to 14 by 14 pixels. */
+    width: 14px; height: 14px;
+    /* Makes the timeline dot a circle. */
+    border-radius: 50%;
+    /* Gives the dot a gray fill by default. */
+    background: var(--gray-300);
+    /* Adds a white ring around the dot. */
+    border: 3px solid var(--white);
+    /* Adds a thin gray outline around the dot. */
+    box-shadow: 0 0 0 2px var(--gray-300);
+/* Closes the timeline dot rule. */
+}
+
+/* Colors the dot of a completed timeline item green. */
+.timeline-item.completed .timeline-dot {
+    /* Fills the completed dot green. */
+    background: var(--success);
+    /* Adds a green outline around the completed dot. */
+    box-shadow: 0 0 0 2px var(--success);
+/* Closes the completed dot rule. */
+}
+
+/* Colors the dot of the active timeline item gold. */
+.timeline-item.active .timeline-dot {
+    /* Fills the active dot gold. */
+    background: var(--adzu-gold);
+    /* Adds a gold outline around the active dot. */
+    box-shadow: 0 0 0 2px var(--adzu-gold);
+/* Closes the active dot rule. */
+}
+
+/* Shows the dot of a pending timeline item in gray. */
+.timeline-item.pending .timeline-dot {
+    /* Fills the pending dot light gray. */
+    background: var(--gray-200);
+    /* Adds a gray outline around the pending dot. */
+    box-shadow: 0 0 0 2px var(--gray-300);
+/* Closes the pending dot rule. */
+}
+
+/* Styles the title of a timeline item. */
+.timeline-content h4 { font-size: 0.9rem; font-weight: 600; color: var(--adzu-navy); }
+/* Styles the description under a timeline title. */
+.timeline-content p { font-size: 0.8rem; color: var(--gray-500); margin-top: 0.15rem; }
+
+/* Adds space below a tab section. */
+.tabs { margin-bottom: 1.5rem; }
+
+/* Lays the tab buttons out in a horizontal row. */
+.tab-list {
+    /* Turns the tab list into a flex row. */
+    display: flex;
+    /* Removes any gap between tab buttons. */
+    gap: 0;
+    /* Draws a line under the tab buttons. */
+    border-bottom: 2px solid var(--gray-200);
+    /* Lets the tab row scroll sideways on small screens. */
+    overflow-x: auto;
+/* Closes the tab list rule. */
+}
+
+/* Styles one tab button. */
+.tab-btn {
+    /* Adds padding inside the tab button. */
+    padding: 0.75rem 1.25rem;
+    /* Removes the default button background. */
+    background: none;
+    /* Removes the default button border. */
+    border: none;
+    /* Sets the tab button text size. */
+    font-size: 0.875rem;
+    /* Sets a medium weight for tab text. */
+    font-weight: 500;
+    /* Shows inactive tab text in gray. */
+    color: var(--gray-500);
+    /* Shows a hand cursor over tabs. */
+    cursor: pointer;
+    /* Reserves space for the active tab underline. */
+    border-bottom: 2px solid transparent;
+    /* Pulls the tab underline onto the list border. */
+    margin-bottom: -2px;
+    /* Keeps tab labels on one line. */
+    white-space: nowrap;
+    /* Uses the site font for tab buttons. */
+    font-family: var(--font);
+    /* Animates tab color changes smoothly. */
+    transition: all var(--transition);
+/* Closes the tab button rule. */
+}
+
+/* Turns the tab label navy on hover. */
+.tab-btn:hover { color: var(--adzu-navy); }
+/* Underlines and highlights the selected tab. */
+.tab-btn.active { color: var(--adzu-navy); border-bottom-color: var(--adzu-navy); font-weight: 600; }
+
+/* Hides tab panels by default. */
+.tab-panel { display: none; padding-top: 1.25rem; }
+/* Shows the panel that belongs to the selected tab. */
+.tab-panel.active { display: block; }
+
+/* Styles a boxed alert message. */
+.alert {
+    /* Adds padding inside the alert box. */
+    padding: 0.85rem 1rem;
+    /* Rounds the alert box corners. */
+    border-radius: var(--radius);
+    /* Sets the alert text size. */
+    font-size: 0.875rem;
+    /* Adds space below the alert box. */
+    margin-bottom: 1rem;
+    /* Lays out the alert icon and text in a row. */
+    display: flex;
+    /* Aligns the alert items to the top. */
+    align-items: flex-start;
+    /* Spaces the alert icon from its text. */
+    gap: 0.65rem;
+/* Closes the alert rule. */
+}
+
+/* Colors an informational alert blue. */
+.alert-info { background: var(--info-bg); color: #1e40af; border: 1px solid #bfdbfe; }
+/* Colors a success alert green. */
+.alert-success { background: var(--success-bg); color: #166534; border: 1px solid #bbf7d0; }
+/* Styles a yellow warning banner with dark amber text and a soft border. */
+.alert-warning { background: var(--warning-bg); color: #854d0e; border: 1px solid var(--gray-300); }
+/* Styles a red danger banner with dark red text and a pink border. */
+.alert-danger { background: var(--danger-bg); color: #991b1b; border: 1px solid #fecaca; }
+
+/* Starts the filter bar that holds search, dropdowns, and the result count. */
+.filter-bar {
+    /* Lays the filter controls out in one flexible row. */
+    display: flex;
+    /* Adds a small gap between filter controls. */
+    gap: 0.5rem;
+    /* Lets filter controls wrap onto a new line on narrow screens. */
+    flex-wrap: wrap;
+    /* Vertically centers the filter controls. */
+    align-items: center;
+    /* Leaves space below the filter bar before the table or cards. */
+    margin-bottom: 1rem;
+/* Closes the .filter-bar rule. */
+}
+/* Starts the search wrapper so the icon can sit inside the input. */
+.filter-search {
+    /* Allows the search icon to be positioned over the input. */
+    position: relative;
+    /* Lets search grow and gives it a 220px starting width. */
+    flex: 1 1 220px;
+/* Closes the .filter-search rule. */
+}
+/* Targets the magnifier icon inside the search box. */
+.filter-search i {
+    /* Places the icon absolutely inside the search box. */
+    position: absolute;
+    /* Sets the icon 10px from the left edge. */
+    left: 10px;
+    /* Moves the icon to the vertical middle of the box. */
+    top: 50%;
+    /* Pulls the icon up by half its own height to center it exactly. */
+    transform: translateY(-50%);
+    /* Colors the search icon light gray. */
+    color: var(--gray-400);
+    /* Makes the search icon slightly smaller than normal text. */
+    font-size: 0.85rem;
+/* Closes the .filter-search i rule. */
+}
+/* Selects the search input, which shares styling with the dropdowns. */
+.filter-search input,
+/* Selects the filter dropdowns and opens their shared rule. */
+.filter-bar select {
+    /* Adds inner spacing to the search box and dropdowns. */
+    padding: 0.45rem 0.75rem;
+    /* Draws a light gray border around the controls. */
+    border: 1px solid var(--gray-300);
+    /* Rounds the corners using the shared radius variable. */
+    border-radius: var(--radius);
+    /* Sets the control text a little smaller than body text. */
+    font-size: 0.85rem;
+/* Closes the shared input and select rule. */
+}
+/* Targets just the search input to size it. */
+.filter-search input {
+    /* Makes the search input fill the available width. */
+    width: 100%;
+    /* Adds left padding so typed text clears the icon. */
+    padding-left: 2.2rem;
+/* Closes the .filter-search input rule. */
+}
+/* Starts the small label that shows how many results were found. */
+.filter-count {
+    /* Sets the result count text slightly smaller. */
+    font-size: 0.82rem;
+    /* Colors the result count gray. */
+    color: var(--gray-500);
+    /* Pushes the result count to the right end of the filter bar. */
+    margin-left: auto;
+/* Closes the .filter-count rule. */
+}
+
+/* Starts the full-screen dark backdrop used by pop-up modals. */
+.modal-overlay {
+    /* Hides the overlay until a modal is opened. */
+    display: none;
+    /* Pins the overlay to the browser window when shown. */
+    position: fixed;
+    /* Stretches the overlay across all four edges of the screen. */
+    inset: 0;
+    /* Uses a semi-transparent black background behind the modal. */
+    background: rgba(0, 0, 0, 0.5);
+    /* Places the modal above ordinary page content. */
+    z-index: 500;
+    /* Centers the modal vertically in the overlay. */
+    align-items: center;
+    /* Centers the modal horizontally in the overlay. */
+    justify-content: center;
+    /* Adds padding so the modal never touches the screen edge. */
+    padding: 1rem;
+/* Closes the .modal-overlay rule. */
+}
+
+/* Shows the overlay as a flex box when the active class is added. */
+.modal-overlay.active { display: flex; }
+
+/* Starts the backdrop for the edit form modal. */
+.edit-modal-overlay {
+    /* Keeps the edit overlay hidden by default. */
+    display: none;
+    /* Fixes the edit overlay to the browser viewport. */
+    position: fixed;
+    /* Covers the whole screen with the edit overlay. */
+    inset: 0;
+    /* Dims the page with a semi-transparent black layer. */
+    background: rgba(0, 0, 0, 0.5);
+    /* Sets the edit overlay above other page content. */
+    z-index: 500;
+    /* Centers the edit modal vertically. */
+    align-items: center;
+    /* Centers the edit modal horizontally. */
+    justify-content: center;
+    /* Adds padding around the edit modal. */
+    padding: 1rem;
+/* Closes the .edit-modal-overlay rule. */
+}
+
+/* Shows the edit overlay when JavaScript adds the active class. */
+.edit-modal-overlay.active { display: flex; }
+
+/* Widens the edit modal to 640px for the larger form. */
+.edit-modal { max-width: 640px; }
+
+/* Starts the base modal box used for dialogs. */
+.modal {
+    /* Gives the modal a white background. */
+    background: var(--white);
+    /* Rounds the modal corners with the large radius. */
+    border-radius: var(--radius-lg);
+    /* Lets the modal fill the width of its container. */
+    width: 100%;
+    /* Caps the modal width at 520 pixels. */
+    max-width: 520px;
+    /* Stops the modal from growing past 90% of the screen height. */
+    max-height: 90vh;
+    /* Adds a vertical scrollbar when the modal content is tall. */
+    overflow-y: auto;
+    /* Adds a strong soft shadow so the modal floats above the page. */
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+/* Closes the .modal rule. */
+}
+
+/* Starts the modal header row with the title and close button. */
+.modal-header {
+    /* Adds padding inside the modal header. */
+    padding: 1.25rem;
+    /* Draws a light line under the header. */
+    border-bottom: 1px solid var(--gray-200);
+    /* Lays out the title and close button in a row. */
+    display: flex;
+    /* Vertically centers the header items. */
+    align-items: center;
+    /* Pushes the close button to the far right. */
+    justify-content: space-between;
+/* Closes the .modal-header rule. */
+}
+
+/* Styles the modal title in navy with medium weight. */
+.modal-header h3 { font-size: 1.05rem; font-weight: 600; color: var(--adzu-navy); }
+
+/* Starts the X close button in the modal header. */
+.modal-close {
+    /* Removes the default button background. */
+    background: none;
+    /* Removes the default button border. */
+    border: none;
+    /* Makes the X symbol larger. */
+    font-size: 1.25rem;
+    /* Colors the X gray so it looks secondary. */
+    color: var(--gray-400);
+    /* Shows a pointer cursor so users know it is clickable. */
+    cursor: pointer;
+    /* Adds a little padding to make the X easier to click. */
+    padding: 0.25rem;
+/* Closes the .modal-close rule. */
+}
+
+/* Adds padding inside the modal body content. */
+.modal-body { padding: 1.25rem; }
+
+/* Starts the modal footer that holds the action buttons. */
+.modal-footer {
+    /* Adds padding inside the footer. */
+    padding: 1rem 1.25rem;
+    /* Draws a light line above the footer. */
+    border-top: 1px solid var(--gray-200);
+    /* Lays the footer buttons out in a row. */
+    display: flex;
+    /* Adds space between footer buttons. */
+    gap: 0.75rem;
+    /* Aligns the footer buttons to the right. */
+    justify-content: flex-end;
+/* Closes the .modal-footer rule. */
+}
+
+/* Starts the grid that shows labelled details side by side. */
+.detail-grid {
+    /* Uses CSS grid for the detail items. */
+    display: grid;
+    /* Fits as many 220px-wide columns as the space allows. */
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    /* Adds a gap between detail items. */
+    gap: 1rem;
+/* Closes the .detail-grid rule. */
+}
+
+/* Styles the small label above each detail value. */
+.detail-item label {
+    /* Makes the label take its own line. */
+    display: block;
+    /* Sets the label text small. */
+    font-size: 0.75rem;
+    /* Makes the label semibold. */
+    font-weight: 600;
+    /* Colors the label light gray for a secondary look. */
+    color: var(--gray-400);
+    /* Uppercases the label text. */
+    text-transform: uppercase;
+    /* Adds slight spacing between the uppercase letters. */
+    letter-spacing: 0.04em;
+    /* Leaves a small gap under the label. */
+    margin-bottom: 0.2rem;
+/* Closes the .detail-item label rule. */
+}
+
+/* Styles the value shown under each detail label. */
+.detail-item span {
+    /* Sets the value text slightly larger than body text. */
+    font-size: 0.9rem;
+    /* Colors the value dark gray for readability. */
+    color: var(--gray-700);
+    /* Gives the value medium weight. */
+    font-weight: 500;
+/* Closes the .detail-item span rule. */
+}
+
+/* Explains why the hidden attribute is enforced for filtered rows. */
+/* Filtering: the generic filter component hides rows via the hidden attribute.
+   Any author style that sets display (e.g. .template-item { display:flex }) would
+   otherwise override the UA sheet, so enforce hidden everywhere. */
+/* Forces any element with the hidden attribute to stay hidden. */
+[hidden] { display: none !important; }
+

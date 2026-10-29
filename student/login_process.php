@@ -4,9 +4,9 @@
 // Starts the session so the login details can be remembered across pages.
 session_start();
 // Loads the shared configuration and helper functions.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the database class used to look up the user account.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 
 // Only run the login check when the form was submitted with POST.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

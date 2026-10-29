@@ -1,9 +1,9 @@
 <?php /* Opens PHP mode so the server can run the schedule form logic. */ ?>
 <?php
 // Loads config.php, which holds site settings and the url() helper.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads db.php, the DB class used for every database query on this page.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Checks that no session is running yet, so it is not started twice.
 if (session_status() === PHP_SESSION_NONE) {
@@ -337,47 +337,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'status' => ($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
         // Closes the array of values given to addScheduleRecord().
         ]);
-        // If the store had an application for this student, update it.
-        if ($app) {
-            // Marks that application as scheduled so the tracker shows it.
-            updateApplicationRecord((int) $app['id'], ['status' => 'scheduled']);
-        // Closes the if that updated the store application status.
-        }
-        // Only touch the database when the DB class is available.
-        if (class_exists('DB')) {
-            // Starts a try block for the database status update.
-            try {
-                // Looks up the database user id again for this email.
-                $userId = databaseUserIdForEmail($email);
-                // Only continue when a real user id was found.
-                if ($userId > 0) {
-                    // Finds the database application id for this student and stage.
-                    $dbAppId = databaseApplicationIdForStudent($userId, $stage);
-                    // Only continue when the application row exists.
-                    if ($dbAppId) {
-                        // Starts a note saying the schedule data was already copied over.
-                        /*
-                         * addScheduleRecord() has already copied the date, time,
-                         * venue, panel and confirmation into the application's
-                         * workflow state (the Milestone Tracker reads it from
-                         * there), so only the status is left to set here.
-                         */
-                        // Gets the shared database connection for the status update.
-                        DB::getConnection()
-                            // Prepares a query that sets the application status field.
-                            ->prepare('UPDATE applications SET status = :status WHERE application_id = :id')
-                            // Runs the update with status 'scheduled' for that application id.
-                            ->execute(['status' => 'scheduled', 'id' => $dbAppId]);
-                    // Closes the if that checked a database application id.
-                    }
-                // Closes the if that checked a database user id.
-                }
-            // Catches any error during the database status update.
-            } catch (Throwable $e) {
-            // Closes the try/catch around the status update.
-            }
-        // Closes the if that checked the DB class exists.
-        }
+        // addScheduleRecord() synchronizes the application status: a confirmed
+        // schedule moves the stage to Scheduled for Presentation, while a
+        // pending schedule leaves the stage at Ready for Presentation.
         // Sends the coordinator to the schedule list after saving.
         redirectTo('coordinator/schedule/manage.php');
     // Closes the if that handled a found student and stage.
@@ -471,7 +433,7 @@ foreach ($students as $s) {
 }
 
 // Loads the shared header, which prints the page top and sidebar.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP mode and switches back to HTML output.
 ?>
 
@@ -947,4 +909,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </script>
 
 <?php /* Loads the shared footer, which prints closing tags and scripts. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

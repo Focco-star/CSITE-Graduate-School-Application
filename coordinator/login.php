@@ -1,7 +1,7 @@
 <?php /* Opens the PHP block that handles coordinator sign-in. */ ?>
 <?php
 // Loads shared settings and helper functions such as url() and setFlash().
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 
 // Checks whether a session is already running before starting one.
 if (session_status() === PHP_SESSION_NONE) {
@@ -115,9 +115,9 @@ $role = 'public';
 // Adds a CSS class that styles the page as a login screen.
 $bodyClass = 'login-body';
 // Includes the shared header with styles and scripts.
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/layout/header.php';
 // Includes the background slideshow used on public pages.
-require_once __DIR__ . '/../includes/slideshow.php';
+require_once __DIR__ . '/../includes/layout/slideshow.php';
 // Closes PHP and switches to HTML output.
 ?>
 
@@ -204,4 +204,4 @@ require_once __DIR__ . '/../includes/slideshow.php';
 </div>
 
 <?php /* Includes the shared footer that closes the page layout. */ ?>
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/layout/footer.php'; ?>

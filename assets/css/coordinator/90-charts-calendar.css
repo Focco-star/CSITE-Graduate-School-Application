@@ -1,0 +1,852 @@
+/* Section header: the population chart dashboard styles begin here. */
+/* ==========================================================================
+  Charts
+   ========================================================================== */
+/* Adds space below the chart dashboard block. */
+.pop-dashboard { margin-bottom: 1.5rem; }
+
+/* Sub-heading comment for the chart title banner. */
+/* ---------- Title banner ---------- */
+/* Styles the dark title banner at the top of the chart dashboard. */
+.pop-banner {
+    /* Lays the banner contents out in a row. */
+    display: flex;
+    /* Centres the banner items vertically. */
+    align-items: center;
+    /* Adds a 1.1rem gap between banner items. */
+    gap: 1.1rem;
+    /* Lets banner items wrap onto a second line on narrow screens. */
+    flex-wrap: wrap;
+    /* Adds padding inside the banner. */
+    padding: 1.5rem 1.75rem;
+    /* Paints the banner with a dark charcoal diagonal gradient. */
+    background: linear-gradient(135deg, #2e3844 0%, #232b35 55%, #141a21 100%);
+    /* Removes the bottom border so it joins the panel below. */
+    border-bottom: 0;
+    /* Rounds only the top corners of the banner. */
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    /* Makes the banner text white. */
+    color: #fff;
+/* Closes the chart banner rule. */
+}
+/* Styles the square icon badge on the left of the banner. */
+.pop-banner-mark {
+    /* Sets the badge to 58 by 58 pixels and stops it shrinking. */
+    width: 58px; height: 58px; flex-shrink: 0;
+    /* Centres the icon inside the badge. */
+    display: flex; align-items: center; justify-content: center;
+    /* Fills the badge with a gold gradient. */
+    background: linear-gradient(135deg, #FFB82B 0%, #e5a526 100%);
+    /* Makes the badge icon dark charcoal. */
+    color: #232b35;
+    /* Rounds the badge corners by 14 pixels. */
+    border-radius: 14px;
+    /* Sets the badge icon size to 1.5rem. */
+    font-size: 1.5rem;
+/* Closes the banner badge rule. */
+}
+/* Text block beside the badge; grows to fill space but can shrink. */
+.pop-banner-text { flex: 1 1 260px; min-width: 0; }
+/* Styles the small uppercase label above the chart title. */
+.pop-eyebrow {
+    /* Shows the label as a block on its own line. */
+    display: block;
+    /* Adds a small gap below the label. */
+    margin-bottom: 0.2rem;
+    /* Sets the label size to 0.7rem and makes it bold. */
+    font-size: 0.7rem; font-weight: 700;
+    /* Spaces the letters and shows the label in uppercase. */
+    letter-spacing: 0.12em; text-transform: uppercase;
+    /* Colours the label ADZU gold. */
+    color: var(--adzu-gold);
+/* Closes the eyebrow label rule. */
+}
+/* Styles the big chart dashboard title. */
+.pop-title {
+    /* Uses the heading font for the dashboard title. */
+    font-family: var(--font-heading);
+    /* Sets the title to 1.85rem and extra bold. */
+    font-size: 1.85rem; font-weight: 800;
+    /* Tightens the title line height and letter spacing. */
+    line-height: 1.15; letter-spacing: -0.01em;
+    /* Makes the dashboard title white. */
+    color: #fff;
+/* Closes the dashboard title rule. */
+}
+/* Small light gray subtitle under the dashboard title. */
+.pop-subtitle { margin-top: 0.25rem; font-size: 0.9rem; color: #cbd5e1; }
+/* Styles the gold total-count box on the right of the banner. */
+.pop-banner-total {
+    /* Stacks the number and its label, aligned to the right. */
+    display: flex; flex-direction: column; align-items: flex-end;
+    /* Adds a small gap between the number and the label. */
+    gap: 0.35rem;
+    /* Keeps the total box at least 150 pixels wide. */
+    min-width: 150px;
+    /* Adds padding inside the total box. */
+    padding: 0.85rem 1.1rem;
+    /* Fills the total box with ADZU gold. */
+    background: var(--adzu-gold);
+    /* Adds a faint dark border around the total box. */
+    border: 1px solid rgba(35, 43, 53, 0.12);
+    /* Rounds the total box corners with the large radius. */
+    border-radius: var(--radius-lg);
+    /* Tightens the line height inside the total box. */
+    line-height: 1;
+/* Closes the total box rule. */
+}
+/* Styles the big number inside the banner total box. */
+.pop-banner-total strong {
+    /* Uses the heading font for the total number. */
+    font-family: var(--font-heading);
+    /* Scales the total number between 1.8rem and 2.25rem with the screen. */
+    font-size: clamp(1.8rem, 3vw, 2.25rem);
+    /* Makes the total number extra bold. */
+    font-weight: 800;
+    /* Uses tabular figures so the number does not jump while changing. */
+    font-variant-numeric: tabular-nums;
+    /* Tightens the letter spacing of the total number. */
+    letter-spacing: -0.03em;
+    /* Colours the total number dark gray. */
+    color: #374151;
+/* Closes the total number rule. */
+}
+/* Styles the small uppercase label under the total number. */
+.pop-banner-total span {
+    /* Sets the label size to 0.68rem. */
+    font-size: 0.68rem;
+    /* Makes the label bold. */
+    font-weight: 700;
+    /* Widens the letter spacing of the label. */
+    letter-spacing: 0.1em;
+    /* Shows the label in uppercase. */
+    text-transform: uppercase;
+    /* Colours the label medium gray. */
+    color: #4b5563;
+/* Closes the total label rule. */
+}
+
+/* Sub-heading comment for the chart container panel. */
+/* ---------- Chart container ---------- */
+/* The white panel that holds the chart and its controls. */
+.pop-panel {
+    /* Adds padding inside the chart panel. */
+    padding: 1.25rem 1.5rem 1.25rem;
+    /* Gives the chart panel a white background. */
+    background: var(--white);
+    /* Adds a light gray border around the panel. */
+    border: 1px solid var(--gray-200);
+    /* Removes the top border so it meets the banner. */
+    border-top: 0;
+    /* Rounds only the bottom corners of the panel. */
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    /* Adds the standard soft shadow to the panel. */
+    box-shadow: var(--shadow);
+/* Closes the chart panel rule. */
+}
+/* Header row inside the chart panel with title and chart-type menu. */
+.pop-panel-head {
+    /* Places the heading on the left and the selector on the right. */
+    display: flex; align-items: flex-start; justify-content: space-between;
+    /* Adds a 1rem gap and lets items wrap on small screens. */
+    gap: 1rem; flex-wrap: wrap;
+    /* Adds space below the header and above the divider. */
+    margin-bottom: 1.25rem; padding-bottom: 1rem;
+    /* Draws a light divider under the panel header. */
+    border-bottom: 1px solid var(--gray-100);
+/* Closes the panel header rule. */
+}
+/* The text block of the panel header; flexible but able to shrink. */
+.pop-panel-heading { flex: 1 1 260px; min-width: 0; }
+/* Styles the panel heading in the heading font, navy and bold. */
+.pop-panel-heading h3 { font-family: var(--font-heading); font-size: 1.05rem; font-weight: 700; color: var(--adzu-navy); }
+/* Small gray description under the panel heading. */
+.pop-panel-heading p { margin-top: 0.2rem; font-size: 0.82rem; color: var(--gray-500); }
+
+/* Sub-heading comment for the chart-type selector control. */
+/* ---------- Chart-type selector (upper-right) ---------- */
+/* Wrapper for the chart-type dropdown, pushed to the right. */
+.pop-select { position: relative; margin-left: auto; }
+/* Styles the button that opens the chart-type menu. */
+.pop-select-btn {
+    /* Lays the icon, label and caret out in a row. */
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    /* Adds padding inside the selector button. */
+    padding: 0.55rem 0.9rem;
+    /* Gives the selector button a dark background and white text. */
+    background: #232b35; color: #fff;
+    /* Adds a faint light border around the button. */
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    /* Rounds the selector button with the standard radius. */
+    border-radius: var(--radius);
+    /* Uses the site font at 0.85rem semibold. */
+    font-family: var(--font); font-size: 0.85rem; font-weight: 600;
+    /* Shows a pointer cursor on the selector button. */
+    cursor: pointer;
+    /* Adds a small shadow under the selector button. */
+    box-shadow: 0 2px 6px rgba(35, 43, 53, 0.18);
+    /* Animates background and shadow changes on the button. */
+    transition: background var(--transition), box-shadow var(--transition);
+/* Closes the selector button rule. */
+}
+/* Lightens the selector button background on hover. */
+.pop-select-btn:hover { background: #2e3844; }
+/* Adds a gold focus ring for keyboard users. */
+.pop-select-btn:focus-visible { outline: 2px solid var(--adzu-gold); outline-offset: 2px; }
+/* Colours the leading icon inside the button gold. */
+.pop-select-btn > i:first-child { color: var(--adzu-gold); }
+/* Styles the small caret arrow inside the button. */
+.pop-select-caret { font-size: 0.7rem; color: #8fa0b5; transition: transform 0.25s ease; }
+/* Flips the caret upside down while the menu is open. */
+.pop-select-btn[aria-expanded="true"] .pop-select-caret { transform: rotate(180deg); }
+
+/* The dropdown list of chart types. */
+.pop-menu {
+    /* Positions the menu under the button, aligned to its right edge. */
+    position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
+    /* Sets the menu width limits so it fits small screens. */
+    min-width: 230px; max-width: calc(100vw - 2rem);
+    /* Adds small padding and removes the default list bullets. */
+    padding: 0.35rem; list-style: none;
+    /* Gives the menu a dark charcoal background. */
+    background: #232b35;
+    /* Adds a faint light border around the menu. */
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    /* Rounds the menu corners with the large radius. */
+    border-radius: var(--radius-lg);
+    /* Adds a deep shadow so the menu floats above the chart. */
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    /* Slides the menu in when it opens. */
+    animation: pop-menu-in 0.15s ease-out;
+/* Closes the chart-type menu rule. */
+}
+/* Styles each chart-type option in the menu. */
+.pop-menu-item {
+    /* Lays the option icon and label out in a row. */
+    display: flex; align-items: center; gap: 0.7rem;
+    /* Makes each option full width with its own padding. */
+    width: 100%; padding: 0.6rem 0.75rem;
+    /* Keeps options transparent with no border and rounded corners. */
+    background: transparent; border: 0; border-radius: 6px;
+    /* Sets the option text light gray and left aligned. */
+    color: #e8edf2; text-align: left;
+    /* Uses the site font at 0.85rem medium weight. */
+    font-family: var(--font); font-size: 0.85rem; font-weight: 500;
+    /* Shows a pointer cursor on each option. */
+    cursor: pointer;
+    /* Animates option colours on hover. */
+    transition: background var(--transition), color var(--transition);
+/* Closes the menu option rule. */
+}
+/* Fixes the icon column width and colours the icons gold. */
+.pop-menu-item > i:first-child { width: 18px; text-align: center; color: var(--adzu-gold); }
+/* Lets the option label take the remaining space. */
+.pop-menu-item span { flex: 1; }
+/* Hover and keyboard focus state for menu options (selector list). */
+.pop-menu-item:hover,
+/* Highlights the option with a lighter background and white text. */
+.pop-menu-item:focus-visible { background: #2e3844; color: #fff; outline: none; }
+/* Marks the selected chart type with a darker background. */
+.pop-menu-item.is-selected { background: #1a222c; color: #fff; font-weight: 700; }
+/* Styles the check mark on the selected option, hidden by default. */
+.pop-check { font-size: 0.75rem; color: var(--adzu-gold); opacity: 0; }
+/* Shows the check mark only on the selected chart type. */
+.pop-menu-item.is-selected .pop-check { opacity: 1; }
+
+/* Sub-heading comment for the chart plus legend column layout. */
+/* ---------- Chart + legend layout ---------- */
+/* Lays the chart and the legend side by side in two columns. */
+.pop-body {
+    /* Uses CSS grid for the two-column chart layout. */
+    display: grid;
+    /* Gives the chart flexible space and the legend a 300px column. */
+    grid-template-columns: minmax(0, 1fr) 300px;
+    /* Adds a 1.5rem gap between the chart and the legend. */
+    gap: 1.5rem;
+    /* Aligns both columns to the top. */
+    align-items: start;
+/* Closes the chart layout rule. */
+}
+/* The stage area that holds the chart graphic. */
+.pop-stage {
+    /* Positions the stage relative for the tooltip and overlays. */
+    position: relative;
+    /* Centres the chart inside the stage. */
+    display: flex; align-items: center; justify-content: center;
+    /* Keeps the stage at least 300 pixels tall. */
+    min-height: 300px;
+    /* Animates the chart when switching between chart types. */
+    transition: opacity 0.17s ease, transform 0.17s ease;
+/* Closes the chart stage rule. */
+}
+/* Fades and slightly shrinks the chart while it is switching. */
+.pop-stage.is-switching { opacity: 0; transform: scale(0.985); }
+/* Makes the chart container full width. */
+.pop-chart { width: 100%; }
+/* Makes the SVG chart fill its container and stay responsive. */
+.pop-svg { display: block; width: 100%; height: auto; overflow: visible; }
+/* Centres radial charts and caps their width at 420 pixels. */
+.pop-svg-radial { max-width: 420px; margin: 0 auto; }
+/* Styles the fallback text shown when scripts are turned off. */
+.pop-noscript { font-size: 0.85rem; color: var(--gray-500); }
+
+/* Sub-heading comment for the SVG chart text and line styles. */
+/* SVG text + lines */
+/* Draws dashed light gray grid lines inside charts. */
+.pop-grid { stroke: var(--gray-200); stroke-dasharray: 3 4; }
+/* Colours the chart axis lines light gray. */
+.pop-axis { stroke: var(--gray-300); }
+/* Sets the small axis tick labels to 11px gray text. */
+.pop-tick { font: 600 11px var(--font); fill: var(--gray-500); }
+/* Styles the category labels along the chart axis in dark gray. */
+.pop-cat { font: 600 12px var(--font); fill: var(--gray-700); }
+/* Styles the value labels on bars in navy bold heading text. */
+.pop-value { font: 700 12.5px var(--font-heading); fill: var(--adzu-navy); }
+/* Colours the track behind chart progress bars light gray. */
+.pop-track { stroke: var(--gray-100); }
+/* Centres the percentage text printed inside pie slices. */
+.pop-slice-pct { font: 700 14px var(--font-heading); text-anchor: middle; pointer-events: none; }
+/* Centres the count text inside pie slices at a smaller size. */
+.pop-slice-cnt { font: 600 11px var(--font); text-anchor: middle; opacity: 0.92; pointer-events: none; }
+/* Styles the big number in the middle of a donut chart. */
+.pop-center-value { font: 800 34px var(--font-heading); fill: var(--adzu-navy); text-anchor: middle; }
+/* Styles the uppercase label under the donut centre value. */
+.pop-center-label { font: 600 11px var(--font); fill: var(--gray-500); text-anchor: middle; letter-spacing: 0.08em; text-transform: uppercase; }
+/* Stops text inside chart SVGs from catching mouse clicks. */
+.pop-svg text { pointer-events: none; }
+
+/* Sub-heading comment for the interactive chart shapes. */
+/* Interactive shapes */
+/* Gives chart shapes a pointer cursor and smooth hover effect. */
+.pop-shape { cursor: pointer; transition: opacity 0.15s ease, filter 0.15s ease; }
+/* Removes the default focus outline on chart shapes. */
+.pop-shape:focus { outline: none; }
+/* Draws a navy ring when a chart shape is focused by keyboard. */
+.pop-shape:focus-visible { outline: 2px solid var(--adzu-navy); outline-offset: 2px; }
+/* Dims the other shapes while one chart shape is highlighted. */
+.pop-chart.has-active .pop-shape:not(.is-active) { opacity: 0.35; }
+/* Brightens the highlighted shape and adds a soft drop shadow. */
+.pop-shape.is-active { filter: brightness(1.07) drop-shadow(0 2px 6px rgba(35, 43, 53, 0.25)); }
+
+/* Sub-heading comment for the chart entry animations. */
+/* Entry animations */
+/* Grows vertical bars up from their bottom edge when the chart appears. */
+.pop-bar   { transform-box: fill-box; transform-origin: 50% 100%; animation: pop-grow-y 0.65s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Grows horizontal bars out from their left edge when the chart appears. */
+.pop-bar-h { transform-box: fill-box; transform-origin: 0% 50%;   animation: pop-grow-x 0.65s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Fades chart labels and slices in softly. */
+.pop-fade  { animation: pop-fade-in 0.45s ease both; }
+/* When the chart has no-anim, target vertical bars to skip animation. */
+.pop-chart.no-anim .pop-bar,
+/* Also targets horizontal bars in the no-animation rule. */
+.pop-chart.no-anim .pop-bar-h,
+/* Turns off entry animations for bars and faded chart parts. */
+.pop-chart.no-anim .pop-fade { animation: none; }
+
+/* Sub-heading comment for the chart tooltip. */
+/* Tooltip */
+/* The dark tooltip box shown when hovering over a chart shape. */
+.pop-tooltip {
+    /* Positions the tooltip absolutely inside the chart stage. */
+    position: absolute; z-index: 5;
+    /* Adds padding inside the tooltip. */
+    padding: 0.55rem 0.75rem;
+    /* Gives the tooltip a dark background and white text. */
+    background: #232b35; color: #fff;
+    /* Rounds the tooltip corners by 8 pixels. */
+    border-radius: 8px;
+    /* Adds a soft shadow under the tooltip. */
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    /* Sets the tooltip text size and line height. */
+    font-size: 0.8rem; line-height: 1.4;
+    /* Keeps tooltip text on one line and stops it blocking the mouse. */
+    white-space: nowrap; pointer-events: none;
+/* Closes the tooltip rule. */
+}
+/* Lays out the tooltip name row with its colour dot. */
+.pop-tooltip-name { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; }
+/* The small coloured square beside the tooltip name. */
+.pop-tooltip-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+/* Styles the secondary line under the tooltip name. */
+.pop-tooltip-meta { margin-top: 0.15rem; color: #cbd5e1; }
+
+/* Sub-heading comment for the chart legend styles. */
+/* ---------- Legend ---------- */
+/* The legend panel shown beside the chart. */
+.pop-legend {
+    /* Adds padding inside the legend panel. */
+    padding: 1rem;
+    /* Gives the legend a very light gray background. */
+    background: var(--gray-50);
+    /* Adds a light border around the legend. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the legend corners with the large radius. */
+    border-radius: var(--radius-lg);
+/* Closes the legend panel rule. */
+}
+/* Styles the small heading above the legend list. */
+.pop-legend h4 {
+    /* Adds space below the legend heading. */
+    margin-bottom: 0.65rem;
+    /* Sets the heading size to 0.72rem and bold. */
+    font-size: 0.72rem; font-weight: 700;
+    /* Spaces the letters and shows the heading in uppercase. */
+    letter-spacing: 0.08em; text-transform: uppercase;
+    /* Colours the legend heading mid gray. */
+    color: var(--gray-500);
+/* Closes the legend heading rule. */
+}
+/* The legend list; scrolls when there are many categories. */
+.pop-legend-list { list-style: none; max-height: 380px; overflow-y: auto; margin: 0 -0.25rem; padding: 0 0.25rem; }
+/* Each row in the legend: colour dot, name and figures. */
+.pop-legend-item {
+    /* Lays the legend row out as a grid. */
+    display: grid;
+    /* Defines the dot, name and figures columns for the row. */
+    grid-template-columns: 14px minmax(0, 1fr) auto;
+    /* Centres the row items and adds gaps between columns. */
+    align-items: center; gap: 0.65rem;
+    /* Adds padding inside each legend row. */
+    padding: 0.55rem 0.6rem;
+    /* Keeps the row border invisible until it is hovered. */
+    border: 1px solid transparent; border-radius: 8px;
+    /* Animates row background and border changes. */
+    transition: background var(--transition), border-color var(--transition);
+/* Closes the legend row rule. */
+}
+/* Hover and active states for legend rows (selector list). */
+.pop-legend-item:hover,
+/* Highlights the legend row with a white background and border. */
+.pop-legend-item.is-active { background: var(--white); border-color: var(--gray-200); }
+/* Adds a navy focus ring for keyboard users on legend rows. */
+.pop-legend-item:focus-visible { outline: 2px solid var(--adzu-navy); outline-offset: 1px; }
+/* Styles the small colour square beside a legend name. */
+.pop-swatch { width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08); }
+/* Styles the legend category name, wrapping long text. */
+.pop-legend-name { font-size: 0.85rem; font-weight: 600; line-height: 1.3; color: var(--gray-800); overflow-wrap: anywhere; }
+/* Stacks the count and percentage on the right of the legend row. */
+.pop-legend-figures { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+/* Styles the count number in navy. */
+.pop-legend-figures strong { font-size: 0.88rem; color: var(--adzu-navy); }
+/* Styles the small percentage text under the count. */
+.pop-legend-figures small { font-size: 0.72rem; color: var(--gray-500); }
+/* The total row at the bottom of the legend. */
+.pop-legend-total {
+    /* Places the label and total on opposite ends of the row. */
+    display: flex; align-items: center; justify-content: space-between;
+    /* Adds space above the total row and inside it. */
+    margin-top: 0.75rem; padding-top: 0.75rem;
+    /* Draws a divider above the total row. */
+    border-top: 1px solid var(--gray-200);
+    /* Sets the total row text size, weight and colour. */
+    font-size: 0.82rem; font-weight: 600; color: var(--gray-600);
+/* Closes the legend total rule. */
+}
+/* Styles the total number in the heading font and navy. */
+.pop-legend-total strong { font-family: var(--font-heading); font-size: 1.1rem; color: var(--adzu-navy); }
+/* Small light gray footnote under the legend. */
+.pop-footnote { margin-top: 1rem; font-size: 0.75rem; color: var(--gray-400); }
+
+/* Keyframes that grow vertical bars from zero height. */
+@keyframes pop-grow-y  { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+/* Keyframes that grow horizontal bars from zero width. */
+@keyframes pop-grow-x  { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* Keyframes that fade chart elements in. */
+@keyframes pop-fade-in { from { opacity: 0; } to { opacity: 1; } }
+/* Keyframes that slide the chart menu down into view. */
+@keyframes pop-menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* At 960px wide and below, stack the chart above the legend. */
+@media (max-width: 960px) {
+    /* Makes the chart and legend a single column. */
+    .pop-body { grid-template-columns: 1fr; }
+    /* Removes the legend height limit so it shows fully. */
+    .pop-legend-list { max-height: none; }
+/* Closes the 960px media query. */
+}
+/* At 640px wide and below, tighten the chart dashboard for phones. */
+@media (max-width: 640px) {
+    /* Reduces the banner padding on small screens. */
+    .pop-banner { padding: 1.25rem; }
+    /* Shrinks the dashboard title to 1.4rem. */
+    .pop-title { font-size: 1.4rem; }
+    /* Puts the banner total box in a horizontal layout on phones. */
+    .pop-banner-total {
+        /* Lays the total box contents out in a row. */
+        flex-direction: row;
+        /* Centres the total box items vertically. */
+        align-items: center;
+        /* Spreads the total box contents to both ends. */
+        justify-content: space-between;
+        /* Makes the total box full width. */
+        width: 100%;
+        /* Removes the minimum width so the box can shrink. */
+        min-width: 0;
+    /* Closes the phone total box rule. */
+    }
+    /* Reduces the chart panel padding on phones. */
+    .pop-panel { padding: 1rem; }
+    /* Makes the chart selector full width. */
+    .pop-select { width: 100%; }
+    /* Makes the selector button full width. */
+    .pop-select-btn { width: 100%; }
+    /* Lets the button label fill the space and align left. */
+    .pop-select-btn span { flex: 1; text-align: left; }
+    /* Stretches the dropdown menu across the full button width. */
+    .pop-menu { left: 0; right: 0; min-width: 0; }
+/* Closes the 640px media query. */
+}
+/* Honours the reduced-motion preference for chart animations. */
+@media (prefers-reduced-motion: reduce) {
+    /* Turns off chart and menu animations for these users. */
+    .pop-bar, .pop-bar-h, .pop-fade, .pop-menu { animation: none; }
+    /* Turns off the chart switching transition. */
+    .pop-stage { transition: none; }
+/* Closes the reduced-motion block. */
+}
+/* Print styles for the chart dashboard. */
+@media print {
+    /* Hides the chart-type selector when printing. */
+    .pop-select { display: none !important; }
+    /* Hides the chart tooltip when printing. */
+    .pop-tooltip { display: none !important; }
+/* Closes the print media query. */
+}
+
+/* The presentation schedule calendar card. */
+.psc {
+    /* Adds vertical space around the calendar card. */
+    margin: 1.5rem 0;
+    /* Gives the calendar card a white background. */
+    background: var(--white);
+    /* Adds a light border around the card. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the card corners with the large radius. */
+    border-radius: var(--radius-lg);
+    /* Adds the standard soft shadow to the card. */
+    box-shadow: var(--shadow);
+    /* Clips inner content to the rounded corners. */
+    overflow: hidden;
+/* Closes the calendar card rule. */
+}
+/* Shared flex layout for the calendar header, toolbar, nav and legend. */
+.psc-header, .psc-toolbar, .psc-nav, .psc-legend, .psc-day-heading {
+    /* Makes these calendar parts flex containers. */
+    display: flex;
+    /* Centres their children vertically. */
+    align-items: center;
+/* Closes the shared flex rule. */
+}
+/* Styles the dark header strip of the calendar. */
+.psc-header {
+    /* Puts the title on the left and the legend on the right. */
+    justify-content: space-between;
+    /* Adds a 1rem gap between header items. */
+    gap: 1rem;
+    /* Removes any default margin from the header. */
+    margin: 0;
+    /* Adds padding inside the header. */
+    padding: 1.35rem 1.5rem;
+    /* Makes header text white. */
+    color: #fff;
+    /* Paints the header with a dark charcoal gradient. */
+    background: linear-gradient(135deg, #2e3844 0%, #232b35 55%, #141a21 100%);
+/* Closes the calendar header rule. */
+}
+/* Styles the calendar title in white bold heading text. */
+.psc-title { margin: 0; color: #fff; font-family: var(--font-heading); font-size: 1.15rem; font-weight: 700; }
+/* The small gold pill showing the number of events in view. */
+.psc-summary { display: inline-flex; margin: 0.45rem 0 0; padding: 0.25rem 0.55rem; color: #374151; background: var(--adzu-gold); border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+/* The legend list explaining what the event colours mean. */
+.psc-legend {
+    /* Lets legend items wrap onto new lines. */
+    flex-wrap: wrap;
+    /* Adds a gap between legend items. */
+    gap: 0.8rem;
+    /* Removes the default list margin. */
+    margin: 0;
+    /* Removes the default list padding. */
+    padding: 0;
+    /* Sets the legend text to light gray. */
+    color: #e8edf2;
+    /* Sets the legend text size to 0.75rem. */
+    font-size: 0.75rem;
+    /* Removes the bullet markers from the legend list. */
+    list-style: none;
+/* Closes the legend rule. */
+}
+/* Lays each legend entry out beside its colour swatch. */
+.psc-legend li { display: flex; align-items: center; gap: 0.35rem; }
+/* Styles the small round colour dot in the legend. */
+.psc-swatch { width: 0.62rem; height: 0.62rem; border-radius: 50%; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12); }
+/* Colours the confirmed swatch blue with a soft ring. */
+.psc-swatch-confirmed { background: #8e9bff; box-shadow: 0 0 0 3px rgba(142, 155, 255, 0.2); }
+/* Colours the pending swatch gray with a soft ring. */
+.psc-swatch-pending { background: #b6bcc5; box-shadow: 0 0 0 3px rgba(182, 188, 197, 0.2); }
+/* Toolbar row holding the month controls and the today button. */
+.psc-toolbar { justify-content: space-between; margin: 0; padding: 1rem 1.5rem 0.75rem; }
+/* Adds a gap between the previous and next controls. */
+.psc-nav { gap: 0.75rem; }
+/* Styles the month name shown in the middle of the toolbar. */
+.psc-month { min-width: 10rem; margin: 0; color: var(--gray-800); text-align: center; font-size: 1rem; }
+/* Styles the previous, next and today buttons. */
+.psc-nav-btn, .psc-today-btn {
+    /* Keeps the buttons at least 2.2rem tall. */
+    min-height: 2.2rem;
+    /* Adds padding inside the buttons. */
+    padding: 0.35rem 0.65rem;
+    /* Sets the button text to dark gray. */
+    color: var(--gray-700);
+    /* Gives the buttons a white background. */
+    background: var(--white);
+    /* Adds a gray border around the buttons. */
+    border: 1px solid var(--gray-300);
+    /* Rounds the buttons with the standard radius. */
+    border-radius: var(--radius);
+    /* Shows a pointer cursor on the buttons. */
+    cursor: pointer;
+/* Closes the calendar button rule. */
+}
+/* Turns the buttons dark with white text on hover. */
+.psc-nav-btn:hover, .psc-today-btn:hover { color: #fff; background: #2e3844; border-color: #2e3844; }
+/* Makes the today button gold with dark bold text. */
+.psc-today-btn { color: #374151; background: var(--adzu-gold); border-color: var(--adzu-gold); font-weight: 700; }
+/* The thin progress line under the calendar toolbar. */
+.psc-progress { height: 2px; margin: 0 1.5rem 0.5rem; background: transparent; }
+/* Shows an animated navy-to-gold bar while the calendar loads. */
+.psc-progress.is-active { background: linear-gradient(90deg, var(--adzu-navy), var(--adzu-gold), var(--adzu-navy)); background-size: 200% 100%; animation: psc-progress 1s linear infinite; }
+/* Keyframes that slide the loading bar background sideways. */
+@keyframes psc-progress { to { background-position: -200% 0; } }
+/* The red alert box shown when the calendar fails to load. */
+.psc-alert { display: flex; align-items: center; gap: 0.65rem; margin: 0.5rem 1.5rem 1rem; padding: 0.75rem; color: var(--danger); background: var(--danger-bg); border-radius: var(--radius); font-size: 0.9rem; }
+/* Hides the alert box and overlay while they have the hidden attribute. */
+.psc-alert[hidden], .psc-overlay[hidden] { display: none; }
+/* Styles the small dismiss button inside the calendar alert. */
+.psc-alert-btn { margin-left: auto; padding: 0.35rem 0.6rem; color: inherit; background: transparent; border: 1px solid currentColor; border-radius: var(--radius); cursor: pointer; }
+/* Adds padding around the calendar grid. */
+.psc-calendar { padding: 0 1.5rem 1.5rem; }
+/* Lays out weekdays and weeks as seven equal columns. */
+.psc-weekdays, .psc-weeks { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+/* Styles the dark weekday header strip with rounded top corners. */
+.psc-weekdays { border: 1px solid #d8dee6; border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; background: #232b35; }
+/* Styles each weekday name in light gray bold text. */
+.psc-weekday { padding: 0.55rem 0.25rem; color: #e8edf2; font-size: 0.75rem; font-weight: 700; text-align: center; }
+/* Adds a left border to the weeks grid. */
+.psc-weeks { border-left: 1px solid var(--gray-200); }
+/* Styles each day cell in the calendar grid. */
+.psc-day {
+    /* Allows day cells to shrink inside the grid. */
+    min-width: 0;
+    /* Keeps each day cell at least 7rem tall. */
+    min-height: 7rem;
+    /* Adds padding inside each day cell. */
+    padding: 0.4rem;
+    /* Hides content that overflows a day cell. */
+    overflow: hidden;
+    /* Draws a light right border between days. */
+    border-right: 1px solid #e1e6ed;
+    /* Draws a light bottom border between weeks. */
+    border-bottom: 1px solid #e1e6ed;
+    /* Gives day cells a white background. */
+    background: var(--white);
+/* Closes the day cell rule. */
+}
+/* Greys out day cells that belong to another month. */
+.psc-day.is-outside { background: #f5f7fa; }
+/* Greys the date number in days from another month. */
+.psc-day.is-outside .psc-day-number { color: var(--gray-400); }
+/* Highlights today's cell with a cream background and gold ring. */
+.psc-day.is-today { background: #fffaf0; box-shadow: inset 0 0 0 2px var(--adzu-gold); }
+/* Lays out the date number and event count inside a day. */
+.psc-day-heading { justify-content: space-between; gap: 0.2rem; margin-bottom: 0.35rem; }
+/* Styles the date number in each day cell. */
+.psc-day-number { color: var(--gray-700); font-size: 0.8rem; font-weight: 700; }
+/* Styles the small event count text with ellipsis overflow. */
+.psc-day-count { overflow: hidden; color: var(--gray-400); font-size: 0.62rem; text-overflow: ellipsis; white-space: nowrap; }
+/* Styles each event chip shown inside a day cell. */
+.psc-event {
+    /* Makes the event chip a block that fills the cell width. */
+    display: block;
+    /* Sets the event chip to full width. */
+    width: 100%;
+    /* Adds a small gap above each event chip. */
+    margin-top: 0.25rem;
+    /* Adds padding inside the event chip. */
+    padding: 0.3rem 0.4rem;
+    /* Hides overflowing text inside the event chip. */
+    overflow: hidden;
+    /* Sets the event chip text to dark brown. */
+    color: #34302a;
+    /* Fills the chip with a gold gradient. */
+    background: linear-gradient(135deg, #ffd36a 0%, var(--adzu-gold) 100%);
+    /* Removes the button border from the chip. */
+    border: 0;
+    /* Rounds the event chip corners by 6 pixels. */
+    border-radius: 6px;
+    /* Adds a soft shadow under the event chip. */
+    box-shadow: 0 2px 5px rgba(35, 43, 53, 0.12);
+    /* Shows a pointer cursor on event chips. */
+    cursor: pointer;
+    /* Aligns the chip text to the left. */
+    text-align: left;
+    /* Animates the chip lift, shadow and brightness changes. */
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+/* Closes the event chip rule. */
+}
+/* Lifts the event chip and brightens it on hover. */
+.psc-event:hover { filter: brightness(1.03); transform: translateY(-1px); box-shadow: 0 4px 9px rgba(35, 43, 53, 0.18); }
+/* Draws a dark focus ring when a chip is focused by keyboard. */
+.psc-event:focus-visible { outline: 2px solid #232b35; outline-offset: 2px; }
+/* Colours confirmed event chips blue. */
+.psc-event--confirmed { color: #05036e; background: linear-gradient(135deg, #e0e4ff 0%, #a9b2f7 100%); }
+/* Darkens the time text inside a confirmed chip. */
+.psc-event--confirmed .psc-event-time { color: #1d169f; }
+/* Colours pending event chips gray. */
+.psc-event--pending { color: #374151; background: linear-gradient(135deg, #f4f5f7 0%, #d2d6dd 100%); }
+/* Darkens the time text inside a pending chip. */
+.psc-event--pending .psc-event-time { color: #4b5563; }
+/* Colours completed event chips green. */
+.psc-event--completed { color: #123f30; background: linear-gradient(135deg, #cdf1df 0%, #8fd9b8 100%); }
+/* Darkens the time text inside a completed chip. */
+.psc-event--completed .psc-event-time { color: #14624a; }
+/* Colours cancelled event chips red. */
+.psc-event--cancelled { color: #5b2730; background: linear-gradient(135deg, #f6d9dd 0%, #e9b8c1 100%); }
+/* Darkens the time text inside a cancelled chip. */
+.psc-event--cancelled .psc-event-time { color: #7a3441; }
+/* Makes the time and name lines block level with ellipsis overflow. */
+.psc-event-time, .psc-event-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Styles the event time line in small bold brown text. */
+.psc-event-time { color: #5e4a20; font-size: 0.63rem; font-weight: 700; }
+/* Styles the event name line in slightly larger semibold text. */
+.psc-event-name { font-size: 0.7rem; font-weight: 600; }
+/* Styles the small status badge shown on an event chip. */
+.psc-event-status {
+    /* Shows the badge inline so it sits beside other content. */
+    display: inline-block;
+    /* Adds a small gap above the status badge. */
+    margin-top: 0.12rem;
+    /* Adds tight padding inside the status badge. */
+    padding: 0.04rem 0.32rem;
+    /* Sets the badge text colour to dark brown. */
+    color: #5e4a20;
+    /* Gives the badge a translucent white background. */
+    background: rgba(255, 255, 255, 0.6);
+    /* Makes the badge pill shaped with a 999px radius. */
+    border-radius: 999px;
+    /* Sets the badge text size to 0.5rem. */
+    font-size: 0.5rem;
+    /* Makes the badge text extra bold. */
+    font-weight: 800;
+    /* Adds slight letter spacing to the badge text. */
+    letter-spacing: 0.03em;
+    /* Sets the badge line height to 1.5. */
+    line-height: 1.5;
+    /* Shows the badge text in uppercase. */
+    text-transform: uppercase;
+    /* Keeps the badge text on one line. */
+    white-space: nowrap;
+/* Closes the status badge rule. */
+}
+/* Recolours the badge for confirmed events on white. */
+.psc-event--confirmed .psc-event-status { color: var(--adzu-navy); background: rgba(255, 255, 255, 0.72); }
+/* Recolours the badge for pending events on white. */
+.psc-event--pending .psc-event-status { color: #4b5563; background: rgba(255, 255, 255, 0.7); }
+/* Recolours the badge text for completed events. */
+.psc-event--completed .psc-event-status { color: #14624a; }
+/* Recolours the badge text for cancelled events. */
+.psc-event--cancelled .psc-event-status { color: #7a3441; }
+/* The small more-events button inside a crowded day cell. */
+.psc-more-events { display: block; margin-top: 0.2rem; padding: 0; color: var(--adzu-navy); background: transparent; border: 0; font-size: 0.65rem; font-weight: 700; cursor: pointer; text-align: left; }
+/* Full-screen overlay behind the event details dialog. */
+.psc-overlay {
+    /* Fixes the overlay to the browser viewport. */
+    position: fixed;
+    /* Keeps the overlay above the calendar (z-index 1100). */
+    z-index: 1100;
+    /* Stretches the overlay to all four screen edges. */
+    inset: 0;
+    /* Uses grid layout to centre the dialog. */
+    display: grid;
+    /* Centres the dialog both horizontally and vertically. */
+    place-items: center;
+    /* Adds padding so the dialog never touches the edge. */
+    padding: 1rem;
+    /* Dims the page behind the event dialog. */
+    background: rgba(15, 23, 42, 0.55);
+/* Closes the dialog overlay rule. */
+}
+/* The white dialog box that shows the details of one event. */
+.psc-dialog { width: min(100%, 34rem); max-height: min(85vh, 40rem); overflow: auto; background: var(--white); border-radius: var(--radius-lg); box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+/* Removes the browser focus outline on the dialog itself. */
+.psc-dialog:focus { outline: none; }
+/* Styles the dark header strip of the event dialog. */
+.psc-dialog-head { display: flex; align-items: flex-start; gap: 0.8rem; padding: 1.1rem 1.25rem; color: #fff; background: linear-gradient(135deg, #2e3844 0%, #232b35 100%); border-bottom: 1px solid var(--gray-200); }
+/* Makes the icon in the dialog header gold. */
+.psc-dialog-icon { color: var(--adzu-gold); font-size: 1.25rem; }
+/* Lets the dialog heading text fill and shrink. */
+.psc-dialog-heading { flex: 1; min-width: 0; }
+/* Styles the dialog title in white 1.1rem text. */
+.psc-dialog-title { margin: 0; color: #fff; font-size: 1.1rem; }
+/* Styles the small gray subtitle under the dialog title. */
+.psc-dialog-sub { margin: 0.35rem 0 0; color: #cbd5e1; font-size: 0.82rem; }
+/* Styles the small close button in the dialog header. */
+.psc-close { padding: 0.2rem 0.45rem; color: #cbd5e1; background: transparent; border: 0; font-size: 1.1rem; cursor: pointer; }
+/* Adds padding inside the dialog body. */
+.psc-dialog-body { padding: 0.75rem 1.25rem 1.25rem; }
+/* Lays each detail row out as a label and value grid. */
+.psc-detail-row { display: grid; grid-template-columns: 7rem 1fr; gap: 0.75rem; padding: 0.65rem 0; border-bottom: 1px solid var(--gray-100); }
+/* Styles the small gray label in a detail row. */
+.psc-detail-label { color: var(--gray-500); font-size: 0.85rem; }
+/* Styles the dark value text, wrapping long words. */
+.psc-detail-value { color: var(--gray-800); font-size: 0.9rem; overflow-wrap: anywhere; }
+/* Locks page scrolling while the event dialog is open. */
+body.psc-dialog-open { overflow: hidden; }
+/* At 700px wide and below, adjust the calendar for small screens. */
+@media (max-width: 700px) {
+    /* Stacks the calendar header title and legend vertically. */
+    .psc-header { align-items: flex-start; flex-direction: column; padding: 1.1rem; }
+    /* Reduces the toolbar padding for small screens. */
+    .psc-toolbar { padding: 0.85rem 1rem 0.65rem; }
+    /* Reduces the loading bar side margins. */
+    .psc-progress { margin-right: 1rem; margin-left: 1rem; }
+    /* Reduces the alert box side margins. */
+    .psc-alert { margin-right: 1rem; margin-left: 1rem; }
+    /* Reduces the calendar grid padding. */
+    .psc-calendar { padding: 0 1rem 1rem; }
+    /* Makes day cells shorter and tighter on small screens. */
+    .psc-day { min-height: 5.6rem; padding: 0.25rem; }
+    /* Hides the event count text on small screens. */
+    .psc-day-count { display: none; }
+    /* Reduces event chip padding on small screens. */
+    .psc-event { padding: 0.2rem; }
+    /* Hides the status badge on small screens. */
+    .psc-event-status { display: none; }
+    /* Shrinks the event time text further. */
+    .psc-event-time { font-size: 0.58rem; }
+    /* Shrinks the event name text further. */
+    .psc-event-name { font-size: 0.62rem; }
+    /* Shrinks the weekday header text further. */
+    .psc-weekday { font-size: 0.67rem; }
+/* Closes the 700px media query. */
+}
+/* At 420px wide and below, keep the calendar usable on phones. */
+@media (max-width: 420px) {
+    /* Makes day cells even shorter on phones. */
+    .psc-day { min-height: 4.4rem; }
+    /* Hides event names so only times show on phones. */
+    .psc-event-name { display: none; }
+    /* Centres the date number inside each day cell. */
+    .psc-day-heading { justify-content: center; }
+    /* Centres the more-events button on phones. */
+    .psc-more-events { text-align: center; }
+/* Closes the 420px media query. */
+}
+/* Honours the reduced-motion preference for calendar animations. */
+@media (prefers-reduced-motion: reduce) {
+    /* Stops the loading bar animation for these users. */
+    .psc-progress.is-active { animation: none; }
+    /* Removes the event chip hover transition. */
+    .psc-event { transition: none; }
+/* Closes the reduced-motion block. */
+}
+

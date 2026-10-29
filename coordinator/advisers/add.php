@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block that builds the Add Adviser page. */ ?>
 <?php
 // Loads the shared config file with helper functions and settings.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database helper class DB used for all queries.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Checks whether no session is running yet.
 if (session_status() === PHP_SESSION_NONE) {
@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Loads the shared page header with sidebar and top navigation.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML markup below is output.
 ?>
 
@@ -186,4 +186,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </form>
 
 <?php /* Loads the shared footer with scripts, then closes PHP. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

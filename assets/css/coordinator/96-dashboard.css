@@ -1,0 +1,869 @@
+/* Major section header: the coordinator dashboard styles begin here. */
+/* ==========================================================================
+   Coordinator dashboard
+   --------------------------------------------------------------------------
+   The page opens with a compact welcome strip, then the presentation schedule
+   calendar, the student population chart in the same card frame as the
+   calendar, and the Quick Summary. These rules only polish those blocks: every
+   link, button, chart control and calendar behaviour is left exactly as it was.
+   ========================================================================== */
+
+/* Section label comment for the coordinator dashboard welcome strip. */
+/* --- 1. Welcome strip --------------------------------------------------- */
+/* Styles the welcome strip at the top of the coordinator dashboard. */
+.dash-hero {
+    /* Lets the gold accent bar be placed inside the strip. */
+    position: relative;
+    /* Lays the welcome text and academic year badge out in one row. */
+    display: flex;
+    /* Centres the text and badge vertically. */
+    align-items: center;
+    /* Pushes the welcome text left and the year badge right. */
+    justify-content: space-between;
+    /* Adds space between the welcome text and the badge. */
+    gap: 1.25rem;
+    /* Lets the badge drop below the text on narrow screens. */
+    flex-wrap: wrap;
+    /* Clips the gradients and accent bar to the rounded corners. */
+    overflow: hidden;
+    /* Leaves space between the strip and the next card below. */
+    margin-bottom: 1.5rem;
+    /* Sets the inner padding of the welcome strip. */
+    padding: 1.35rem 1.5rem;
+    /* Rounds the strip corners with the large radius token. */
+    border-radius: var(--radius-lg);
+    /* Makes all text inside the strip white. */
+    color: #ffffff;
+    /* Starts the layered gold glow and navy gradient background. */
+    background:
+        /* Adds a soft gold glow in the top-right corner. */
+        radial-gradient(125% 180% at 92% -40%, rgba(255, 184, 43, 0.42) 0%, rgba(255, 184, 43, 0) 58%),
+        /* Fills the strip with the navy brand gradient. */
+        linear-gradient(118deg, var(--adzu-navy-dark) 0%, var(--adzu-navy) 45%, var(--adzu-navy-light) 100%);
+    /* Gives the strip a soft navy shadow so it lifts off the page. */
+    box-shadow: 0 14px 34px rgba(6, 2, 151, 0.22);
+/* Closes the .dash-hero rule. */
+}
+
+/* Creates the thin gold accent line at the bottom of the strip. */
+.dash-hero::after {
+    /* Empty content is required so the pseudo-element is drawn. */
+    content: "";
+    /* Positions the accent line inside the welcome strip. */
+    position: absolute;
+    /* Stretches the accent line to the right edge. */
+    right: 0;
+    /* Pins the accent line to the bottom edge. */
+    bottom: 0;
+    /* Stretches the accent line to the left edge. */
+    left: 0;
+    /* Makes the accent line three pixels tall. */
+    height: 3px;
+    /* Fades the gold line out towards the right side. */
+    background: linear-gradient(90deg, var(--adzu-gold) 0%, rgba(255, 184, 43, 0.1) 70%);
+/* Closes the accent line rule. */
+}
+
+/* Groups the gold icon and welcome text on the left side. */
+.dash-hero-main {
+    /* Keeps the text group above the strip background layers. */
+    position: relative;
+    /* Places the icon badge beside the welcome text. */
+    display: flex;
+    /* Centres the icon badge with the text block. */
+    align-items: center;
+    /* Adds space between the icon badge and the text. */
+    gap: 1rem;
+    /* Lets the group grow and wrap once it is narrower than 380px. */
+    flex: 1 1 380px;
+    /* Allows the text to shrink instead of overflowing the strip. */
+    min-width: 0;
+/* Closes the .dash-hero-main rule. */
+}
+
+/* Styles the square gold icon badge in the welcome strip. */
+.dash-hero-mark {
+    /* Centres the icon inside the badge. */
+    display: flex;
+    /* Vertically centres the icon. */
+    align-items: center;
+    /* Horizontally centres the icon. */
+    justify-content: center;
+    /* Sets the badge width to 52 pixels. */
+    width: 52px;
+    /* Sets the badge height to 52 pixels. */
+    height: 52px;
+    /* Stops the badge from shrinking on small screens. */
+    flex-shrink: 0;
+    /* Rounds the badge corners by 14 pixels. */
+    border-radius: 14px;
+    /* Paints the badge with the gold brand gradient. */
+    background: linear-gradient(135deg, var(--adzu-gold) 0%, var(--adzu-gold-hover) 100%);
+    /* Draws the icon in dark grey on the gold badge. */
+    color: var(--gray-800);
+    /* Sizes the icon glyph inside the badge. */
+    font-size: 1.35rem;
+    /* Adds a small shadow under the badge. */
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+/* Closes the .dash-hero-mark rule. */
+}
+
+/* Lets the welcome text shrink inside the flexible row. */
+.dash-hero-copy { min-width: 0; }
+
+/* Styles the small gold label above the welcome heading. */
+.dash-hero-eyebrow {
+    /* Keeps the label and its icon on one line. */
+    display: inline-flex;
+    /* Centres the icon with the label text. */
+    align-items: center;
+    /* Spaces the icon away from the label text. */
+    gap: 0.45rem;
+    /* Tucks the label close to the heading below it. */
+    margin-bottom: 0.25rem;
+    /* Sets the small label text size. */
+    font-size: 0.68rem;
+    /* Makes the small label bold. */
+    font-weight: 700;
+    /* Spreads the label letters for an eyebrow look. */
+    letter-spacing: 0.14em;
+    /* Shows the small label in capital letters. */
+    text-transform: uppercase;
+    /* Colours the small label with the Ateneo gold accent. */
+    color: var(--adzu-gold);
+/* Closes the .dash-hero-eyebrow rule. */
+}
+
+/* Styles the main welcome heading of the dashboard. */
+.dash-hero-title {
+    /* Uses the heading font for the welcome title. */
+    font-family: var(--font-heading);
+    /* Scales the title between 1.3 and 1.6 rem by screen width. */
+    font-size: clamp(1.3rem, 2vw, 1.6rem);
+    /* Makes the welcome title extra bold. */
+    font-weight: 800;
+    /* Tightens the spacing between title lines. */
+    line-height: 1.24;
+    /* Slightly tightens the title letters. */
+    letter-spacing: -0.015em;
+    /* Shows the welcome title in white on the navy strip. */
+    color: #ffffff;
+/* Closes the .dash-hero-title rule. */
+}
+
+/* Styles the small supporting line under the welcome title. */
+.dash-hero-subtitle {
+    /* Adds a little space under the title. */
+    margin-top: 0.35rem;
+    /* Sets the subtitle text size. */
+    font-size: 0.86rem;
+    /* Shows the subtitle in slightly faded white. */
+    color: rgba(255, 255, 255, 0.78);
+/* Closes the .dash-hero-subtitle rule. */
+}
+
+/* Sizes and fades the small separator dot between subtitle items. */
+.dash-hero-dot { margin: 0 0.4rem; opacity: 0.5; }
+
+/* Groups the academic year pill on the right side. */
+.dash-hero-aside {
+    /* Keeps the pill above the strip background layers. */
+    position: relative;
+    /* Lets the pill sit in a flexible row. */
+    display: flex;
+    /* Centres the pill contents vertically. */
+    align-items: center;
+    /* Allows the pill group to shrink on narrow screens. */
+    min-width: 0;
+/* Closes the .dash-hero-aside rule. */
+}
+
+/* Styles the rounded academic year pill. */
+.dash-hero-ay {
+    /* Keeps the calendar icon and year text on one line. */
+    display: inline-flex;
+    /* Centres the icon and text vertically. */
+    align-items: center;
+    /* Spaces the icon from the academic year text. */
+    gap: 0.45rem;
+    /* Sets the pill inner padding. */
+    padding: 0.5rem 0.85rem;
+    /* Adds a faint white outline around the pill. */
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    /* Makes the pill fully rounded. */
+    border-radius: 999px;
+    /* Gives the pill a faint glassy white fill. */
+    background: rgba(255, 255, 255, 0.08);
+    /* Shows the academic year text in gold. */
+    color: var(--adzu-gold);
+    /* Sets the academic year text size. */
+    font-size: 0.76rem;
+    /* Makes the academic year text bold. */
+    font-weight: 700;
+    /* Adds a little letter spacing to the year text. */
+    letter-spacing: 0.03em;
+    /* Keeps the academic year on a single line. */
+    white-space: nowrap;
+/* Closes the .dash-hero-ay rule. */
+}
+
+/* Section label comment for the student population chart card. */
+/* --- 2. Chart card: same frame as the calendar -------------------------- */
+/* Adds vertical space around the population chart card. */
+.dash-chart { margin: 1.5rem 0; }
+/* Removes the inner dashboard margin so the frame matches the calendar. */
+.dash-chart .pop-dashboard { margin: 0; }
+
+/* Adjusts the chart banner spacing to match the calendar card. */
+.dash-chart .pop-banner {
+    /* Spaces the banner icon from the banner text. */
+    gap: 1rem;
+    /* Sets the banner inner padding. */
+    padding: 1.35rem 1.5rem;
+/* Closes the chart banner rule. */
+}
+
+/* Sizes the gold icon square in the chart banner. */
+.dash-chart .pop-banner-mark {
+    /* Sets the banner icon width. */
+    width: 44px;
+    /* Sets the banner icon height. */
+    height: 44px;
+    /* Rounds the banner icon corners. */
+    border-radius: 12px;
+    /* Sizes the banner icon glyph. */
+    font-size: 1.15rem;
+/* Closes the banner icon rule. */
+}
+
+/* Lays the chart title and subtitle out side by side. */
+.dash-chart .pop-banner-text {
+    /* Uses a flexible row for the banner text. */
+    display: flex;
+    /* Lets the title and subtitle wrap onto new lines. */
+    flex-wrap: wrap;
+    /* Aligns the title and subtitle on their text baselines. */
+    align-items: baseline;
+    /* Sets small row and column gaps between the texts. */
+    gap: 0.1rem 0.7rem;
+    /* Lets the banner text grow and wrap below 300px. */
+    flex: 1 1 300px;
+/* Closes the banner text rule. */
+}
+
+/* Hides the small eyebrow label in the chart banner. */
+.dash-chart .pop-eyebrow { display: none; }
+
+/* Styles the chart card title. */
+.dash-chart .pop-title {
+    /* Sets the chart title size. */
+    font-size: 1.15rem;
+    /* Makes the chart title bold. */
+    font-weight: 700;
+    /* Sets the chart title line height. */
+    line-height: 1.3;
+    /* Resets letter spacing for the chart title. */
+    letter-spacing: 0;
+/* Closes the chart title rule. */
+}
+
+/* Styles the small subtitle under the chart title. */
+.dash-chart .pop-subtitle {
+    /* Removes the top margin so it sits right under the title. */
+    margin-top: 0;
+    /* Sets the chart subtitle text size. */
+    font-size: 0.82rem;
+    /* Shows the chart subtitle in light grey. */
+    color: #cbd5e1;
+/* Closes the chart subtitle rule. */
+}
+
+/* Turns the total student count into a rounded pill. */
+.dash-chart .pop-banner-total {
+    /* Keeps the number and label on one row. */
+    flex-direction: row;
+    /* Aligns the number and label on their baselines. */
+    align-items: baseline;
+    /* Spaces the number from the label. */
+    gap: 0.45rem;
+    /* Allows the pill to shrink when space is tight. */
+    min-width: 0;
+    /* Sets the pill inner padding. */
+    padding: 0.45rem 0.85rem;
+    /* Makes the total pill fully rounded. */
+    border-radius: 999px;
+/* Closes the total pill rule. */
+}
+
+/* Styles the big total number inside the pill. */
+.dash-chart .pop-banner-total strong {
+    /* Sets the total number size. */
+    font-size: 1.15rem;
+    /* Tightens the total number letters. */
+    letter-spacing: -0.02em;
+/* Closes the total number rule. */
+}
+
+/* Styles the small label beside the total number. */
+.dash-chart .pop-banner-total span {
+    /* Sets the total label size. */
+    font-size: 0.64rem;
+    /* Spreads the total label letters. */
+    letter-spacing: 0.07em;
+    /* Keeps the total label on one line. */
+    white-space: nowrap;
+/* Closes the total label rule. */
+}
+
+/* Sets the inner padding of the chart panel body. */
+.dash-chart .pop-panel { padding: 1rem 1.5rem 1.5rem; }
+
+/* Spaces the chart panel heading from the chart below. */
+.dash-chart .pop-panel-head {
+    /* Adds space under the panel heading. */
+    margin-bottom: 1.1rem;
+    /* Adds space above the heading divider line. */
+    padding-bottom: 0.9rem;
+/* Closes the panel heading rule. */
+}
+
+/* Sizes the chart period select button. */
+.dash-chart .pop-select-btn {
+    /* Sets the select button padding. */
+    padding: 0.45rem 0.8rem;
+    /* Sets the select button text size. */
+    font-size: 0.82rem;
+/* Closes the select button rule. */
+}
+
+/* Stretches the chart body so the stage and legend match height. */
+.dash-chart .pop-body {
+    /* Makes both body columns stretch to the same height. */
+    align-items: stretch;
+    /* Spaces the chart stage from the legend. */
+    gap: 1.25rem;
+    /* Gives the chart body a tall minimum height. */
+    min-height: 540px;
+/* Closes the chart body rule. */
+}
+
+/* Lets the chart stage shrink inside the taller body. */
+.dash-chart .pop-stage { min-height: 0; }
+
+/* Stacks the chart legend items in a column. */
+.dash-chart .pop-legend {
+    /* Uses a flex column for the legend. */
+    display: flex;
+    /* Stacks legend rows vertically. */
+    flex-direction: column;
+    /* Sets the legend inner padding. */
+    padding: 0.9rem 1rem;
+/* Closes the chart legend rule. */
+}
+
+/* Lets the legend list fill the remaining column height. */
+.dash-chart .pop-legend-list { flex: 1; }
+
+/* Pushes the legend total to the bottom of the column. */
+.dash-chart .pop-legend-total { margin-top: auto; }
+
+/* Adds space above the chart footnote text. */
+.dash-chart .pop-footnote { margin-top: 0.9rem; }
+
+/* Section label comment for the Quick Summary block. */
+/* --- 3. Quick Summary ---------------------------------------------------
+   The summary closes the page with the same navy header as the calendar and
+   the chart, then four accent-tinted figure cards. */
+/* Styles the Quick Summary card that closes the dashboard page. */
+.quick-summary {
+    /* Leaves space below the summary card. */
+    margin-bottom: 1.5rem;
+    /* Clips the dark header to the rounded card corners. */
+    overflow: hidden;
+    /* Adds a light grey border around the card. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the summary card corners. */
+    border-radius: var(--radius-lg);
+    /* Gives the card a white background. */
+    background: var(--white);
+    /* Adds soft shadows under the summary card. */
+    box-shadow: 0 1px 2px rgba(6, 2, 151, 0.05), 0 12px 30px rgba(6, 2, 151, 0.07);
+/* Closes the .quick-summary rule. */
+}
+
+/* Styles the dark header bar of the Quick Summary. */
+.quick-summary-header {
+    /* Puts the heading and year pill on one row. */
+    display: flex;
+    /* Centres the header contents vertically. */
+    align-items: center;
+    /* Pushes the year pill to the right edge. */
+    justify-content: space-between;
+    /* Lets the header wrap on narrow screens. */
+    flex-wrap: wrap;
+    /* Spaces the heading from the year pill. */
+    gap: 1rem;
+    /* Sets the header inner padding. */
+    padding: 1.35rem 1.5rem;
+    /* Makes the header text white. */
+    color: #ffffff;
+    /* Paints the header with the dark slate gradient. */
+    background: linear-gradient(135deg, #2e3844 0%, #232b35 55%, #141a21 100%);
+/* Closes the summary header rule. */
+}
+
+/* Groups the summary icon and heading text. */
+.quick-summary-heading {
+    /* Puts the icon beside the heading text. */
+    display: flex;
+    /* Centres the icon with the heading text. */
+    align-items: center;
+    /* Spaces the icon from the heading text. */
+    gap: 0.9rem;
+    /* Allows the heading group to shrink when needed. */
+    min-width: 0;
+/* Closes the summary heading rule. */
+}
+
+/* Styles the gold icon square in the summary header. */
+.quick-summary-header .quick-summary-mark {
+    /* Keeps the icon square inline. */
+    display: inline-flex;
+    /* Centres the icon vertically. */
+    align-items: center;
+    /* Centres the icon horizontally. */
+    justify-content: center;
+    /* Sets the icon square width. */
+    width: 44px;
+    /* Sets the icon square height. */
+    height: 44px;
+    /* Stops the icon square from shrinking. */
+    flex-shrink: 0;
+    /* Rounds the icon square corners. */
+    border-radius: 12px;
+    /* Paints the icon square with the gold gradient. */
+    background: linear-gradient(135deg, var(--adzu-gold) 0%, var(--adzu-gold-hover) 100%);
+    /* Draws the icon in dark slate on the gold square. */
+    color: #232b35;
+    /* Sizes the icon glyph. */
+    font-size: 1.15rem;
+    /* Adds a small shadow under the icon square. */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+/* Closes the summary icon square rule. */
+}
+
+/* Lets the summary heading text wrap instead of overflowing. */
+.quick-summary-heading-text { min-width: 0; }
+
+/* Styles the Quick Summary heading text. */
+.quick-summary-header h3 {
+    /* Removes the default heading margin. */
+    margin: 0;
+    /* Uses the heading font for the summary title. */
+    font-family: var(--font-heading);
+    /* Sets the summary heading size. */
+    font-size: 1.15rem;
+    /* Makes the summary heading bold. */
+    font-weight: 700;
+    /* Shows the summary heading in white. */
+    color: #ffffff;
+/* Closes the summary heading rule. */
+}
+
+/* Styles the small description under the summary heading. */
+.quick-summary-heading-text p {
+    /* Adds a small gap above the description. */
+    margin: 0.25rem 0 0;
+    /* Sets the description text size. */
+    font-size: 0.82rem;
+    /* Shows the description in light grey. */
+    color: #cbd5e1;
+/* Closes the summary description rule. */
+}
+
+/* Styles the rounded academic year pill in the summary header. */
+.quick-summary-header .quick-summary-year {
+    /* Keeps the year icon and text on one line. */
+    display: inline-flex;
+    /* Centres the pill contents vertically. */
+    align-items: center;
+    /* Spaces the calendar icon from the year text. */
+    gap: 0.45rem;
+    /* Sets the year pill padding. */
+    padding: 0.45rem 0.8rem;
+    /* Adds a faint white outline around the pill. */
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    /* Makes the year pill fully rounded. */
+    border-radius: 999px;
+    /* Gives the pill a faint glassy fill. */
+    background: rgba(255, 255, 255, 0.08);
+    /* Shows the year text in light grey. */
+    color: #e8edf2;
+    /* Sets the year text size. */
+    font-size: 0.74rem;
+    /* Makes the year text bold. */
+    font-weight: 700;
+    /* Adds a little letter spacing to the year text. */
+    letter-spacing: 0.04em;
+/* Closes the year pill rule. */
+}
+
+/* Colours the calendar icon inside the year pill gold. */
+.quick-summary-header .quick-summary-year i { color: var(--adzu-gold); }
+
+/* Sets the pale background of the summary body. */
+.quick-summary-body {
+    /* Sets the inner padding of the summary body. */
+    padding: 1.25rem 1.5rem 1.5rem;
+    /* Fills the body with the very light grey background. */
+    background: var(--gray-50);
+/* Closes the summary body rule. */
+}
+
+/* Sets up the grid that holds the summary figure cards. */
+.quick-summary-grid {
+    /* Turns the summary body into a grid container. */
+    display: grid;
+    /* Shows two summary cards per row by default. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Spaces the summary cards apart. */
+    gap: 1rem;
+/* Closes the summary grid rule. */
+}
+
+/* Starts a wide-screen media query for the summary grid. */
+@media (min-width: 1300px) {
+    /* Shows all four summary cards in one row on wide screens. */
+    .quick-summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* Closes the wide-screen media query. */
+}
+
+/* Styles each clickable summary figure card. */
+.quick-summary-stat {
+    /* Lets the accent bar be placed inside the card. */
+    position: relative;
+    /* Uses a flex layout for the card contents. */
+    display: flex;
+    /* Stacks the card contents vertically. */
+    flex-direction: column;
+    /* Stretches card children to the full card width. */
+    align-items: stretch;
+    /* Removes gaps so spacing comes from padding. */
+    gap: 0;
+    /* Sets the card inner padding. */
+    padding: 1.1rem 1.15rem 1.2rem;
+    /* Clips the accent bar and hover effects to the card. */
+    overflow: hidden;
+    /* Adds a light grey border around the card. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the card corners. */
+    border-radius: var(--radius-lg);
+    /* Gives the card a white background. */
+    background: var(--white);
+    /* Adds a very soft shadow under the card. */
+    box-shadow: 0 1px 2px rgba(6, 2, 151, 0.04);
+    /* Removes the underline because the card is a link. */
+    text-decoration: none;
+    /* Animates lift, shadow, and border colour on hover. */
+    transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+/* Closes the summary stat rule. */
+}
+
+/* Creates the coloured accent bar along the top of the card. */
+.quick-summary-stat::before {
+    /* Empty content is required so the accent bar is drawn. */
+    content: "";
+    /* Positions the accent bar inside the card. */
+    position: absolute;
+    /* Pins the accent bar to the top edge. */
+    top: 0;
+    /* Stretches the accent bar to the right edge. */
+    right: 0;
+    /* Stretches the accent bar to the left edge. */
+    left: 0;
+    /* Makes the accent bar three pixels tall. */
+    height: 3px;
+    /* Fills the bar with the card accent colour, navy by default. */
+    background: var(--qs-accent, var(--adzu-navy));
+/* Closes the accent bar rule. */
+}
+
+/* Sets the green colour set for one summary card. */
+.quick-summary-stat--green {
+    /* Defines the green accent bar colour for this card. */
+    --qs-accent: #16a34a;
+    /* Defines the light green icon background tint. */
+    --qs-tint: rgba(22, 163, 74, 0.1);
+    /* Defines the green border colour used on hover. */
+    --qs-line: rgba(22, 163, 74, 0.24);
+    /* Defines the darker green ink for the icon and arrow. */
+    --qs-ink: #15803d;
+/* Closes the green card rule. */
+}
+
+/* Sets the navy colour set for one summary card. */
+.quick-summary-stat--navy {
+    /* Defines the navy accent bar colour for this card. */
+    --qs-accent: var(--adzu-navy);
+    /* Defines the light navy icon background tint. */
+    --qs-tint: rgba(6, 2, 151, 0.1);
+    /* Defines the navy border colour used on hover. */
+    --qs-line: rgba(6, 2, 151, 0.18);
+    /* Defines the navy ink for the icon and arrow. */
+    --qs-ink: var(--adzu-navy);
+/* Closes the navy card rule. */
+}
+
+/* Sets the gold colour set for one summary card. */
+.quick-summary-stat--gold {
+    /* Defines the gold accent bar colour for this card. */
+    --qs-accent: var(--adzu-gold);
+    /* Defines the light gold icon background tint. */
+    --qs-tint: rgba(255, 184, 43, 0.16);
+    /* Defines the gold border colour used on hover. */
+    --qs-line: rgba(255, 184, 43, 0.36);
+    /* Defines the dark amber ink for the icon and arrow. */
+    --qs-ink: #a06d00;
+/* Closes the gold card rule. */
+}
+
+/* Sets the blue colour set for one summary card. */
+.quick-summary-stat--blue {
+    /* Defines the blue accent bar colour for this card. */
+    --qs-accent: #2563eb;
+    /* Defines the light blue icon background tint. */
+    --qs-tint: rgba(37, 99, 235, 0.1);
+    /* Defines the blue border colour used on hover. */
+    --qs-line: rgba(37, 99, 235, 0.2);
+    /* Defines the darker blue ink for the icon and arrow. */
+    --qs-ink: #1d4ed8;
+/* Closes the blue card rule. */
+}
+
+/* Starts the hover and keyboard focus style for a summary card. */
+.quick-summary-stat:hover,
+/* Also applies the lift when the card is focused by keyboard. */
+.quick-summary-stat:focus-visible {
+    /* Keeps the inherited text colour unchanged. */
+    color: inherit;
+    /* Lifts the card three pixels on hover or focus. */
+    transform: translateY(-3px);
+    /* Colours the border with the card accent colour. */
+    border-color: var(--qs-line, rgba(6, 2, 151, 0.18));
+    /* Deepens the shadow while the card is lifted. */
+    box-shadow: 0 14px 30px rgba(6, 2, 151, 0.12);
+/* Closes the hover and focus rule. */
+}
+
+/* Adds a visible focus ring for keyboard users. */
+.quick-summary-stat:focus-visible {
+    /* Draws a navy outline around the focused card. */
+    outline: 2px solid var(--adzu-navy);
+    /* Leaves two pixels between the ring and the card. */
+    outline-offset: 2px;
+/* Closes the focus ring rule. */
+}
+
+/* Puts the icon and arrow on the same row inside the card. */
+.quick-summary-stat-head {
+    /* Uses a flexible row for the icon and arrow. */
+    display: flex;
+    /* Centres the icon and arrow vertically. */
+    align-items: center;
+    /* Pushes the arrow to the right edge. */
+    justify-content: space-between;
+    /* Adds space between the icon and arrow. */
+    gap: 0.75rem;
+    /* Separates the icon row from the figure below. */
+    margin-bottom: 1rem;
+/* Closes the card head rule. */
+}
+
+/* Styles the rounded icon box on each summary card. */
+.quick-summary-icon {
+    /* Centres the icon in its box. */
+    display: flex;
+    /* Centres the icon vertically. */
+    align-items: center;
+    /* Centres the icon horizontally. */
+    justify-content: center;
+    /* Sets the icon box width. */
+    width: 42px;
+    /* Sets the icon box height. */
+    height: 42px;
+    /* Stops the icon box from shrinking. */
+    flex-shrink: 0;
+    /* Rounds the icon box corners. */
+    border-radius: 12px;
+    /* Draws the icon box border in the card line colour. */
+    border: 1px solid var(--qs-line, rgba(6, 2, 151, 0.14));
+    /* Fills the icon box with the card tint colour. */
+    background: var(--qs-tint, rgba(6, 2, 151, 0.1));
+    /* Draws the icon in the card ink colour. */
+    color: var(--qs-ink, var(--adzu-navy));
+    /* Sizes the icon glyph. */
+    font-size: 1rem;
+/* Closes the summary icon rule. */
+}
+
+/* Styles the small circular arrow at the card top right. */
+.quick-summary-arrow {
+    /* Centres the arrow in its circle. */
+    display: flex;
+    /* Centres the arrow vertically. */
+    align-items: center;
+    /* Centres the arrow horizontally. */
+    justify-content: center;
+    /* Sets the arrow circle width. */
+    width: 26px;
+    /* Sets the arrow circle height. */
+    height: 26px;
+    /* Draws a light grey border around the circle. */
+    border: 1px solid var(--gray-200);
+    /* Makes the arrow button a perfect circle. */
+    border-radius: 50%;
+    /* Shows the arrow in light grey. */
+    color: var(--gray-400);
+    /* Sizes the arrow glyph. */
+    font-size: 0.68rem;
+    /* Animates colour, border, and movement on hover. */
+    transition: color var(--transition), border-color var(--transition), transform var(--transition);
+/* Closes the summary arrow rule. */
+}
+
+/* Starts the hover and focus style for the card arrow. */
+.quick-summary-stat:hover .quick-summary-arrow,
+/* Also reacts when the whole card receives keyboard focus. */
+.quick-summary-stat:focus-visible .quick-summary-arrow {
+    /* Colours the arrow with the card ink colour. */
+    color: var(--qs-ink, var(--adzu-navy));
+    /* Colours the circle border with the card line colour. */
+    border-color: var(--qs-line, var(--gray-300));
+    /* Nudges the arrow three pixels to the right. */
+    transform: translateX(3px);
+/* Closes the arrow hover rule. */
+}
+
+/* Styles the big number shown on each summary card. */
+.quick-summary-value {
+    /* Uses the heading font for the number. */
+    font-family: var(--font-heading);
+    /* Sets the number size to 2 rem. */
+    font-size: 2rem;
+    /* Makes the number extra bold. */
+    font-weight: 800;
+    /* Keeps the number on a tight single line. */
+    line-height: 1;
+    /* Tightens the number letters. */
+    letter-spacing: -0.03em;
+    /* Shows the number in Ateneo navy. */
+    color: var(--adzu-navy);
+/* Closes the summary value rule. */
+}
+
+/* Styles the caption under the summary number. */
+.quick-summary-label {
+    /* Adds a little space above the caption. */
+    margin-top: 0.4rem;
+    /* Sets the caption text size. */
+    font-size: 0.76rem;
+    /* Makes the caption semibold. */
+    font-weight: 600;
+    /* Sets the caption line height. */
+    line-height: 1.4;
+    /* Resets letter spacing for the caption. */
+    letter-spacing: 0;
+    /* Keeps the caption in normal letter case. */
+    text-transform: none;
+    /* Shows the caption in medium grey. */
+    color: var(--gray-500);
+/* Closes the summary label rule. */
+}
+
+/* Section label comment for the responsive dashboard rules. */
+/* --- 4. Responsive rules ------------------------------------------------ */
+/* Starts the tablet media query for the dashboard. */
+@media (max-width: 960px) {
+    /* Removes the chart minimum height on tablets. */
+    .dash-chart .pop-body { min-height: 0; }
+    /* Switches the chart legend list to a two-column grid. */
+    .dash-chart .pop-legend-list {
+        /* Turns the legend list into a grid container. */
+        display: grid;
+        /* Shows the legend items in two equal columns. */
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        /* Sets tighter row and column gaps for the legend. */
+        gap: 0.15rem 0.4rem;
+        /* Removes the legend height cap on tablets. */
+        max-height: none;
+    /* Closes the legend list rule. */
+    }
+    /* Reduces the gap above the legend total on tablets. */
+    .dash-chart .pop-legend-total { margin-top: 0.75rem; }
+/* Closes the tablet media query. */
+}
+
+/* Starts the small-tablet media query for the welcome strip. */
+@media (max-width: 900px) {
+    /* Tightens the welcome strip padding. */
+    .dash-hero { padding: 1.25rem 1.35rem; }
+    /* Reduces the welcome title size. */
+    .dash-hero-title { font-size: 1.3rem; }
+/* Closes the small-tablet media query. */
+}
+
+/* Starts the phone media query for the dashboard blocks. */
+@media (max-width: 640px) {
+    /* Stacks the welcome icon above the text on phones. */
+    .dash-hero-main { flex-direction: column; align-items: flex-start; gap: 0.8rem; }
+    /* Shrinks the gold icon badge for phones. */
+    .dash-hero-mark { width: 46px; height: 46px; border-radius: 12px; font-size: 1.2rem; }
+    /* Makes the year badge area full width on phones. */
+    .dash-hero-aside { width: 100%; }
+    /* Reduces the year pill text size. */
+    .dash-hero-ay { font-size: 0.72rem; }
+    /* Tightens the chart banner padding on phones. */
+    .dash-chart .pop-banner { padding: 1.15rem; }
+    /* Stacks the chart banner texts instead of using a row. */
+    .dash-chart .pop-banner-text { display: block; }
+    /* Reduces the chart title size. */
+    .dash-chart .pop-title { font-size: 1.05rem; }
+    /* Tightens the gap under the chart subtitle. */
+    .dash-chart .pop-subtitle { margin-top: 0.2rem; }
+    /* Pushes the total pill to the right on phones. */
+    .dash-chart .pop-banner-total { margin-left: auto; }
+    /* Tightens the chart panel padding on phones. */
+    .dash-chart .pop-panel { padding: 0.9rem 1.15rem 1.15rem; }
+    /* Stacks the summary header on phones. */
+    .quick-summary-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; padding: 1.15rem; }
+    /* Aligns the summary heading contents to the top. */
+    .quick-summary-heading { align-items: flex-start; }
+    /* Reduces the summary body padding. */
+    .quick-summary-body { padding: 1rem; }
+    /* Shows one summary card per row on phones. */
+    .quick-summary-grid { grid-template-columns: 1fr; }
+/* Closes the phone media query. */
+}
+
+/* Starts the small-phone media query for the chart legend. */
+@media (max-width: 560px) {
+    /* Shows the chart legend in one column on small phones. */
+    .dash-chart .pop-legend-list { grid-template-columns: 1fr; }
+/* Closes the small-phone media query. */
+}
+
+/* Starts the reduced-motion query for the summary cards. */
+@media (prefers-reduced-motion: reduce) {
+    /* Removes the summary card transition for reduced motion. */
+    .quick-summary-stat { transition: none; }
+    /* Starts the hover and focus rule for reduced motion. */
+    .quick-summary-stat:hover,
+    /* Removes the card lift for reduced motion users. */
+    .quick-summary-stat:focus-visible { transform: none; }
+    /* Starts the arrow hover rule for reduced motion. */
+    .quick-summary-stat:hover .quick-summary-arrow,
+    /* Stops the arrow from sliding for reduced motion users. */
+    .quick-summary-stat:focus-visible .quick-summary-arrow { transform: none; }
+/* Closes the reduced-motion media query. */
+}
+

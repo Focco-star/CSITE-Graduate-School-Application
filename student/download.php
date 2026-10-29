@@ -1,7 +1,7 @@
 <?php /* Opens the script that safely sends a stored document file to the browser. */ ?>
 <?php
 // Loads the shared configuration, helpers and settings needed by this page.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 
 // 1. Fetch parameters & document
 // Reads the document id from the URL (id=...) and stores it as text.

@@ -1,0 +1,368 @@
+/* Major section header: interface refresh for the student portal pages. */
+/* ==========================================================================
+   Interface refresh - student portal & applications pages
+   A calmer, more modern look that keeps the ADZU language: the same navy and
+   gold, the same type scale, the same radii and the same spacing rhythm as
+   the rest of the system.
+   ========================================================================== */
+
+/* Part 1 heading comment about the navy page banner. */
+/* --- 1. The page banner ------------------------------------------------
+   A page opens with its title and a short explanation of what the page is
+   for. On the student portal and on the applications pages that heading
+   becomes a navy banner with a gold glow, so the page starts with a clear
+   anchor instead of a line of text on the gray background. */
+/* Navy banner that holds a page title and its short description. */
+.page-header.page-banner {
+    /* Positions the banner relative so its glow layer stays inside. */
+    position: relative;
+    /* Clips the background glow to the rounded corners. */
+    overflow: hidden;
+    /* Adds space below the banner. */
+    margin-bottom: 1.35rem;
+    /* Adds padding inside the banner. */
+    padding: 1.4rem 1.6rem;
+    /* Rounds the banner corners with the large radius. */
+    border-radius: var(--radius-lg);
+    /* Starts the two-layer background definition for the banner. */
+    background:
+        /* Adds a gold glow in the top-right corner of the banner. */
+        radial-gradient(120% 170% at 88% -35%, rgba(255, 184, 43, 0.45) 0%, rgba(255, 184, 43, 0) 58%),
+        /* Adds the navy diagonal gradient underneath the glow. */
+        linear-gradient(115deg, var(--adzu-navy) 0%, var(--adzu-navy-light) 62%, #3527d8 100%);
+    /* Adds a medium shadow under the banner. */
+    box-shadow: var(--shadow-md);
+/* Closes the page banner rule. */
+}
+
+/* Styles the page title inside the navy banner. */
+.page-header.page-banner h2 {
+    /* Keeps the title above the background layers. */
+    position: relative;
+    /* Adds a small gap below the banner title. */
+    margin-bottom: 0.3rem;
+    /* Sets the banner title size to 1.45rem. */
+    font-size: 1.45rem;
+    /* Makes the banner title bold. */
+    font-weight: 700;
+    /* Tightens the title letter spacing slightly. */
+    letter-spacing: -0.01em;
+    /* Makes the banner title white. */
+    color: #ffffff;
+/* Closes the banner title rule. */
+}
+
+/* Styles the description paragraph inside the banner. */
+.page-header.page-banner p {
+    /* Keeps the paragraph above the background layers. */
+    position: relative;
+    /* Caps the paragraph line length at 78 characters. */
+    max-width: 78ch;
+    /* Sets the paragraph size to 0.9rem. */
+    font-size: 0.9rem;
+    /* Makes the paragraph text slightly transparent white. */
+    color: rgba(255, 255, 255, 0.85);
+/* Closes the banner paragraph rule. */
+}
+
+/* Makes links inside the banner white. */
+.page-header.page-banner a { color: #ffffff; }
+/* Turns banner links gold on hover. */
+.page-header.page-banner a:hover { color: var(--adzu-gold); }
+
+/* Styles outline buttons placed inside the navy banner. */
+.page-header.page-banner .btn-outline {
+    /* Gives the outline button a translucent white border. */
+    border-color: rgba(255, 255, 255, 0.55);
+    /* Makes the outline button text white. */
+    color: #ffffff;
+/* Closes the banner outline button rule. */
+}
+/* Hover style for outline buttons inside the banner. */
+.page-header.page-banner .btn-outline:hover {
+    /* Makes the button border fully white on hover. */
+    border-color: #ffffff;
+    /* Adds a faint white fill behind the button on hover. */
+    background: rgba(255, 255, 255, 0.12);
+    /* Keeps the button text white on hover. */
+    color: #ffffff;
+/* Closes the banner outline button hover rule. */
+}
+
+/* At 640px wide and below, scale the banner down for phones. */
+@media (max-width: 640px) {
+    /* Reduces the banner padding on phones. */
+    .page-header.page-banner { padding: 1.15rem 1.15rem; }
+    /* Shrinks the banner title to 1.2rem. */
+    .page-header.page-banner h2 { font-size: 1.2rem; }
+    /* Shrinks the banner paragraph text. */
+    .page-header.page-banner p { font-size: 0.85rem; }
+/* Closes the 640px media query. */
+}
+
+/* Part 2 heading comment about the refreshed cards. */
+/* --- 2. Cards ---------------------------------------------------------
+   Cards carry the work of a page. They get a deeper shadow, a soft header
+   and a little lift when the pointer is over them, so the eye can tell the
+   sections apart without a heavy border. */
+/* Refreshes the standard card with a softer border and shadow. */
+.card {
+    /* Sets the card border to light gray. */
+    border-color: var(--gray-200);
+    /* Adds a two-layer navy-tinted shadow to the card. */
+    box-shadow: 0 1px 2px rgba(6, 2, 151, 0.05), 0 8px 24px rgba(6, 2, 151, 0.06);
+    /* Animates shadow and movement changes on the card. */
+    transition: box-shadow var(--transition), transform var(--transition);
+/* Closes the card rule. */
+}
+
+/* Refreshes the card header with a subtle white-to-gray gradient. */
+.card-header {
+    /* Adds padding inside the card header. */
+    padding: 0.95rem 1.25rem;
+    /* Fades the card header from white to light gray. */
+    background: linear-gradient(180deg, #ffffff 0%, var(--gray-50) 100%);
+/* Closes the card header rule. */
+}
+
+/* Adjusts the spacing of the card header title. */
+.card-header h3 {
+    /* Tightens the letter spacing of the header title. */
+    letter-spacing: -0.01em;
+/* Closes the header title rule. */
+}
+
+/* Styles the icon inside a card header title. */
+.card-header h3 i {
+    /* Colours the header icon navy. */
+    color: var(--adzu-navy);
+    /* Makes the header icon slightly transparent. */
+    opacity: 0.75;
+/* Closes the header icon rule. */
+}
+
+/* Part 3 heading comment about the refreshed data tables. */
+/* --- 3. Tables --------------------------------------------------------
+   Wide tables are the backbone of the applications pages, so the rows are
+   easier to follow: a gentle stripe, a clear head and a little more room
+   for the content. */
+/* Styles the header cells of the wide data tables. */
+.data-table thead th {
+    /* Gives the table header a light gray background. */
+    background: var(--gray-50);
+    /* Draws a light line under the header row. */
+    border-bottom: 1px solid var(--gray-200);
+    /* Adds a thicker inset line under the header for emphasis. */
+    box-shadow: inset 0 -2px 0 var(--gray-200);
+/* Closes the table header rule. */
+}
+
+/* Styles every other body row of the data table. */
+.data-table tbody tr:nth-child(even) {
+    /* Gives even rows a faint gray stripe. */
+    background: rgba(248, 250, 252, 0.75);
+/* Closes the even row rule. */
+}
+
+/* Styles body rows while the pointer is over them. */
+.data-table tbody tr:hover {
+    /* Tints the hovered row with a faint navy wash. */
+    background: rgba(6, 2, 151, 0.04);
+/* Closes the row hover rule. */
+}
+
+/* Adds padding inside data table cells. */
+.data-table td { padding: 0.8rem 1rem; }
+
+/* The scrollable wrapper around wide tables. */
+.table-responsive {
+    /* Rounds only the bottom corners of the table wrapper. */
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+/* Closes the table wrapper rule. */
+}
+
+/* Part 4 heading comment about the filter toolbar row. */
+/* --- 4. The filter row -------------------------------------------------
+   The filters of a table read as one toolbar instead of a row of loose
+   inputs. */
+/* Groups the table filters into one toolbar box. */
+.filter-bar {
+    /* Adds padding inside the filter bar. */
+    padding: 0.7rem 0.75rem;
+    /* Adds space below the filter bar. */
+    margin-bottom: 1rem;
+    /* Adds a light border around the filter bar. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the filter bar with the standard radius. */
+    border-radius: var(--radius);
+    /* Gives the filter bar a light gray background. */
+    background: var(--gray-50);
+/* Closes the filter bar rule. */
+}
+
+/* Styles the search box and dropdowns inside filters (selector list). */
+.filter-search input,
+/* Applies the same look to dropdowns in the filter bar. */
+.filter-bar select {
+    /* Gives filter inputs a white background. */
+    background: var(--white);
+    /* Sets the filter input border to light gray. */
+    border-color: var(--gray-300);
+    /* Animates the border and shadow on focus. */
+    transition: border-color var(--transition), box-shadow var(--transition);
+/* Closes the filter input rule. */
+}
+
+/* Focus styles for the filter search box and dropdowns (selector list). */
+.filter-search input:focus,
+/* Applies the focus style to filter bar dropdowns. */
+.filter-bar select:focus {
+    /* Removes the default focus outline. */
+    outline: none;
+    /* Turns the border navy while the field has focus. */
+    border-color: var(--adzu-navy);
+    /* Adds a soft navy glow ring around the focused field. */
+    box-shadow: 0 0 0 3px rgba(6, 2, 151, 0.1);
+/* Closes the filter focus rule. */
+}
+
+/* Part 5 heading comment about the statistic cards. */
+/* --- 5. Statistic cards ----------------------------------------------- */
+/* Refreshes the small statistic cards used on dashboards. */
+.stat-card {
+    /* Positions the stat card relative for its accent bar. */
+    position: relative;
+    /* Clips the accent bar to the rounded corners. */
+    overflow: hidden;
+    /* Sets the stat card border to light gray. */
+    border-color: var(--gray-200);
+    /* Adds a two-layer navy-tinted shadow to the stat card. */
+    box-shadow: 0 1px 2px rgba(6, 2, 151, 0.05), 0 8px 20px rgba(6, 2, 151, 0.06);
+    /* Animates lift and shadow changes on the stat card. */
+    transition: transform var(--transition), box-shadow var(--transition);
+/* Closes the stat card rule. */
+}
+
+/* The thin accent bar drawn at the left edge of a stat card. */
+.stat-card::before {
+    /* Creates the empty content box needed for the pseudo element. */
+    content: "";
+    /* Positions the accent bar absolutely inside the card. */
+    position: absolute;
+    /* Pins the accent bar to the top edge. */
+    top: 0;
+    /* Pins the accent bar to the bottom edge. */
+    bottom: 0;
+    /* Pins the accent bar to the left edge. */
+    left: 0;
+    /* Sets the accent bar width to 3 pixels. */
+    width: 3px;
+    /* Colours the accent bar navy. */
+    background: var(--adzu-navy);
+    /* Makes the accent bar very faint. */
+    opacity: 0.12;
+/* Closes the accent bar rule. */
+}
+
+/* Adjusts the big number shown inside a statistic card. */
+.stat-card .stat-value {
+    /* Tightens the letter spacing of the stat value. */
+    letter-spacing: -0.02em;
+/* Closes the stat value rule. */
+}
+
+/* Part 6 heading comment about clearer form labels. */
+/* --- 6. Forms ---------------------------------------------------------
+   Labels are a little clearer and the fields keep a comfortable height, so
+   a long form stays easy to walk through. */
+/* Styles labels inside form fields. */
+.form-field label {
+    /* Colours form labels dark gray. */
+    color: var(--gray-700);
+    /* Adds a hint of letter spacing to form labels. */
+    letter-spacing: 0.01em;
+/* Closes the form label rule. */
+}
+
+/* Styles the small hint text under a form field. */
+.form-field .field-hint {
+    /* Colours field hints mid gray. */
+    color: var(--gray-500);
+/* Closes the field hint rule. */
+}
+
+/* Part 7 heading comment about the button polish. */
+/* --- 7. Buttons ------------------------------------------------------- */
+/* Adds smooth transitions to all buttons. */
+.btn {
+    /* Starts the list of transitioned button properties. */
+    transition: background var(--transition), color var(--transition),
+                /* Continues the list with border colour, shadow and movement. */
+                border-color var(--transition), box-shadow var(--transition),
+                /* Ends the button transition list with transform. */
+                transform var(--transition);
+/* Closes the button rule. */
+}
+
+/* Hover style for buttons that are not disabled. */
+.btn:not([disabled]):not([aria-disabled="true"]):hover {
+    /* Lifts the button up by one pixel on hover. */
+    transform: translateY(-1px);
+    /* Adds a soft shadow under the hovered button. */
+    box-shadow: 0 4px 10px rgba(6, 2, 151, 0.12);
+/* Closes the button hover rule. */
+}
+
+/* Pressed style for buttons that are not disabled. */
+.btn:not([disabled]):not([aria-disabled="true"]):active {
+    /* Returns the button to its normal position when pressed. */
+    transform: translateY(0);
+    /* Removes the shadow while the button is pressed. */
+    box-shadow: none;
+/* Closes the button pressed rule. */
+}
+
+/* Part 8 heading comment about empty state blocks. */
+/* --- 8. Empty states --------------------------------------------------- */
+/* Styles the placeholder block shown when a list has no rows. */
+.empty-state {
+    /* Adds generous padding around the empty state. */
+    padding: 3.25rem 1.5rem;
+    /* Colours the empty state text light gray. */
+    color: var(--gray-400);
+/* Closes the empty state rule. */
+}
+
+/* Styles the large icon in an empty state. */
+.empty-state i {
+    /* Adds space below the empty state icon. */
+    margin-bottom: 1rem;
+    /* Colours the empty state icon very light gray. */
+    color: var(--gray-300);
+/* Closes the empty state icon rule. */
+}
+
+/* Styles the heading inside an empty state. */
+.empty-state h4 {
+    /* Uses the heading font for the empty state title. */
+    font-family: var(--font-heading);
+    /* Sets the empty state title size to 1.05rem. */
+    font-size: 1.05rem;
+    /* Colours the empty state title mid gray. */
+    color: var(--gray-600);
+/* Closes the empty state title rule. */
+}
+
+/* Honours reduced-motion for cards and buttons. */
+@media (prefers-reduced-motion: reduce) {
+    /* Targets cards inside the reduced-motion rule. */
+    .card,
+    /* Also targets statistic cards in the same rule. */
+    .stat-card,
+    /* Removes transitions from cards and buttons. */
+    .btn { transition: none; }
+    /* Removes the button hover lift for these users. */
+    .btn:not([disabled]):not([aria-disabled="true"]):hover { transform: none; }
+/* Closes the reduced-motion block. */
+}
+

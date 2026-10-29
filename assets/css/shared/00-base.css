@@ -1,0 +1,1901 @@
+/* Opens the :root block that holds all shared color and size variables. */
+:root {
+    /* Sets the main ADZU navy brand color to #060297. */
+    --adzu-navy: #060297;
+    /* Sets the lighter navy shade used for hover states. */
+    --adzu-navy-light: #2018c0;
+    /* Sets the darkest navy shade used for text on gold buttons. */
+    --adzu-navy-dark: #040170;
+    /* Sets the ADZU gold accent color to #FFB82B. */
+    --adzu-gold: #FFB82B;
+    /* Sets a slightly darker gold for button hover states. */
+    --adzu-gold-hover: #e5a526;
+    /* Sets the Google blue used by the Google sign-in button. */
+    --adzu-blue: #4285F4;
+    /* Sets the pure white used for cards, light text, and buttons. */
+    --white: #ffffff;
+    /* Sets gray-50, the lightest gray background tone. */
+    --gray-50: #f8fafc;
+    /* Sets gray-100, the default page background tone. */
+    --gray-100: #f1f5f9;
+    /* Sets gray-200, used for light borders and dividers. */
+    --gray-200: #e2e8f0;
+    /* Sets gray-300, used for stronger borders and outline buttons. */
+    --gray-300: #cbd5e1;
+    /* Sets gray-400, used for muted hint text. */
+    --gray-400: #94a3b8;
+    /* Sets gray-500, used for secondary body text. */
+    --gray-500: #64748b;
+    /* Sets gray-600, used for labels and secondary buttons. */
+    --gray-600: #475569;
+    /* Sets gray-700, the default body text color. */
+    --gray-700: #334155;
+    /* Sets gray-800, used for the darkest gray text. */
+    --gray-800: #1e293b;
+    /* Sets the green success color for confirmations. */
+    --success: #16a34a;
+    /* Sets the pale green background for success messages. */
+    --success-bg: #dcfce7;
+    /* Sets the amber warning color. */
+    --warning: #ca8a04;
+    /* Sets the pale yellow background for warning messages. */
+    --warning-bg: #fef9c3;
+    /* Sets the red danger color for errors and delete buttons. */
+    --danger: #dc2626;
+    /* Sets the pale red background for error messages. */
+    --danger-bg: #fee2e2;
+    /* Sets the blue info color for neutral notices. */
+    --info: #2563eb;
+    /* Sets the pale blue background for info messages. */
+    --info-bg: #dbeafe;
+    /* Sets the purple accent color for special badges. */
+    --purple: #7c3aed;
+    /* Sets the pale purple background for purple badges. */
+    --purple-bg: #ede9fe;
+    /* Sets the sidebar width to 260 pixels. */
+    --sidebar-width: 260px;
+    /* Sets the top bar height to 64 pixels. */
+    --topbar-height: 64px;
+    /* Sets the small 8-pixel corner radius used by inputs and buttons. */
+    --radius: 8px;
+    /* Sets the larger 12-pixel corner radius used by cards. */
+    --radius-lg: 12px;
+    /* Sets the soft default shadow used by cards. */
+    --shadow: 0 1px 3px rgba(6, 2, 151, 0.08);
+    /* Sets the stronger shadow used when a card is hovered. */
+    --shadow-md: 0 4px 12px rgba(6, 2, 151, 0.1);
+    /* Sets the shared 0.2s ease transition timing. */
+    --transition: 0.2s ease;
+    /* Sets the main body font stack, starting with Source Sans 3. */
+    --font: 'Source Sans 3', 'Segoe UI', sans-serif;
+    /* Sets the heading font stack, starting with Montserrat. */
+    --font-heading: 'Montserrat', 'Segoe UI', sans-serif;
+/* Closes the :root variable block. */
+}
+
+/* Resets box sizing, margins, and padding for every element. */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Enables smooth scrolling when the page jumps to an anchor. */
+html { scroll-behavior: smooth; }
+
+/* Opens the body rule that sets base typography and background. */
+body {
+    /* Applies the shared body font family to all text. */
+    font-family: var(--font);
+    /* Sets the base font size to 15 pixels. */
+    font-size: 15px;
+    /* Sets the line height to 1.6 for comfortable reading. */
+    line-height: 1.6;
+    /* Sets default body text to the gray-700 color. */
+    color: var(--gray-700);
+    /* Sets the page background to the light gray-100 tone. */
+    background: var(--gray-100);
+    /* Makes the body at least as tall as the browser window. */
+    min-height: 100vh;
+/* Closes the body rule. */
+}
+
+/* Starts the rule that gives titles the Montserrat heading font. */
+h1, h2, h3, h4, h5, h6,
+/* Includes the top bar title h1 in the heading font rule. */
+.topbar-title h1,
+/* Includes the section title class in the heading font rule. */
+.section-title,
+/* Includes the page header h2 in the heading font rule. */
+.page-header h2,
+/* Includes the card header h3 in the heading font rule. */
+.card-header h3 {
+    /* Uses the Montserrat heading font for these title elements. */
+    font-family: var(--font-heading);
+/* Closes the heading font rule. */
+}
+
+/* Styles links with the navy brand color and a smooth transition. */
+a { color: var(--adzu-navy); text-decoration: none; transition: color var(--transition); }
+/* Turns links a lighter navy when the mouse hovers over them. */
+a:hover { color: var(--adzu-navy-light); }
+
+/* Makes images shrink to fit their container without stretching. */
+img { max-width: 100%; height: auto; }
+
+/* Lays out the app shell as a flex row with sidebar and content side by side. */
+.app-layout { display: flex; min-height: 100vh; }
+
+/* Opens the sidebar rule for the fixed left navigation panel. */
+.sidebar {
+    /* Sets the sidebar width to the shared 260-pixel variable. */
+    width: var(--sidebar-width);
+    /* Uses the dark charcoal #232b35 as the sidebar background. */
+    background: #232b35;
+    /* Draws a faint white line on the sidebar's right edge. */
+    border-right: 1px solid rgba(255,255,255,0.07);
+    /* Sets the sidebar text color to a light blue-gray. */
+    color: #e8edf2;
+    /* Turns the sidebar into a flex container. */
+    display: flex;
+    /* Stacks the sidebar children in a vertical column. */
+    flex-direction: column;
+    /* Fixes the sidebar to the viewport so it stays while scrolling. */
+    position: fixed;
+    /* Pins the fixed sidebar to the top, left, and bottom edges. */
+    top: 0; left: 0; bottom: 0;
+    /* Places the sidebar above other content with z-index 200. */
+    z-index: 200;
+    /* Animates the sidebar sliding in and out. */
+    transition: transform var(--transition);
+/* Closes the sidebar rule. */
+}
+
+/* Opens the brand block that holds the logo and school name. */
+.sidebar-brand {
+    /* Adds 1.25rem by 1rem padding inside the brand block. */
+    padding: 1.25rem 1rem;
+    /* Aligns the logo and brand text in a row. */
+    display: flex;
+    /* Centers the logo and brand text vertically. */
+    align-items: center;
+    /* Adds 0.75rem space between the logo and text. */
+    gap: 0.75rem;
+    /* Draws a faint divider under the brand block. */
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    /* Gives the brand block a deep blue #0f2a4a background. */
+    background: #0f2a4a;
+    /* Sets the brand text to white. */
+    color: #ffffff;
+/* Closes the sidebar brand rule. */
+}
+
+/* Opens the round logo box in the sidebar brand. */
+.brand-logo {
+    /* Sets the logo box to 44 by 44 pixels. */
+    width: 44px; height: 44px;
+    /* Rounds the logo box into a circle. */
+    border-radius: 50%;
+    /* Hides anything that overflows the round logo box. */
+    overflow: hidden;
+    /* Keeps the logo box background transparent. */
+    background: transparent;
+    /* Stops the logo box from shrinking in the flex row. */
+    flex-shrink: 0;
+    /* Uses flexbox to center the logo image. */
+    display: flex;
+    /* Centers the logo image vertically. */
+    align-items: center;
+    /* Centers the logo image horizontally. */
+    justify-content: center;
+/* Closes the brand logo rule. */
+}
+
+/* Sizes the sidebar logo image to 36 pixels and keeps it contained. */
+.brand-logo img { width: 36px; height: 36px; object-fit: contain; }
+
+/* Opens the fallback circle shown when the logo image is missing. */
+.brand-logo-fallback {
+    /* Hides the fallback by default until the image fails. */
+    display: none;
+    /* Sets the fallback circle to 44 by 44 pixels. */
+    width: 44px; height: 44px;
+    /* Centers the fallback icon inside the circle. */
+    align-items: center; justify-content: center;
+    /* Gives the fallback circle a white background. */
+    background: var(--white);
+    /* Colors the fallback icon navy. */
+    color: var(--adzu-navy);
+    /* Rounds the fallback into a circle. */
+    border-radius: 50%;
+    /* Sets the fallback icon size to 1.25rem. */
+    font-size: 1.25rem;
+/* Closes the brand logo fallback rule. */
+}
+
+/* Stacks the brand name and subtitle vertically. */
+.brand-text { display: flex; flex-direction: column; line-height: 1.3; }
+/* Styles the bold brand name at 0.85rem. */
+.brand-text strong { font-size: 0.85rem; font-weight: 700; }
+/* Styles the small brand subtitle and fades it slightly. */
+.brand-text small { font-size: 0.7rem; opacity: 0.85; }
+
+/* Makes the sidebar nav fill the space and scroll when long. */
+.sidebar-nav { flex: 1; overflow-y: auto; padding: 1rem 0; }
+
+/* Removes the default bullet points from sidebar lists. */
+.sidebar-nav ul { list-style: none; }
+
+/* Opens the styling for sidebar navigation links. */
+.sidebar-nav a {
+    /* Displays each sidebar link as a flex row. */
+    display: flex;
+    /* Centers the icon and label vertically in the link. */
+    align-items: center;
+    /* Adds 0.75rem space between the icon and label. */
+    gap: 0.75rem;
+    /* Adds padding inside each sidebar link. */
+    padding: 0.7rem 1.25rem;
+    /* Colors sidebar links a light blue-gray. */
+    color: #cbd5e1;
+    /* Sets sidebar link text to 0.875rem. */
+    font-size: 0.875rem;
+    /* Uses a medium 500 font weight for sidebar links. */
+    font-weight: 500;
+    /* Reserves a transparent 3-pixel left border for the active marker. */
+    border-left: 3px solid transparent;
+    /* Animates hover changes on sidebar links. */
+    transition: all var(--transition);
+/* Closes the sidebar link rule. */
+}
+
+/* Sizes and centers icons in sidebar links and fades their color. */
+.sidebar-nav a i { width: 20px; text-align: center; font-size: 0.95rem; color: #8fa0b5; }
+
+/* Opens the hover state for sidebar links. */
+.sidebar-nav a:hover {
+    /* Gives hovered sidebar links a slightly lighter background. */
+    background: #2e3844;
+    /* Turns hovered sidebar link text white. */
+    color: #ffffff;
+/* Closes the sidebar link hover rule. */
+}
+
+/* Highlights the sidebar link for the current page. */
+.sidebar-nav a.active {
+    /* Uses a darker background for the active link. */
+    background: #1a222c;
+    /* Keeps the active link text white. */
+    color: #ffffff;
+    /* Shows the navy left border on the active link. */
+    border-left-color: var(--adzu-navy);
+    /* Makes the active link text semibold. */
+    font-weight: 600;
+/* Closes the active sidebar link rule. */
+}
+
+/* Opens the sidebar footer that holds the home link. */
+.sidebar-footer {
+    /* Adds 1rem padding around the sidebar footer. */
+    padding: 1rem;
+    /* Draws a faint line above the sidebar footer. */
+    border-top: 1px solid rgba(255,255,255,0.07);
+    /* Matches the footer background to the sidebar color. */
+    background: #232b35;
+/* Closes the sidebar footer rule. */
+}
+
+/* Opens the button-style home link in the sidebar footer. */
+.sidebar-home-link {
+    /* Uses flexbox to align the icon and label. */
+    display: flex;
+    /* Centers the icon and label vertically. */
+    align-items: center;
+    /* Adds 0.6rem space between icon and label. */
+    gap: 0.6rem;
+    /* Makes the home link fill the sidebar width. */
+    width: 100%;
+    /* Adds padding inside the home link. */
+    padding: 0.65rem 1rem;
+    /* Gives the home link a navy background. */
+    background: var(--adzu-navy);
+    /* Sets the home link text to white. */
+    color: var(--white);
+    /* Adds a navy border that matches the background. */
+    border: 1.5px solid var(--adzu-navy);
+    /* Rounds the home link corners with the shared radius. */
+    border-radius: var(--radius);
+    /* Sets the home link text size to 0.82rem. */
+    font-size: 0.82rem;
+    /* Makes the home link text semibold. */
+    font-weight: 600;
+    /* Uses the shared body font for the home link. */
+    font-family: var(--font);
+    /* Shows a pointer cursor so the link looks clickable. */
+    cursor: pointer;
+    /* Animates background and color changes on hover. */
+    transition: background var(--transition), color var(--transition);
+    /* Removes the underline decoration from the link. */
+    text-decoration: none;
+/* Closes the sidebar home link rule. */
+}
+
+/* Colors the home link icon gold and sets its size. */
+.sidebar-home-link i { color: var(--adzu-gold); font-size: 0.85rem; }
+/* On hover, the home link becomes transparent with navy text. */
+.sidebar-home-link:hover { background: transparent; color: var(--adzu-navy); }
+/* On hover, the home link icon also turns navy. */
+.sidebar-home-link:hover i { color: var(--adzu-navy); }
+
+/* Sizes the small pencil icon by the user name and fades it. */
+.user-edit-icon { font-size: 0.65rem; opacity: 0.45; }
+
+/* Opens the dark overlay shown behind the open mobile sidebar. */
+.sidebar-overlay {
+    /* Hides the overlay by default. */
+    display: none;
+    /* Fixes the overlay to the viewport. */
+    position: fixed;
+    /* Stretches the overlay to cover the whole screen. */
+    inset: 0;
+    /* Gives the overlay a semi-transparent black tint. */
+    background: rgba(0, 0, 0, 0.4);
+    /* Places the overlay under the sidebar but above content. */
+    z-index: 150;
+/* Closes the sidebar overlay rule. */
+}
+
+/* Opens the main wrapper for the top bar, content, and footer. */
+.main-wrapper {
+    /* Lets the wrapper grow to fill the remaining width. */
+    flex: 1;
+    /* Allows the wrapper to shrink below its content width. */
+    min-width: 0;
+    /* Offsets the wrapper by the sidebar width so content is visible. */
+    margin-left: var(--sidebar-width);
+    /* Stacks the top bar, content, and footer vertically. */
+    display: flex;
+    /* Sets the wrapper's flex direction to column. */
+    flex-direction: column;
+    /* Makes the wrapper at least as tall as the viewport. */
+    min-height: 100vh;
+/* Closes the main wrapper rule. */
+}
+
+/* Opens the top bar styling. */
+.topbar {
+    /* Sets the top bar height to the shared 64-pixel variable. */
+    height: var(--topbar-height);
+    /* Uses a mostly opaque white top bar background. */
+    background: rgba(255, 255, 255, 0.94);
+    /* Blurs content behind the top bar for a frosted look. */
+    backdrop-filter: blur(10px);
+    /* Adds the WebKit version of the backdrop blur. */
+    -webkit-backdrop-filter: blur(10px);
+    /* Draws a very faint navy line under the top bar. */
+    border-bottom: 1px solid rgba(6, 2, 151, 0.08);
+    /* Uses flexbox to arrange the top bar contents. */
+    display: flex;
+    /* Centers top bar items vertically. */
+    align-items: center;
+    /* Adds 1.5rem left and right padding inside the top bar. */
+    padding: 0 1.5rem;
+    /* Adds 1rem space between top bar items. */
+    gap: 1rem;
+    /* Makes the top bar stick to the top while scrolling. */
+    position: sticky;
+    /* Sets the sticky top offset to zero. */
+    top: 0;
+    /* Places the top bar above page content with z-index 100. */
+    z-index: 100;
+    /* Adds a soft shadow under the top bar. */
+    box-shadow: 0 10px 30px -26px rgba(6, 2, 151, 0.55);
+/* Closes the top bar rule. */
+}
+
+/* Notes that the thin line under the top bar fades from navy to gold. */
+/* Thin brand line under the bar: navy into gold. */
+/* Uses the ::after pseudo-element to draw the brand line. */
+.topbar::after {
+    /* Creates an empty box so the pseudo-element can be drawn. */
+    content: '';
+    /* Positions the brand line absolutely inside the top bar. */
+    position: absolute;
+    /* Aligns the brand line to the left edge. */
+    left: 0;
+    /* Stretches the brand line to the right edge. */
+    right: 0;
+    /* Sits the brand line just below the top bar. */
+    bottom: -1px;
+    /* Makes the brand line 1 pixel tall. */
+    height: 1px;
+    /* Fills the line with a navy-to-gold gradient. */
+    background: linear-gradient(90deg, rgba(6, 2, 151, 0.3), rgba(255, 184, 43, 0.5), rgba(6, 2, 151, 0.12));
+/* Closes the top bar brand line rule. */
+}
+
+/* Opens the mobile sidebar toggle button. */
+.sidebar-toggle {
+    /* Hides the toggle button on desktop screens. */
+    display: none;
+    /* Centers the toggle icon vertically. */
+    align-items: center;
+    /* Centers the toggle icon horizontally. */
+    justify-content: center;
+    /* Sets the toggle button to 40 pixels wide. */
+    width: 40px;
+    /* Sets the toggle button to 40 pixels tall. */
+    height: 40px;
+    /* Uses the light gray-50 background for the toggle. */
+    background: var(--gray-50);
+    /* Adds a light gray border around the toggle. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the toggle button corners by 10 pixels. */
+    border-radius: 10px;
+    /* Sets the toggle icon size to 1rem. */
+    font-size: 1rem;
+    /* Colors the toggle icon navy. */
+    color: var(--adzu-navy);
+    /* Shows a pointer cursor on the toggle. */
+    cursor: pointer;
+    /* Animates background and border color changes. */
+    transition: background var(--transition), border-color var(--transition);
+/* Closes the toggle button rule. */
+}
+/* Turns the toggle white with a stronger border on hover. */
+.sidebar-toggle:hover { background: var(--white); border-color: var(--gray-300); }
+
+/* Opens the top bar title area. */
+.topbar-title {
+    /* Lets the title area grow to fill available space. */
+    flex: 1;
+    /* Allows the title area to shrink when space is tight. */
+    min-width: 0;
+    /* Uses flexbox for the title text and subtitle. */
+    display: flex;
+    /* Stacks the title text vertically. */
+    flex-direction: column;
+    /* Centers the title text vertically. */
+    justify-content: center;
+    /* Removes extra gap between the title lines. */
+    gap: 0;
+/* Closes the top bar title rule. */
+}
+
+/* Opens the portal name shown in the top bar. */
+.topbar-portal {
+    /* Uses the Montserrat heading font for the portal name. */
+    font-family: var(--font-heading);
+    /* Sets the portal name size to 1.12rem. */
+    font-size: 1.12rem;
+    /* Makes the portal name extra bold. */
+    font-weight: 800;
+    /* Adds space between the portal name letters. */
+    letter-spacing: 0.08em;
+    /* Turns the portal name into uppercase letters. */
+    text-transform: uppercase;
+    /* Sets the portal name line height to 1.15. */
+    line-height: 1.15;
+    /* Colors the portal name navy. */
+    color: var(--adzu-navy);
+/* Closes the portal name rule. */
+}
+
+/* Opens the group holding the avatar and logout button. */
+.topbar-user {
+    /* Aligns the avatar and logout button in a row. */
+    display: flex;
+    /* Centers the avatar and logout button vertically. */
+    align-items: center;
+    /* Adds 0.6rem space between the avatar and logout button. */
+    gap: 0.6rem;
+    /* Prevents the user group from shrinking. */
+    flex-shrink: 0;
+/* Closes the top bar user rule. */
+}
+
+/* Notes that the profile link shows only an avatar, not the student name. */
+/* Avatar-only profile link (the student's name is not shown in the bar). */
+/* Opens the round avatar link in the top bar. */
+.topbar-avatar {
+    /* Makes the avatar an inline flex box. */
+    display: inline-flex;
+    /* Centers the avatar initials vertically. */
+    align-items: center;
+    /* Centers the avatar initials horizontally. */
+    justify-content: center;
+    /* Sets the avatar width to 36 pixels. */
+    width: 36px;
+    /* Sets the avatar height to 36 pixels. */
+    height: 36px;
+    /* Fixes the avatar at 36 pixels so it never shrinks. */
+    flex: 0 0 36px;
+    /* Rounds the avatar into a circle. */
+    border-radius: 50%;
+    /* Fills the avatar with a navy gradient. */
+    background: linear-gradient(135deg, var(--adzu-navy), var(--adzu-navy-light));
+    /* Sets the avatar initials to white. */
+    color: var(--white);
+    /* Sets the avatar initials size to 0.78rem. */
+    font-size: 0.78rem;
+    /* Adds a small navy shadow under the avatar. */
+    box-shadow: 0 2px 6px rgba(6, 2, 151, 0.25);
+    /* Animates the avatar lift, shadow, and color on hover. */
+    transition: transform var(--transition), box-shadow var(--transition), color var(--transition);
+/* Closes the top bar avatar rule. */
+}
+/* Opens the avatar hover state. */
+.topbar-avatar:hover {
+    /* Keeps the avatar initials white on hover. */
+    color: var(--white);
+    /* Lifts the avatar up by 1 pixel on hover. */
+    transform: translateY(-1px);
+    /* Deepens the avatar shadow on hover. */
+    box-shadow: 0 5px 14px rgba(6, 2, 151, 0.32);
+/* Closes the avatar hover rule. */
+}
+
+/* Opens the logout button in the top bar. */
+.topbar .topbar-logout {
+    /* Makes the logout button an inline flex box. */
+    display: inline-flex;
+    /* Centers the logout button contents vertically. */
+    align-items: center;
+    /* Adds 0.4rem space between the logout icon and text. */
+    gap: 0.4rem;
+    /* Adds padding inside the logout button. */
+    padding: 0.45rem 0.85rem;
+    /* Gives the logout button fully rounded pill corners. */
+    border-radius: 999px;
+    /* Adds a light gray border to the logout button. */
+    border: 1px solid var(--gray-200);
+    /* Sets the logout button background to white. */
+    background: var(--white);
+    /* Colors the logout button text gray-600. */
+    color: var(--gray-600);
+    /* Sets the logout text size to 0.78rem. */
+    font-size: 0.78rem;
+    /* Makes the logout text semibold. */
+    font-weight: 600;
+    /* Animates the logout color, border, and background on hover. */
+    transition: color var(--transition), border-color var(--transition), background var(--transition);
+/* Closes the logout button rule. */
+}
+/* Opens the logout hover state. */
+.topbar .topbar-logout:hover {
+    /* Turns the logout text red on hover. */
+    color: var(--danger);
+    /* Turns the logout border light red on hover. */
+    border-color: rgba(220, 38, 38, 0.35);
+    /* Gives the logout button a pale red background on hover. */
+    background: #fff6f6;
+/* Closes the logout hover rule. */
+}
+
+/* Opens the main content area beside the sidebar. */
+.main-content {
+    /* Lets the content area grow to fill the space. */
+    flex: 1;
+    /* Allows the content area to shrink without overflowing. */
+    min-width: 0;
+    /* Adds 1.5rem padding around the page content. */
+    padding: 1.5rem;
+/* Closes the main content rule. */
+}
+
+/* Opens the app footer shown under the content. */
+.app-footer {
+    /* Adds 1rem top and bottom padding plus 1.5rem sides to the footer. */
+    padding: 1rem 1.5rem;
+    /* Centers the footer text. */
+    text-align: center;
+    /* Sets the footer text size to 0.75rem. */
+    font-size: 0.75rem;
+    /* Colors the footer text gray-400. */
+    color: var(--gray-400);
+    /* Draws a light gray line above the footer. */
+    border-top: 1px solid var(--gray-200);
+    /* Sets the footer background to white. */
+    background: var(--white);
+/* Closes the app footer rule. */
+}
+
+/* Adds a small gap above the footer subtitle line. */
+.footer-sub { margin-top: 0.15rem; }
+
+/* Makes public pages fill the viewport minus an 80-pixel header. */
+.public-main { min-height: calc(100vh - 80px); }
+
+/* Opens the footer used on public pages. */
+.public-footer {
+    /* Gives the public footer a navy background. */
+    background: var(--adzu-navy);
+    /* Sets public footer text to translucent white. */
+    color: rgba(255,255,255,0.7);
+    /* Adds 1.5rem padding inside the public footer. */
+    padding: 1.5rem;
+    /* Centers the public footer text. */
+    text-align: center;
+    /* Sets the public footer text size to 0.8rem. */
+    font-size: 0.8rem;
+/* Closes the public footer rule. */
+}
+
+/* Fades the subtitle inside the public footer. */
+.public-footer .footer-sub { opacity: 0.6; }
+
+/* Centers content with a 1140-pixel max width and side padding. */
+.container { max-width: 1140px; margin: 0 auto; padding: 0 1.5rem; }
+
+/* Opens the homepage hero banner. */
+.hero {
+    /* Sets the hero navy background with a campus photo cover image. */
+    background: var(--adzu-navy) url('../../img/campus-bg.jpg') center top / cover no-repeat;
+    /* Makes hero text white. */
+    color: var(--white);
+    /* Adds generous top and bottom padding to the hero. */
+    padding: 4rem 0 5rem;
+    /* Centers the hero text. */
+    text-align: center;
+    /* Allows the hero pseudo-element to be positioned inside it. */
+    position: relative;
+    /* Clips anything that overflows the hero. */
+    overflow: hidden;
+/* Closes the hero rule. */
+}
+
+/* Adds a dark gradient overlay on the hero image. */
+.hero::before {
+    /* Creates an empty box for the overlay. */
+    content: '';
+    /* Positions the overlay inside the hero. */
+    position: absolute;
+    /* Stretches the overlay to all hero edges. */
+    inset: 0;
+    /* Fades the overlay from navy to dark at the bottom. */
+    background: linear-gradient(to bottom, rgba(6,2,151,0.72) 0%, rgba(6,2,151,0.55) 60%, rgba(0,0,0,0.65) 100%);
+    /* Keeps the overlay behind the hero text. */
+    z-index: 0;
+/* Closes the hero overlay rule. */
+}
+
+/* Places the hero content above the dark overlay. */
+.hero-content { position: relative; z-index: 1; }
+
+/* Opens the round hero logo box. */
+.hero-logo {
+    /* Sizes the hero logo box to 80 by 80 pixels. */
+    width: 80px; height: 80px;
+    /* Keeps the hero logo background transparent. */
+    background: transparent;
+    /* Rounds the hero logo box into a circle. */
+    border-radius: 50%;
+    /* Centers the logo and adds 1.5rem space below it. */
+    margin: 0 auto 1.5rem;
+    /* Uses flexbox inside the logo box. */
+    display: flex;
+    /* Centers the logo vertically. */
+    align-items: center;
+    /* Centers the logo horizontally. */
+    justify-content: center;
+    /* Sets the fallback logo icon size to 2rem. */
+    font-size: 2rem;
+    /* Colors the fallback logo icon white. */
+    color: var(--white);
+/* Closes the hero logo rule. */
+}
+
+/* Sizes the hero logo image to 56 pixels and keeps it contained. */
+.hero-logo img { width: 56px; height: 56px; object-fit: contain; }
+
+/* Opens the hero heading style. */
+.hero h1 {
+    /* Sets the hero heading size to 2rem. */
+    font-size: 2rem;
+    /* Makes the hero heading bold. */
+    font-weight: 700;
+    /* Adds 0.5rem space under the hero heading. */
+    margin-bottom: 0.5rem;
+/* Closes the hero heading rule. */
+}
+
+/* Opens the italic tagline under the hero heading. */
+.hero .tagline {
+    /* Sets the tagline size to 1.1rem. */
+    font-size: 1.1rem;
+    /* Makes the tagline slightly transparent. */
+    opacity: 0.9;
+    /* Renders the tagline in italics. */
+    font-style: italic;
+    /* Adds 2rem space under the tagline. */
+    margin-bottom: 2rem;
+/* Closes the tagline rule. */
+}
+
+/* Opens the row of hero call-to-action buttons. */
+.hero-actions {
+    /* Lays the hero buttons out in a row. */
+    display: flex;
+    /* Adds 1rem space between hero buttons. */
+    gap: 1rem;
+    /* Centers the hero buttons horizontally. */
+    justify-content: center;
+    /* Lets hero buttons wrap onto a new line on small screens. */
+    flex-wrap: wrap;
+/* Closes the hero actions rule. */
+}
+
+/* Adds 3rem vertical padding to each info section. */
+.info-section { padding: 3rem 0; }
+/* Gives every other info section a white background. */
+.info-section:nth-child(even) { background: var(--white); }
+
+/* Opens the section title style. */
+.section-title {
+    /* Sets section titles to 1.5rem. */
+    font-size: 1.5rem;
+    /* Makes section titles bold. */
+    font-weight: 700;
+    /* Colors section titles navy. */
+    color: var(--adzu-navy);
+    /* Adds 1.5rem space under section titles. */
+    margin-bottom: 1.5rem;
+    /* Centers section titles. */
+    text-align: center;
+/* Closes the section title rule. */
+}
+
+/* Opens the section subtitle style. */
+.section-subtitle {
+    /* Centers subtitle text. */
+    text-align: center;
+    /* Colors subtitles gray-500. */
+    color: var(--gray-500);
+    /* Pulls subtitles up slightly toward the title. */
+    margin-top: -1rem;
+    /* Adds 2rem space under subtitles. */
+    margin-bottom: 2rem;
+    /* Limits subtitle width to 600 pixels. */
+    max-width: 600px;
+    /* Centers the subtitle with an automatic left margin. */
+    margin-left: auto;
+    /* Centers the subtitle with an automatic right margin. */
+    margin-right: auto;
+/* Closes the section subtitle rule. */
+}
+
+/* Opens the responsive card grid for info sections. */
+.info-grid {
+    /* Turns the info container into a grid. */
+    display: grid;
+    /* Creates columns that shrink to 280 pixels and wrap. */
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    /* Adds 1.5rem gap between grid cards. */
+    gap: 1.5rem;
+/* Closes the info grid rule. */
+}
+
+/* Opens the white info card style. */
+.info-card {
+    /* Sets the info card background to white. */
+    background: var(--white);
+    /* Adds a light gray border around info cards. */
+    border: 1px solid var(--gray-200);
+    /* Rounds info card corners with the large radius. */
+    border-radius: var(--radius-lg);
+    /* Adds 1.5rem padding inside info cards. */
+    padding: 1.5rem;
+    /* Adds the soft default shadow to info cards. */
+    box-shadow: var(--shadow);
+    /* Animates the info card shadow change on hover. */
+    transition: box-shadow var(--transition);
+/* Closes the info card rule. */
+}
+
+/* Targets info cards inside even-numbered sections. */
+.info-section:nth-child(even) .info-card {
+    /* Gives those cards a light gray-50 background instead of white. */
+    background: var(--gray-50);
+/* Closes the even-section info card rule. */
+}
+
+/* Deepens the info card shadow on hover. */
+.info-card:hover { box-shadow: var(--shadow-md); }
+
+/* Disables hover effects on static info cards. */
+.info-grid--static .info-card:hover { box-shadow: var(--shadow); cursor: default; }
+
+/* Opens the round icon box inside info cards. */
+.info-card .icon {
+    /* Sizes the icon box to 48 by 48 pixels. */
+    width: 48px; height: 48px;
+    /* Gives the icon box a faint navy tint background. */
+    background: rgba(6, 2, 151, 0.08);
+    /* Rounds the icon box corners. */
+    border-radius: var(--radius);
+    /* Uses flexbox to center the icon. */
+    display: flex;
+    /* Centers the icon vertically. */
+    align-items: center;
+    /* Centers the icon horizontally. */
+    justify-content: center;
+    /* Colors the icon navy. */
+    color: var(--adzu-navy);
+    /* Sets the icon size to 1.25rem. */
+    font-size: 1.25rem;
+    /* Adds 1rem space under the icon box. */
+    margin-bottom: 1rem;
+/* Closes the info card icon rule. */
+}
+
+/* Opens the info card heading style. */
+.info-card h3 {
+    /* Sets the card heading size to 1rem. */
+    font-size: 1rem;
+    /* Makes the card heading semibold. */
+    font-weight: 600;
+    /* Colors the card heading navy. */
+    color: var(--adzu-navy);
+    /* Adds 0.5rem space under the card heading. */
+    margin-bottom: 0.5rem;
+/* Closes the info card heading rule. */
+}
+
+/* Sets card paragraph text to 0.875rem in gray-500. */
+.info-card p { font-size: 0.875rem; color: var(--gray-500); }
+
+/* Styles process steps as a centered column up to 700 pixels wide. */
+.process-steps { display: flex; flex-direction: column; gap: 0; max-width: 700px; margin: 0 auto; }
+
+/* Opens one step in the process list. */
+.process-step {
+    /* Lays out the step number and text in a row. */
+    display: flex;
+    /* Adds 1.25rem space between step number and text. */
+    gap: 1.25rem;
+    /* Adds 1.25rem vertical padding to each step. */
+    padding: 1.25rem 0;
+    /* Allows the connector line to be positioned inside the step. */
+    position: relative;
+/* Closes the process step rule. */
+}
+
+/* Draws a connector line between steps except the last one. */
+.process-step:not(:last-child)::after {
+    /* Creates an empty box for the connector line. */
+    content: '';
+    /* Positions the connector line absolutely. */
+    position: absolute;
+    /* Places the connector line under the step number. */
+    left: 19px;
+    /* Starts the connector 60 pixels from the top of the step. */
+    top: 60px;
+    /* Extends the connector 20 pixels past the bottom. */
+    bottom: -20px;
+    /* Makes the connector line 2 pixels wide. */
+    width: 2px;
+    /* Colors the connector line light gray. */
+    background: var(--gray-200);
+/* Closes the connector line rule. */
+}
+
+/* Opens the round number badge for each step. */
+.step-number {
+    /* Sizes the step number badge to 40 by 40 pixels. */
+    width: 40px; height: 40px;
+    /* Gives the step badge a navy background. */
+    background: var(--adzu-navy);
+    /* Makes the step number text white. */
+    color: var(--white);
+    /* Rounds the step badge into a circle. */
+    border-radius: 50%;
+    /* Uses flexbox to center the step number. */
+    display: flex;
+    /* Centers the step number vertically. */
+    align-items: center;
+    /* Centers the step number horizontally. */
+    justify-content: center;
+    /* Centers the step number text. */
+    text-align: center;
+    /* Makes the step number bold. */
+    font-weight: 700;
+    /* Sets the step number size to 0.9rem. */
+    font-size: 0.9rem;
+    /* Sets the step number line height to 1. */
+    line-height: 1;
+    /* Prevents the step badge from shrinking. */
+    flex-shrink: 0;
+    /* Keeps the step badge above the connector line. */
+    z-index: 1;
+/* Closes the step number rule. */
+}
+
+/* Styles step headings with semibold navy text and a small gap. */
+.step-content h4 { font-weight: 600; color: var(--adzu-navy); margin-bottom: 0.25rem; }
+/* Styles step paragraph text at 0.875rem in gray-500. */
+.step-content p { font-size: 0.875rem; color: var(--gray-500); }
+
+/* Opens the grid for the three track cards. */
+.track-grid {
+    /* Turns the track container into a grid. */
+    display: grid;
+    /* Creates columns that shrink to 260 pixels and wrap. */
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    /* Adds 1.5rem gap between track cards. */
+    gap: 1.5rem;
+/* Closes the track grid rule. */
+}
+
+/* Opens the bordered track card. */
+.track-card {
+    /* Adds a 2-pixel light gray border around the track card. */
+    border: 2px solid var(--gray-200);
+    /* Rounds the track card corners with the large radius. */
+    border-radius: var(--radius-lg);
+    /* Clips the card header and body to the rounded corners. */
+    overflow: hidden;
+/* Closes the track card rule. */
+}
+
+/* Opens the navy header band of a track card. */
+.track-card-header {
+    /* Gives the track header a navy background. */
+    background: var(--adzu-navy);
+    /* Sets the track header text to white. */
+    color: var(--white);
+    /* Adds 1rem by 1.25rem padding inside the track header. */
+    padding: 1rem 1.25rem;
+    /* Makes the track header text semibold. */
+    font-weight: 600;
+/* Closes the track card header rule. */
+}
+
+/* Adds padding and a white background to the track card body. */
+.track-card-body { padding: 1.25rem; background: var(--white); }
+
+/* Removes the default list bullets from track stages. */
+.track-stages { list-style: none; }
+
+/* Opens one stage row inside a track card. */
+.track-stages li {
+    /* Lays out the stage number and label in a row. */
+    display: flex;
+    /* Centers the stage number and label vertically. */
+    align-items: center;
+    /* Adds 0.75rem space between the number and label. */
+    gap: 0.75rem;
+    /* Adds 0.6rem vertical padding to each stage row. */
+    padding: 0.6rem 0;
+    /* Draws a light divider under each stage. */
+    border-bottom: 1px solid var(--gray-100);
+    /* Sets stage label text to 0.875rem. */
+    font-size: 0.875rem;
+/* Closes the track stage rule. */
+}
+
+/* Removes the divider under the last stage in the list. */
+.track-stages li:last-child { border-bottom: none; }
+
+/* Opens the small gold number badge for each stage. */
+.track-stages .stage-num {
+    /* Sizes the stage badge to 28 by 28 pixels. */
+    width: 28px; height: 28px;
+    /* Gives the stage badge a gold background. */
+    background: var(--adzu-gold);
+    /* Sets the stage number text to dark navy. */
+    color: var(--adzu-navy-dark);
+    /* Rounds the stage badge into a circle. */
+    border-radius: 50%;
+    /* Uses flexbox to center the stage number. */
+    display: flex;
+    /* Centers the stage number vertically. */
+    align-items: center;
+    /* Centers the stage number horizontally. */
+    justify-content: center;
+    /* Sets the stage number size to 0.75rem. */
+    font-size: 0.75rem;
+    /* Makes the stage number bold. */
+    font-weight: 700;
+    /* Prevents the stage badge from shrinking. */
+    flex-shrink: 0;
+/* Closes the stage number rule. */
+}
+
+/* Opens the fixed slideshow layer behind the login page. */
+.slideshow-bg {
+    /* Fixes the slideshow to the viewport. */
+    position: fixed;
+    /* Stretches the slideshow to cover the whole screen. */
+    inset: 0;
+    /* Keeps the slideshow behind the login card. */
+    z-index: 0;
+    /* Clips slides that overflow the screen. */
+    overflow: hidden;
+/* Closes the slideshow container rule. */
+}
+
+/* Opens one background slide in the slideshow. */
+.slideshow-bg .slide {
+    /* Positions each slide absolutely inside the container. */
+    position: absolute;
+    /* Stretches each slide to all edges. */
+    inset: 0;
+    /* Scales slide images to cover the area. */
+    background-size: cover;
+    /* Centers the slide background image. */
+    background-position: center;
+    /* Starts slides fully transparent for cross-fading. */
+    opacity: 0;
+    /* Fades slides in and out over 2 seconds. */
+    transition: opacity 2s ease-in-out;
+/* Closes the slide rule. */
+}
+
+/* Shows only the slide that has the active class. */
+.slideshow-bg .slide.active { opacity: 1; }
+
+/* Opens the dark gradient overlay on the slideshow. */
+.slideshow-bg .slide-overlay {
+    /* Positions the overlay absolutely. */
+    position: absolute;
+    /* Stretches the overlay across the whole screen. */
+    inset: 0;
+    /* Applies a navy gradient over the slideshow photos. */
+    background: linear-gradient(150deg, rgba(4,1,110,0.82) 0%, rgba(6,2,151,0.75) 50%, rgba(13,8,196,0.78) 100%);
+/* Closes the slideshow overlay rule. */
+}
+
+/* Opens the login page container. */
+.login-page {
+    /* Makes the login page at least as tall as the viewport. */
+    min-height: 100vh;
+    /* Uses flexbox to center the login card. */
+    display: flex;
+    /* Centers the login card vertically. */
+    align-items: center;
+    /* Centers the login card horizontally. */
+    justify-content: center;
+    /* Keeps the login page background transparent so slides show. */
+    background: transparent;
+    /* Adds 3rem by 1.5rem padding around the login card. */
+    padding: 3rem 1.5rem;
+    /* Allows the card to sit above the slideshow layer. */
+    position: relative;
+    /* Places the login page above the slideshow with z-index 1. */
+    z-index: 1;
+/* Closes the login page rule. */
+}
+
+/* Opens the dark translucent login card. */
+.login-card {
+    /* Gives the login card a deep navy translucent background. */
+    background: rgba(4, 2, 80, 0.92);
+    /* Blurs the slideshow behind the login card. */
+    backdrop-filter: blur(4px);
+    /* Adds the WebKit version of the backdrop blur. */
+    -webkit-backdrop-filter: blur(4px);
+    /* Draws a faint white border around the card. */
+    border: 1px solid rgba(255,255,255,0.12);
+    /* Rounds the login card corners by 20 pixels. */
+    border-radius: 20px;
+    /* Adds 3rem by 2.75rem padding inside the login card. */
+    padding: 3rem 2.75rem;
+    /* Makes the card take the full available width. */
+    width: 100%;
+    /* Limits the login card width to 440 pixels. */
+    max-width: 440px;
+    /* Centers text inside the login card. */
+    text-align: center;
+    /* Sets login card text to white. */
+    color: var(--white);
+    /* Allows the card to be layered above the slideshow. */
+    position: relative;
+    /* Places the login card above the background. */
+    z-index: 1;
+    /* Adds a deep shadow and inner highlight to the card. */
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.08) inset;
+/* Closes the login card rule. */
+}
+
+/* Widens the card used for the registration form. */
+.login-card.register-card {
+    /* Limits the register card width to 560 pixels. */
+    max-width: 560px;
+    /* Uses 3rem padding inside the register card. */
+    padding: 3rem;
+/* Closes the register card rule. */
+}
+
+/* Opens the round logo box on the login card. */
+.login-logo {
+    /* Sizes the login logo box to 76 by 76 pixels. */
+    width: 76px; height: 76px;
+    /* Keeps the login logo background transparent. */
+    background: transparent;
+    /* Rounds the login logo into a circle. */
+    border-radius: 50%;
+    /* Centers the logo and adds 1.5rem space below it. */
+    margin: 0 auto 1.5rem;
+    /* Uses flexbox to center the logo image. */
+    display: flex;
+    /* Centers the logo image vertically. */
+    align-items: center;
+    /* Centers the logo image horizontally. */
+    justify-content: center;
+    /* Adds a soft dark shadow around the login logo. */
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+/* Closes the login logo rule. */
+}
+
+/* Sizes the login logo image to 46 pixels and keeps it contained. */
+.login-logo img { width: 46px; height: 46px; object-fit: contain; }
+
+/* Styles the login heading with 1.6rem bold text and tight spacing. */
+.login-card h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0.4rem; letter-spacing: -0.01em; }
+/* Styles the italic login subtitle in a faded white. */
+.login-card .login-subtitle { font-style: italic; opacity: 0.85; font-size: 0.88rem; margin-bottom: 2.25rem; }
+
+/* Aligns login form labels and inputs to the left. */
+.login-form { text-align: left; }
+
+/* Opens the small uppercase section label in the login form. */
+.form-section-label {
+    /* Sets the section label size to 0.7rem. */
+    font-size: 0.7rem;
+    /* Makes the section label bold. */
+    font-weight: 700;
+    /* Adds spacing between the section label letters. */
+    letter-spacing: 0.1em;
+    /* Turns the section label uppercase. */
+    text-transform: uppercase;
+    /* Colors the section label gold. */
+    color: var(--adzu-gold);
+    /* Makes the section label slightly transparent. */
+    opacity: 0.85;
+    /* Adds space above and below the section label. */
+    margin: 1.75rem 0 1rem;
+    /* Uses flexbox so a divider line can follow the label. */
+    display: flex;
+    /* Centers the label text and divider vertically. */
+    align-items: center;
+    /* Adds 0.6rem space between label and divider. */
+    gap: 0.6rem;
+/* Closes the form section label rule. */
+}
+/* Adds a divider line after the section label. */
+.form-section-label::after {
+    /* Creates an empty box for the divider line. */
+    content: "";
+    /* Lets the divider line fill the remaining space. */
+    flex: 1;
+    /* Makes the divider 1 pixel tall. */
+    height: 1px;
+    /* Colors the divider a faint white. */
+    background: rgba(255,255,255,0.1);
+/* Closes the section label divider rule. */
+}
+
+/* Adds 1.25rem space below each form group. */
+.form-group { margin-bottom: 1.25rem; }
+
+/* Opens the label styling for login form fields. */
+.form-group label {
+    /* Displays each label as a block above its input. */
+    display: block;
+    /* Sets the form label size to 0.78rem. */
+    font-size: 0.78rem;
+    /* Makes form labels semibold. */
+    font-weight: 600;
+    /* Adds slight letter spacing to form labels. */
+    letter-spacing: 0.02em;
+    /* Adds 0.45rem space between label and input. */
+    margin-bottom: 0.45rem;
+    /* Colors form labels near-white. */
+    color: rgba(255,255,255,0.95);
+/* Closes the form label rule. */
+}
+
+/* Opens the wrapper that positions an icon inside an input. */
+.input-icon-wrap {
+    /* Allows the icon to be positioned inside the wrapper. */
+    position: relative;
+/* Closes the input icon wrapper rule. */
+}
+
+/* Opens the icon placed inside the input wrapper. */
+.input-icon-wrap > i {
+    /* Positions the input icon absolutely. */
+    position: absolute;
+    /* Places the input icon 14 pixels from the left. */
+    left: 14px;
+    /* Moves the icon to the middle of the input height. */
+    top: 50%;
+    /* Pulls the icon up by half its height to center it. */
+    transform: translateY(-50%);
+    /* Colors the input icon translucent white. */
+    color: rgba(255,255,255,0.75);
+    /* Sets the input icon size to 0.85rem. */
+    font-size: 0.85rem;
+    /* Lets clicks pass through the icon to the input. */
+    pointer-events: none;
+/* Closes the input icon rule. */
+}
+
+/* Opens input and select styling inside the icon wrapper. */
+.input-icon-wrap input,
+/* Applies the same input styles to select menus. */
+.input-icon-wrap select {
+    /* Makes inputs and selects fill the wrapper width. */
+    width: 100%;
+    /* Leaves 2.6rem left padding so text clears the icon. */
+    padding: 0.8rem 0.9rem 0.8rem 2.6rem;
+    /* Adds a translucent white border to inputs. */
+    border: 1px solid rgba(255,255,255,0.25);
+    /* Rounds input corners by 10 pixels. */
+    border-radius: 10px;
+    /* Gives inputs a dark translucent background. */
+    background: rgba(0, 0, 0, 0.45);
+    /* Sets input text to white. */
+    color: var(--white);
+    /* Sets input text size to 0.9rem. */
+    font-size: 0.9rem;
+    /* Uses the shared body font inside inputs. */
+    font-family: var(--font);
+    /* Animates border and shadow changes when focused. */
+    transition: border-color 0.18s, box-shadow 0.18s;
+/* Closes the input and select rule. */
+}
+
+/* Colors input placeholder text translucent white. */
+.input-icon-wrap input::placeholder { color: rgba(255,255,255,0.7); }
+/* Opens the focused input and select state. */
+.input-icon-wrap input:focus,
+/* Applies the same focus style to select menus. */
+.input-icon-wrap select:focus {
+    /* Removes the default browser focus outline. */
+    outline: none;
+    /* Turns the focused input border navy. */
+    border-color: var(--adzu-navy);
+    /* Adds a soft navy glow around the focused input. */
+    box-shadow: 0 0 0 3px rgba(6, 2, 151, 0.12);
+/* Closes the input focus rule. */
+}
+
+/* Opens the show/hide password toggle button. */
+.pw-toggle {
+    /* Positions the toggle absolutely inside the input. */
+    position: absolute;
+    /* Places the toggle 0.8rem from the right edge. */
+    right: 0.8rem;
+    /* Moves the toggle to the middle of the input. */
+    top: 50%;
+    /* Pulls the toggle up to center it vertically. */
+    transform: translateY(-50%);
+    /* Removes the default button background. */
+    background: none;
+    /* Removes the default button border. */
+    border: none;
+    /* Shows a pointer cursor on the toggle. */
+    cursor: pointer;
+    /* Colors the eye icon a faint white. */
+    color: rgba(255,255,255,0.4);
+    /* Sets the toggle icon size to 0.9rem. */
+    font-size: 0.9rem;
+    /* Removes extra padding from the toggle. */
+    padding: 0;
+    /* Sets the toggle line height to 1. */
+    line-height: 1;
+    /* Keeps the toggle above the input. */
+    z-index: 2;
+/* Closes the password toggle rule. */
+}
+
+/* Makes the login submit button full width with a small top gap. */
+.login-form .btn { width: 100%; margin-top: 0.5rem; }
+
+/* Opens the divider row around the social login option. */
+.login-divider {
+    /* Uses flexbox to arrange the lines and text. */
+    display: flex;
+    /* Centers the divider lines with the text. */
+    align-items: center;
+    /* Adds 0.75rem space between line and text. */
+    gap: 0.75rem;
+    /* Adds 1.5rem space above and below the divider. */
+    margin: 1.5rem 0;
+    /* Colors the divider text a very faded white. */
+    color: rgba(255,255,255,0.3);
+    /* Sets the divider text size to 0.78rem. */
+    font-size: 0.78rem;
+/* Closes the login divider rule. */
+}
+/* Opens the pseudo-elements that draw both divider lines. */
+.login-divider::before,
+/* Targets the line drawn after the divider text. */
+.login-divider::after {
+    /* Creates an empty box for each divider line. */
+    content: "";
+    /* Lets each divider line fill the remaining space. */
+    flex: 1;
+    /* Makes the divider lines 1 pixel tall. */
+    height: 1px;
+    /* Colors the divider lines a faint white. */
+    background: rgba(255,255,255,0.12);
+/* Closes the divider line rule. */
+}
+
+/* Opens the ghost button used for the Google sign-in option. */
+.btn-ghost {
+    /* Gives the ghost button a faint white background. */
+    background: rgba(255,255,255,0.06);
+    /* Adds a translucent white border to the ghost button. */
+    border: 1px solid rgba(255,255,255,0.2);
+    /* Sets ghost button text to white. */
+    color: var(--white);
+    /* Makes ghost button text semibold. */
+    font-weight: 600;
+/* Closes the ghost button rule. */
+}
+/* Brightens the ghost button background on hover. */
+.btn-ghost:hover { background: rgba(255,255,255,0.12); color: var(--white); }
+
+/* Opens the row of extra login links. */
+.login-links {
+    /* Adds 1.25rem space above the login links. */
+    margin-top: 1.25rem;
+    /* Sets the login links text size to 0.8rem. */
+    font-size: 0.8rem;
+/* Closes the login links rule. */
+}
+
+/* Colors login links a translucent white. */
+.login-links a { color: rgba(255,255,255,0.75); }
+/* Turns login links gold on hover. */
+.login-links a:hover { color: var(--adzu-gold); }
+
+/* Opens the back-to-home link area on the login page. */
+.login-back {
+    /* Adds 1.5rem space above the back link. */
+    margin-top: 1.5rem;
+    /* Sets the back link text size to 0.8rem. */
+    font-size: 0.8rem;
+/* Closes the login back rule. */
+}
+
+/* Colors the back link a faint white. */
+.login-back a { color: rgba(255,255,255,0.6); }
+
+/* Opens the shared button base style. */
+.btn {
+    /* Makes buttons inline flex boxes. */
+    display: inline-flex;
+    /* Centers button text vertically. */
+    align-items: center;
+    /* Centers button text horizontally. */
+    justify-content: center;
+    /* Adds 0.5rem space between a button icon and its text. */
+    gap: 0.5rem;
+    /* Adds 0.65rem by 1.25rem padding inside buttons. */
+    padding: 0.65rem 1.25rem;
+    /* Sets button text size to 0.875rem. */
+    font-size: 0.875rem;
+    /* Makes button text semibold. */
+    font-weight: 600;
+    /* Uses the shared body font on buttons. */
+    font-family: var(--font);
+    /* Removes the default button border. */
+    border: none;
+    /* Rounds button corners with the shared radius. */
+    border-radius: var(--radius);
+    /* Shows a pointer cursor on buttons. */
+    cursor: pointer;
+    /* Animates all button style changes. */
+    transition: all var(--transition);
+    /* Removes underline decoration from link buttons. */
+    text-decoration: none;
+    /* Sets button line height to 1.4. */
+    line-height: 1.4;
+/* Closes the base button rule. */
+}
+
+/* Opens the primary gold button style. */
+.btn-primary {
+    /* Gives primary buttons a gold background. */
+    background: var(--adzu-gold);
+    /* Sets primary button text to dark navy. */
+    color: var(--adzu-navy-dark);
+/* Closes the primary button rule. */
+}
+/* Darkens the primary button background on hover. */
+.btn-primary:hover { background: var(--adzu-gold-hover); color: var(--adzu-navy-dark); }
+
+/* Opens the secondary navy button style. */
+.btn-secondary {
+    /* Gives secondary buttons a navy background. */
+    background: var(--adzu-navy);
+    /* Sets secondary button text to white. */
+    color: var(--white);
+/* Closes the secondary button rule. */
+}
+/* Uses the lighter navy on secondary button hover. */
+.btn-secondary:hover { background: var(--adzu-navy-light); color: var(--white); }
+
+/* Opens the Google sign-in button style. */
+.btn-google {
+    /* Gives the Google button a blue background. */
+    background: var(--adzu-blue);
+    /* Sets Google button text to white. */
+    color: var(--white);
+/* Closes the Google button rule. */
+}
+/* Darkens the Google button blue on hover. */
+.btn-google:hover { background: #3367d6; color: var(--white); }
+
+/* Opens the outline button style. */
+.btn-outline {
+    /* Keeps outline button backgrounds transparent. */
+    background: transparent;
+    /* Adds a light gray border to outline buttons. */
+    border: 1px solid var(--gray-300);
+    /* Colors outline button text gray-600. */
+    color: var(--gray-600);
+/* Closes the outline button rule. */
+}
+/* Turns the outline border and text navy on hover. */
+.btn-outline:hover { border-color: var(--adzu-navy); color: var(--adzu-navy); }
+
+/* Notes that the Presentation Result control matches the outline buttons. */
+/* The Presentation Result control sits in the stage actions row and reads
+   like the outline buttons beside it (Schedule Presentation, Locked): one
+   bordered box, with the label displayed inside next to the result. */
+/* Opens the Presentation Result box styled like an outline button. */
+.stage-result-box {
+    /* Lays out the result label and select in a row. */
+    display: flex;
+    /* Centers the label and select vertically. */
+    align-items: center;
+    /* Adds 0.5rem space between label and select. */
+    gap: 0.5rem;
+    /* Adds padding inside the result box. */
+    padding: 0.65rem 1.25rem;
+    /* Adds a gray outline border around the result box. */
+    border: 1px solid var(--gray-300);
+    /* Rounds the result box corners. */
+    border-radius: var(--radius);
+    /* Keeps the result box background transparent. */
+    background: transparent;
+    /* Colors the result box text gray-600. */
+    color: var(--gray-600);
+    /* Sets result box text size to 0.875rem. */
+    font-size: 0.875rem;
+    /* Uses the shared body font in the result box. */
+    font-family: var(--font);
+    /* Sets the result box line height to 1.4. */
+    line-height: 1.4;
+    /* Animates the result box border and color changes. */
+    transition: all var(--transition);
+/* Closes the result box rule. */
+}
+/* Opens the result box hover state. */
+.stage-result-box:hover {
+    /* Turns the result box border navy on hover. */
+    border-color: var(--adzu-navy);
+    /* Turns the result box text navy on hover. */
+    color: var(--adzu-navy);
+/* Closes the result box hover rule. */
+}
+/* Matches the result box style while a child has focus. */
+.stage-result-box:focus-within {
+    /* Turns the result box border navy on focus. */
+    border-color: var(--adzu-navy);
+    /* Turns the result box text navy on focus. */
+    color: var(--adzu-navy);
+/* Closes the result box focus rule. */
+}
+/* Opens the disabled style for the result box. */
+.stage-result-box.is-disabled {
+    /* Uses a light gray border when the result box is disabled. */
+    border-color: var(--gray-200);
+    /* Uses faded gray text when the result box is disabled. */
+    color: var(--gray-400);
+    /* Shows a not-allowed cursor when the box is disabled. */
+    cursor: not-allowed;
+/* Closes the disabled result box rule. */
+}
+/* Overrides hover so disabled result boxes do not change. */
+.stage-result-box.is-disabled:hover {
+    /* Keeps the light border even on hover when disabled. */
+    border-color: var(--gray-200);
+    /* Keeps the faded text even on hover when disabled. */
+    color: var(--gray-400);
+/* Closes the disabled hover rule. */
+}
+/* Opens the bold label text inside the result box. */
+.stage-result-label {
+    /* Makes the result label semibold. */
+    font-weight: 600;
+    /* Keeps the result label on one line. */
+    white-space: nowrap;
+/* Closes the result label rule. */
+}
+/* Styles the result select so it blends into the outline box. */
+.form-field select.stage-result-select {
+    /* Lets the select size itself to its text. */
+    width: auto;
+    /* Removes the select's minimum width. */
+    min-width: 0;
+    /* Makes the select background transparent. */
+    background: transparent;
+    /* Removes the select border. */
+    border: none;
+    /* Removes the select box shadow. */
+    box-shadow: none;
+    /* Removes padding inside the select. */
+    padding: 0;
+    /* Lets the select inherit the box text color. */
+    color: inherit;
+    /* Makes the selected result text semibold. */
+    font-weight: 600;
+    /* Lets the select inherit the box font family. */
+    font-family: inherit;
+    /* Lets the select inherit the box font size. */
+    font-size: inherit;
+    /* Lets the select inherit the box line height. */
+    line-height: inherit;
+    /* Disables transitions on the select. */
+    transition: none;
+    /* Shows a pointer cursor on the result select. */
+    cursor: pointer;
+/* Closes the result select rule. */
+}
+/* Opens the result select hover state. */
+.form-field select.stage-result-select:hover {
+    /* Keeps the select text color unchanged on hover. */
+    color: inherit;
+/* Closes the result select hover rule. */
+}
+/* Opens the disabled result select style. */
+.form-field select.stage-result-select:disabled {
+    /* Uses faded gray text when the select is disabled. */
+    color: var(--gray-400);
+    /* Shows a not-allowed cursor on the disabled select. */
+    cursor: not-allowed;
+    /* Hides the select border when disabled. */
+    border-color: transparent;
+/* Closes the disabled select rule. */
+}
+/* Opens the result select focus state. */
+.form-field select.stage-result-select:focus {
+    /* Removes the default focus outline. */
+    outline: none;
+    /* Hides the border on focus so only the box shows. */
+    border-color: transparent;
+    /* Removes the focus shadow. */
+    box-shadow: none;
+/* Closes the result select focus rule. */
+}
+
+/* Notes that the document review select matches the outline Download button. */
+/* The document review action in Documents and Requirements matches the
+   outline Download button beside it. */
+/* Opens the document review dropdown used on document rows. */
+select.doc-review-select {
+    /* Lets the dropdown size itself to its content. */
+    width: auto;
+    /* Adds a little space to the left of the dropdown. */
+    margin-left: 0.4rem;
+    /* Adds compact padding inside the dropdown. */
+    padding: 0.4rem 0.85rem;
+    /* Sets the dropdown text size to 0.8rem. */
+    font-size: 0.8rem;
+    /* Adds a gray outline border around the dropdown. */
+    border: 1px solid var(--gray-300);
+    /* Rounds the dropdown corners. */
+    border-radius: var(--radius);
+    /* Keeps the dropdown background transparent. */
+    background: transparent;
+    /* Colors the dropdown text gray-600. */
+    color: var(--gray-600);
+    /* Animates the dropdown border and color changes. */
+    transition: all var(--transition);
+/* Closes the document review select rule. */
+}
+/* Opens the document review dropdown hover state. */
+select.doc-review-select:hover {
+    /* Turns the dropdown border navy on hover. */
+    border-color: var(--adzu-navy);
+    /* Turns the dropdown text navy on hover. */
+    color: var(--adzu-navy);
+/* Closes the document review hover rule. */
+}
+/* Opens the document review dropdown focus state. */
+select.doc-review-select:focus {
+    /* Removes the default focus outline. */
+    outline: none;
+    /* Keeps the gray border when the dropdown is focused. */
+    border-color: var(--gray-300);
+    /* Removes the focus shadow. */
+    box-shadow: none;
+/* Closes the document review focus rule. */
+}
+
+/* Styles danger buttons with a red background and white text. */
+.btn-danger { background: var(--danger); color: var(--white); }
+/* Darkens the danger button red on hover. */
+.btn-danger:hover { background: #b91c1c; color: var(--white); }
+
+/* Styles success buttons with a green background and white text. */
+.btn-success { background: var(--success); color: var(--white); }
+/* Darkens the success button green on hover. */
+.btn-success:hover { background: #15803d; color: var(--white); }
+
+/* Makes small buttons more compact. */
+.btn-sm { padding: 0.4rem 0.85rem; font-size: 0.8rem; }
+/* Makes large buttons bigger with more padding. */
+.btn-lg { padding: 0.85rem 1.75rem; font-size: 1rem; }
+
+/* Makes icon-only buttons square with a minimum 36-pixel width. */
+.btn-icon { padding: 0.5rem; min-width: 36px; }
+
+/* Opens the white card used to wrap forms. */
+.form-card {
+    /* Sets the form card background to white. */
+    background: var(--white);
+    /* Adds a light gray border around the form card. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the form card corners with the large radius. */
+    border-radius: var(--radius-lg);
+    /* Adds 1.5rem padding inside the form card. */
+    padding: 1.5rem;
+    /* Adds the soft default shadow to the form card. */
+    box-shadow: var(--shadow);
+/* Closes the form card rule. */
+}
+
+/* Opens the row layout for groups of form fields. */
+.form-row {
+    /* Turns the form row into a grid. */
+    display: grid;
+    /* Creates columns that shrink to 240 pixels and wrap. */
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    /* Adds 1rem gap between form fields. */
+    gap: 1rem;
+    /* Adds 1rem space below each form row. */
+    margin-bottom: 1rem;
+/* Closes the form row rule. */
+}
+
+/* Adds 1rem space below each form field. */
+.form-field { margin-bottom: 1rem; }
+
+/* Opens the label style for standard form fields. */
+.form-field label {
+    /* Displays each field label as a block. */
+    display: block;
+    /* Sets the field label size to 0.8rem. */
+    font-size: 0.8rem;
+    /* Makes field labels semibold. */
+    font-weight: 600;
+    /* Colors field labels gray-600. */
+    color: var(--gray-600);
+    /* Adds 0.35rem space between label and input. */
+    margin-bottom: 0.35rem;
+/* Closes the form field label rule. */
+}
+
+/* Colors the required asterisk on labels red. */
+.form-field label .required { color: var(--danger); }
+
+/* Styles the text inputs inside a form field group. */
+.form-field input,
+/* Styles the dropdown select boxes inside a form field group. */
+.form-field select,
+/* Styles multi-line text areas inside a form field group. */
+.form-field textarea {
+    /* Makes each field fill the full width of its column. */
+    width: 100%;
+    /* Adds inner padding so typed text is not cramped. */
+    padding: 0.6rem 0.85rem;
+    /* Draws a thin gray border around each field. */
+    border: 1px solid var(--gray-300);
+    /* Rounds the field corners using the shared radius value. */
+    border-radius: var(--radius);
+    /* Sets the size of the text typed inside the field. */
+    font-size: 0.875rem;
+    /* Uses the site font so fields match the rest of the page. */
+    font-family: var(--font);
+    /* Sets the color of the text typed into the field. */
+    color: var(--gray-700);
+    /* Gives the field a white background. */
+    background: var(--white);
+    /* Smoothly animates the border color change when the field is focused. */
+    transition: border-color var(--transition);
+/* Closes the form field input, select and textarea rule. */
+}
+
+/* Applies focus styles to a text input the student is typing in. */
+.form-field input:focus,
+/* Applies focus styles to a dropdown that has focus. */
+.form-field select:focus,
+/* Applies focus styles to a text area that has focus. */
+.form-field textarea:focus {
+    /* Removes the browser default outline around the focused field. */
+    outline: none;
+    /* Turns the border navy blue to show which field is active. */
+    border-color: var(--adzu-navy);
+    /* Adds a soft blue glow around the focused field. */
+    box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
+/* Closes the focus styles for form fields. */
+}
+
+/* Wraps the schedule date picker so its parts can be positioned. */
+.schedule-picker-wrap {
+    /* Lets child elements be placed relative to this wrapper. */
+    position: relative;
+/* Closes the schedule picker wrapper rule. */
+}
+/* Styles the date and time picker inputs on the schedule form. */
+.form-field input.schedule-picker {
+    /* Keeps the picker tall enough to click or tap easily. */
+    min-height: 44px;
+    /* Adds inner padding inside the picker input. */
+    padding: 0.6rem 0.85rem;
+    /* Uses a light gray border around the picker. */
+    border-color: var(--gray-300);
+    /* Uses a very light gray background for the picker. */
+    background-color: var(--gray-50);
+    /* Sets the text color inside the picker. */
+    color: var(--gray-700);
+    /* Tells the browser to draw the picker in light mode. */
+    color-scheme: light;
+    /* Tints the picker highlights with the ADZU gold color. */
+    accent-color: var(--adzu-gold);
+/* Closes the schedule picker input rule. */
+}
+/* Highlights the schedule picker while it is focused. */
+.form-field input.schedule-picker:focus {
+    /* Turns the picker border gold when it is focused. */
+    border-color: var(--adzu-gold);
+    /* Adds a soft gold glow to the focused picker. */
+    box-shadow: 0 0 0 3px rgba(255, 184, 43, 0.22);
+/* Closes the schedule picker focus rule. */
+}
+/* Styles the small calendar icon inside the date picker. */
+.form-field input.schedule-picker::-webkit-calendar-picker-indicator {
+    /* Sets the width of the calendar icon. */
+    width: 1.15rem;
+    /* Sets the height of the calendar icon. */
+    height: 1.15rem;
+    /* Adds a little space inside the calendar icon button. */
+    padding: 0.2rem;
+    /* Rounds the corners of the calendar icon button. */
+    border-radius: 5px;
+    /* Fills the calendar icon button with ADZU gold. */
+    background-color: var(--adzu-gold);
+    /* Shows a hand cursor over the calendar icon. */
+    cursor: pointer;
+    /* Leaves the calendar icon colors unchanged. */
+    filter: none;
+/* Closes the calendar icon rule. */
+}
+/* Styles the clock icon of the time picker input. */
+.form-field input.schedule-time-picker::-webkit-calendar-picker-indicator {
+    /* Removes the background behind the time picker icon. */
+    background-color: transparent;
+    /* Tints the time picker icon gold using a CSS color filter. */
+    filter: invert(65%) sepia(87%) saturate(600%) hue-rotate(2deg) brightness(95%) contrast(90%);
+/* Closes the time picker icon rule. */
+}
+/* Styles disabled choices in the panel member dropdown. */
+.form-field select.panel-member-select option:disabled {
+    /* Shows unavailable panel members in light gray text. */
+    color: var(--gray-400);
+    /* Gives disabled dropdown options a gray background. */
+    background-color: var(--gray-100);
+/* Closes the disabled panel member option rule. */
+}
+
+/* Makes text areas taller and only resizable up and down. */
+.form-field textarea { min-height: 100px; resize: vertical; }
+
+/* Starts the comment about read-only auto-filled fields. */
+/* Read-only (auto-filled) fields: grayed out so they clearly look non-editable */
+/* Targets read-only text inputs that the system fills in. */
+.form-field input[readonly],
+/* Targets disabled dropdowns that the user cannot change. */
+.form-field select[disabled],
+/* Targets read-only text areas that the system fills in. */
+.form-field textarea[readonly] {
+    /* Grays out locked fields so they clearly look non-editable. */
+    background-color: var(--gray-100);
+    /* Uses muted text color inside locked fields. */
+    color: var(--gray-500);
+    /* Uses a faint border on locked fields. */
+    border-color: var(--gray-200);
+    /* Shows a blocked cursor over locked fields. */
+    cursor: not-allowed;
+    /* Stops users from selecting text inside locked fields. */
+    user-select: none;
+/* Closes the read-only field rule. */
+}
+
+/* Starts the comment about the lock icon on read-only inputs. */
+/* Small lock icon on the right side of read-only inputs */
+/* Adds a lock icon inside read-only text inputs. */
+.form-field input[readonly],
+.form-field select.locked-select {
+    /* Leaves room on the right for the lock icon. */
+    padding-right: 2.5rem;
+    /* Draws a small gray padlock icon as the field background image. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E");
+    /* Shows the lock icon only once. */
+    background-repeat: no-repeat;
+    /* Places the lock icon at the right side of the field. */
+    background-position: right 0.85rem center;
+/* Closes the lock icon rule. */
+}
+
+/* Hides the native arrow so it does not overlap the lock icon. */
+.form-field select.locked-select { appearance: none; }
+
+/* Starts the comment about removing focus styling on locked fields. */
+/* No navy focus highlight, since the field can't be edited */
+/* Keeps read-only inputs looking locked even when focused. */
+.form-field input[readonly]:focus,
+/* Also keeps read-only text areas looking locked when focused. */
+.form-field textarea[readonly]:focus {
+    /* Keeps the border gray on a focused locked field. */
+    border-color: var(--gray-200);
+    /* Removes the focus glow because the field cannot be edited. */
+    box-shadow: none;
+    /* Removes the default focus outline on the locked field. */
+    outline: none;
+/* Closes the read-only focus rule. */
+}
+
+/* Styles the small helper text shown under a field. */
+.form-field .field-hint {
+    /* Sets the helper text to a small size. */
+    font-size: 0.75rem;
+    /* Shows the helper text in light gray. */
+    color: var(--gray-400);
+    /* Adds a little space between the field and its hint. */
+    margin-top: 0.25rem;
+/* Closes the field hint rule. */
+}
+
+/* Targets a text input in a field that failed validation. */
+.form-field.has-error input,
+/* Targets a dropdown in a field that failed validation. */
+.form-field.has-error select,
+/* Targets a text area in a field that failed validation. */
+.form-field.has-error textarea {
+    /* Turns the field border red to signal the error. */
+    border-color: var(--danger);
+/* Closes the field error border rule. */
+}
+
+/* Styles the red error message shown under a field. */
+.field-error {
+    /* Sets the error message to a small text size. */
+    font-size: 0.75rem;
+    /* Shows the error message in the danger red color. */
+    color: var(--danger);
+    /* Adds a little space above the error message. */
+    margin-top: 0.25rem;
+/* Closes the field error message rule. */
+}
+
+/* Holds the buttons at the bottom of a form. */
+.form-actions {
+    /* Lays the form buttons out in a row. */
+    display: flex;
+    /* Spaces the form buttons apart. */
+    gap: 0.75rem;
+    /* Lets the buttons wrap onto a new line on small screens. */
+    flex-wrap: wrap;
+    /* Pushes the button row down from the fields above. */
+    margin-top: 1.5rem;
+    /* Adds space above the buttons inside the divider. */
+    padding-top: 1rem;
+    /* Draws a divider line above the form buttons. */
+    border-top: 1px solid var(--gray-200);
+/* Closes the form actions rule. */
+}
+

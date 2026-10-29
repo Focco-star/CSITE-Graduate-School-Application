@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block for the student dashboard page. */ ?>
 <?php
 // Loads the shared config with session, constants, and helper functions.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the DB helper class used for the student lookup below.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 
 // Checks that someone is logged in and that their role is student.
 if (empty($_SESSION['user']) || ($_SESSION['user']['role'] ?? '') !== 'student') {
@@ -62,7 +62,7 @@ $presentationDetails = studentPresentationDetails($user['email']);
 $welcomeName = studentWelcomeName($student, $user);
 
 // Includes the shared header with styles, sidebar, and top bar.
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/layout/header.php';
 // Closes the PHP block before the HTML output starts.
 ?>
 
@@ -689,4 +689,4 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
 </div>
 
 <?php /* Includes the shared footer that closes the page layout. */ ?>
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/layout/footer.php'; ?>

@@ -1,9 +1,9 @@
 <?php /* Opens the page where a student views and edits their own profile. */ ?>
 <?php
 // Loads the shared configuration and helper functions.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the database class used to read and save the profile.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 // Starts the session only if it is not already running.
 if (session_status() === PHP_SESSION_NONE) session_start();
 // Sends visitors who are not logged-in students to the login page.
@@ -127,7 +127,7 @@ foreach (array_keys(PROGRAMS) as $code) {
 // Sets the page title, role, menu highlight and header user name.
 $pageTitle = 'Edit My Profile'; $role = 'student'; $currentPage = 'dashboard'; $userName = $user['full_name'];
 // Loads the shared page header, sidebar and navigation.
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/layout/header.php';
 // Closes PHP so the HTML part of the page can start.
 ?>
 <?php /* Shows the page banner with the title and a short instruction. */ ?>
@@ -186,4 +186,4 @@ require_once __DIR__ . '/../includes/header.php';
 <?php /* Ends the JavaScript for the track dropdown. */ ?>
 </script>
 <?php /* Loads the shared footer and closes the page. */ ?>
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/layout/footer.php'; ?>

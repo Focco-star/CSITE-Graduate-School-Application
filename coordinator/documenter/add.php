@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block that builds the Add Documenter page. */ ?>
 <?php
 // Loads the shared config with helper functions and settings.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the DB class used for database queries.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Checks whether no session is running yet.
 if (session_status() === PHP_SESSION_NONE) {
@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // Loads the shared header with sidebar and top bar.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML below is printed.
 ?>
 
@@ -185,4 +185,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </form>
 
 <?php /* Loads the shared footer scripts and closes PHP. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

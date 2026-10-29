@@ -1,7 +1,7 @@
 <?php /* Starts the PHP code for the student management page. */ ?>
 <?php
 // Loads config settings, helpers, demo data, and function libraries.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 
 // Checks whether no session has been started yet.
 if (session_status() === PHP_SESSION_NONE) {
@@ -148,7 +148,7 @@ if (!$pdo && empty($students) && function_exists('storeGet')) {
 $statusFilters = ['not_started','submitted','under_review','for_payment','payment_recorded','ready_for_presentation','scheduled','approved','requires_revision','completed'];
 
 // Loads the shared header and navigation.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML below is printed.
 ?>
 
@@ -323,4 +323,4 @@ document.querySelectorAll('[data-archive-open]').forEach(button => button.addEve
 </script>
 
 <?php /* Loads the shared footer and closes the page. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

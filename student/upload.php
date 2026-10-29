@@ -1,9 +1,9 @@
 <?php /* Opens the small script that forwards old upload links to the application page. */ ?>
 <?php
 // Loads the shared configuration and helper functions.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the database class, kept for consistency with the other pages.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 
 /*
  * The document upload now lives on the Application page of the Student

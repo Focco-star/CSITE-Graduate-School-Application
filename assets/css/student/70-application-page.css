@@ -1,0 +1,322 @@
+/* Starts the section that styles the student track indicator. */
+/* ==========================================================================
+   Track indicator (student application page)
+   One blue accent for every course and track.
+   ========================================================================== */
+/* Starts the panel that shows the student's program and track. */
+.track-indicator {
+    /* Defines the track accent color, navy by default. */
+    --track: var(--adzu-navy);
+    /* Defines the text color used on the track accent. */
+    --track-ink: #ffffff;
+    /* Stacks the track badge and program name vertically. */
+    display: flex;
+    /* Keeps the track contents in a column. */
+    flex-direction: column;
+    /* Aligns the track contents to the left. */
+    align-items: flex-start;
+    /* Adds space between the badge and program name. */
+    gap: 0.45rem;
+    /* Leaves space below the track indicator. */
+    margin-bottom: 1rem;
+    /* Adds padding inside the indicator. */
+    padding: 1rem 1.25rem;
+    /* Gives the indicator a white background. */
+    background: var(--white);
+    /* Draws a light border around the indicator. */
+    border: 1px solid var(--gray-200);
+    /* Adds a thick accent bar on the left edge. */
+    border-left: 6px solid var(--track);
+    /* Rounds the indicator corners. */
+    border-radius: var(--radius);
+/* Closes the .track-indicator rule. */
+}
+
+/* Starts the small pill showing the track name. */
+.track-indicator-badge {
+    /* Keeps the pill inline with its text. */
+    display: inline-block;
+    /* Adds padding inside the pill. */
+    padding: 0.2rem 0.65rem;
+    /* Fills the pill with the track accent color. */
+    background: var(--track);
+    /* Colors the pill text with the accent ink color. */
+    color: var(--track-ink);
+    /* Slightly rounds the pill corners. */
+    border-radius: 4px;
+    /* Sets the pill text small. */
+    font-size: 0.7rem;
+    /* Makes the pill text bold. */
+    font-weight: 700;
+    /* Adds wide spacing between the uppercase letters. */
+    letter-spacing: 0.09em;
+    /* Uppercases the track name. */
+    text-transform: uppercase;
+/* Closes the .track-indicator-badge rule. */
+}
+
+/* Starts the program name line in the track indicator. */
+.track-indicator-program {
+    /* Uses the heading font for the program name. */
+    font-family: var(--font-heading);
+    /* Sets the program name size. */
+    font-size: 1.05rem;
+    /* Makes the program name bold. */
+    font-weight: 700;
+    /* Tightens the program name line height. */
+    line-height: 1.3;
+    /* Colors the program name dark gray. */
+    color: var(--gray-800);
+/* Closes the .track-indicator-program rule. */
+}
+
+/* Section header: the editable date field and its themed mini calendar. */
+/* ==========================================================================
+   Editable date field with themed calendar (gray + yellow, like the sidebar)
+   ========================================================================== */
+/* Wrapper for the date field; relative so the calendar button can sit inside it. */
+.date-picker { position: relative; }
+
+/* Styles the text input that belongs to a date picker field. */
+.form-field .date-picker input {
+    /* Leaves 3rem on the right so typed text does not run under the calendar button. */
+    padding-right: 3rem;
+/* Closes the date picker input rule. */
+}
+
+/* Focus style for the date picker input while the user is typing. */
+.form-field .date-picker input:focus {
+    /* Turns the input border navy when it has focus. */
+    border-color: var(--adzu-navy);
+    /* Adds a soft navy glow ring around the focused date input. */
+    box-shadow: 0 0 0 3px rgba(6, 2, 151, 0.12);
+/* Closes the focused date input rule. */
+}
+
+/* Styles the small calendar button that sits inside the date field. */
+.date-picker-btn {
+    /* Pins the button absolutely inside the date field. */
+    position: absolute;
+    /* Stretches the button to fill the field height on the right edge. */
+    top: 1px; right: 1px; bottom: 1px;
+    /* Sets the calendar button width to 2.6rem. */
+    width: 2.6rem;
+    /* Removes the default button border. */
+    border: 0;
+    /* Rounds only the right corners so the button matches the input shape. */
+    border-radius: 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0;
+    /* Gives the calendar button a dark slate background. */
+    background: #232b35;
+    /* Makes the calendar icon gold. */
+    color: #FFB82B;
+    /* Sets the calendar icon size to 0.95rem. */
+    font-size: 0.95rem;
+    /* Shows a pointer cursor so the button looks clickable. */
+    cursor: pointer;
+    /* Animates background and text colour changes on the button. */
+    transition: background var(--transition), color var(--transition);
+/* Closes the calendar button rule. */
+}
+/* Matches the calendar button on hover (start of the selector list). */
+.date-picker-btn:hover,
+/* Darkens the button and whitens the icon when hovered or expanded. */
+.date-picker-btn[aria-expanded="true"] { background: #2e3844; color: #ffffff; }
+/* Draws a navy focus ring for keyboard users of the calendar button. */
+.date-picker-btn:focus-visible { outline: 2px solid var(--adzu-navy); outline-offset: -2px; }
+
+/* Styles the floating calendar popover panel. */
+.dp-popover {
+    /* Uses fixed positioning so the popover can be placed beside the field. */
+    position: fixed;
+    /* Keeps the popover on top of other page content (z-index 2000). */
+    z-index: 2000;
+    /* Sets the popover width to 296 pixels. */
+    width: 296px;
+    /* Stops the popover from overflowing very narrow screens. */
+    max-width: calc(100vw - 16px);
+    /* Adds inner padding around the calendar inside the popover. */
+    padding: 0.75rem;
+    /* Gives the popover a dark slate background. */
+    background: #232b35;
+    /* Sets the light text colour used inside the popover. */
+    color: #e8edf2;
+    /* Adds a very faint white border around the popover. */
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    /* Rounds the popover corners with the large radius. */
+    border-radius: var(--radius-lg);
+    /* Adds a deep shadow so the popover floats above the page. */
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    /* Uses the site font inside the popover. */
+    font-family: var(--font);
+    /* Hides the popover until it is opened. */
+    display: none;
+/* Closes the popover rule. */
+}
+/* Shows the popover when it has the open class and animates it in. */
+.dp-popover.open { display: block; animation: dp-in 0.15s ease-out; }
+/* Keyframes that slide and fade the popover into view. */
+@keyframes dp-in {
+    /* Starts the popover slightly transparent and 4px higher. */
+    from { opacity: 0; transform: translateY(-4px); }
+    /* Ends with the popover fully visible at its normal position. */
+    to   { opacity: 1; transform: translateY(0); }
+/* Closes the popover entrance keyframes. */
+}
+
+/* Header row of the popover holding the month and year selectors. */
+.dp-head { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.6rem; }
+
+/* Styles the previous and next month arrow buttons. */
+.dp-nav {
+    /* Sets both arrow buttons to 32 by 32 pixels. */
+    width: 32px; height: 32px;
+    /* Stops the arrows from shrinking inside the flex row. */
+    flex-shrink: 0;
+    /* Removes the default button border from the arrows. */
+    border: 0;
+    /* Rounds the arrow buttons by 6 pixels. */
+    border-radius: 6px;
+    /* Gives the arrows a lighter slate background. */
+    background: #2e3844;
+    /* Makes the arrow glyphs gold. */
+    color: #FFB82B;
+    /* Shows a pointer cursor on the arrows. */
+    cursor: pointer;
+    /* Animates the background colour change on the arrows. */
+    transition: background var(--transition);
+/* Closes the arrow button rule. */
+}
+/* Lightens the arrow background when hovered. */
+.dp-nav:hover { background: #3a4654; }
+
+/* Styles the month and year dropdowns in the popover header. */
+.dp-head select {
+    /* Lets both dropdowns share the remaining width equally. */
+    flex: 1 1 0;
+    /* Allows the dropdowns to shrink instead of overflowing. */
+    min-width: 0;
+    /* Sets the dropdown height to 32 pixels. */
+    height: 32px;
+    /* Adds a little horizontal padding inside the dropdown. */
+    padding: 0 0.4rem;
+    /* Gives the dropdown a very dark blue-black background. */
+    background: #1a222c;
+    /* Makes the dropdown text white. */
+    color: #ffffff;
+    /* Adds a faint white border around the dropdown. */
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    /* Rounds the dropdown corners by 6 pixels. */
+    border-radius: 6px;
+    /* Uses the site font inside the dropdown. */
+    font-family: var(--font);
+    /* Sets the dropdown text size to 0.82rem. */
+    font-size: 0.82rem;
+    /* Makes the dropdown text semibold. */
+    font-weight: 600;
+    /* Shows a pointer cursor on the dropdown. */
+    cursor: pointer;
+/* Closes the dropdown rule. */
+}
+/* Removes the default outline on focus and uses a navy border instead. */
+.dp-head select:focus { outline: none; border-color: var(--adzu-navy); }
+/* Keeps the opened list of month options dark with white text. */
+.dp-head select option { background: #1a222c; color: #ffffff; }
+
+/* Weekday header row of the mini calendar (start of the selector list). */
+.dp-week,
+/* Both weekday and day grids use seven equal columns with a 2px gap. */
+.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+
+/* Styles each weekday label above the day grid. */
+.dp-week span {
+    /* Centres the weekday label text. */
+    text-align: center;
+    /* Adds small vertical padding to weekday labels. */
+    padding: 0.25rem 0;
+    /* Sets the weekday label size to 0.68rem. */
+    font-size: 0.68rem;
+    /* Makes weekday labels semibold. */
+    font-weight: 600;
+    /* Adds slight letter spacing to weekday labels. */
+    letter-spacing: 0.04em;
+    /* Shows weekday labels in uppercase. */
+    text-transform: uppercase;
+    /* Colours weekday labels a muted blue-gray. */
+    color: #8fa0b5;
+/* Closes the weekday label rule. */
+}
+
+/* Styles each clickable day button in the mini calendar. */
+.dp-day {
+    /* Keeps each day button perfectly square. */
+    aspect-ratio: 1 / 1;
+    /* Removes the default button border from days. */
+    border: 0;
+    /* Rounds each day button by 6 pixels. */
+    border-radius: 6px;
+    /* Starts day buttons with a transparent background. */
+    background: transparent;
+    /* Sets the day number colour to light gray. */
+    color: #e8edf2;
+    /* Uses the site font for day numbers. */
+    font-family: var(--font);
+    /* Sets the day number size to 0.82rem. */
+    font-size: 0.82rem;
+    /* Shows a pointer cursor over days. */
+    cursor: pointer;
+    /* Animates background and text colour on day buttons. */
+    transition: background var(--transition), color var(--transition);
+/* Closes the day button rule. */
+}
+/* Lightens the day background and whitens the number on hover. */
+.dp-day:hover { background: #2e3844; color: #ffffff; }
+/* Greys out days that belong to the previous or next month. */
+.dp-day.other { color: #64748b; }
+/* Draws a navy ring around today's date. */
+.dp-day.today { box-shadow: inset 0 0 0 1px var(--adzu-navy); }
+/* Styles the day the user picked (start of the selector list). */
+.dp-day.selected,
+/* Gives the selected day a gold background with dark bold text. */
+.dp-day.selected:hover { background: #FFB82B; color: #1a222c; font-weight: 700; }
+/* Adds a navy focus ring when a day is focused by keyboard. */
+.dp-day:focus-visible { outline: 2px solid var(--adzu-navy); outline-offset: 1px; }
+
+/* Footer row of the popover with shortcut buttons. */
+.dp-foot {
+    /* Lays the footer buttons out in a row. */
+    display: flex;
+    /* Pushes the footer buttons to opposite ends. */
+    justify-content: space-between;
+    /* Adds space above the footer. */
+    margin-top: 0.6rem;
+    /* Adds padding above the footer inside its top border. */
+    padding-top: 0.6rem;
+    /* Draws a faint divider line above the footer. */
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+/* Closes the footer rule. */
+}
+/* Styles the small text buttons in the popover footer. */
+.dp-foot button {
+    /* Removes the button background. */
+    background: none;
+    /* Removes the button border. */
+    border: 0;
+    /* Adds small padding inside footer buttons. */
+    padding: 0.25rem 0.5rem;
+    /* Rounds footer buttons by 6 pixels. */
+    border-radius: 6px;
+    /* Makes footer button text gold. */
+    color: #FFB82B;
+    /* Uses the site font for footer buttons. */
+    font-family: var(--font);
+    /* Sets footer button text size to 0.8rem. */
+    font-size: 0.8rem;
+    /* Makes footer button text semibold. */
+    font-weight: 600;
+    /* Shows a pointer cursor on footer buttons. */
+    cursor: pointer;
+/* Closes the footer button rule. */
+}
+/* Adds a slate background to footer buttons on hover. */
+.dp-foot button:hover { background: #2e3844; }
+

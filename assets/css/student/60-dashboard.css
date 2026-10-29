@@ -1,0 +1,450 @@
+/* Starts the section that styles the student milestone tracker. */
+/* ==========================================================================
+   Milestone Tracker (student dashboard)
+   One collapsible block per stage of the student's own track, each listing the
+   milestones of that stage with their live state.
+   ========================================================================== */
+/* Spreads the milestone card title and overview apart. */
+.milestone-card .card-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+/* Groups the progress bar and its text in a row. */
+.ms-overview { display: flex; align-items: center; gap: 0.85rem; }
+/* Starts the thin bar showing overall milestone progress. */
+.ms-overview-bar {
+    /* Sets the bar to 140px wide and 8px tall. */
+    width: 140px; height: 8px; border-radius: 99px;
+    /* Gives the bar a gray track and clips the fill. */
+    background: var(--gray-200); overflow: hidden; display: flex;
+/* Closes the .ms-overview-bar rule. */
+}
+/* Fills the progress bar with a gold gradient. */
+.ms-overview-fill { height: 100%; background: linear-gradient(90deg, var(--adzu-gold), #f2c14e); border-radius: 99px; transition: width .35s ease; }
+/* Styles the small percentage text beside the bar. */
+.ms-overview-text { font-size: 0.78rem; color: var(--gray-600); font-weight: 600; white-space: nowrap; }
+
+/* Starts the box for one stage in the milestone tracker. */
+.ms-stage { border: 1px solid var(--gray-200); border-radius: var(--radius-lg); margin-bottom: 0.85rem; overflow: hidden; background: var(--white); }
+/* Removes the bottom margin from the last stage box. */
+.ms-stage:last-child { margin-bottom: 0; }
+/* Highlights the stage the student is currently working on. */
+.ms-stage.is-current { border-color: rgba(6, 2, 151, 0.28); box-shadow: 0 1px 3px rgba(6, 2, 151, 0.06); }
+/* Tints completed stages green. */
+.ms-stage.is-done { background: rgba(22, 163, 74, 0.04); border-color: rgba(22, 163, 74, 0.25); }
+
+/* Starts the full-width header button of a stage. */
+.ms-stage-head {
+    /* Stretches the header and lines its items up in a row. */
+    width: 100%; display: flex; align-items: center; gap: 0.75rem;
+    /* Clears button styling and adds padding. */
+    background: none; border: none; padding: 0.95rem 1.1rem;
+    /* Uses the page font, left-aligned text, and pointer cursor. */
+    font: inherit; text-align: left; cursor: pointer; color: inherit;
+    /* Animates the header background change. */
+    transition: background .18s ease;
+/* Closes the .ms-stage-head rule. */
+}
+/* Gives the stage header a light gray hover background. */
+.ms-stage-head:hover { background: var(--gray-50); }
+/* Draws a gold focus ring for keyboard users. */
+.ms-stage-head:focus-visible { outline: 2px solid var(--adzu-gold); outline-offset: -2px; }
+/* Starts the round number badge on each stage. */
+.ms-stage-num {
+    /* Sets the badge to 30px and keeps it round. */
+    width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%;
+    /* Centers the stage number inside the badge. */
+    display: inline-flex; align-items: center; justify-content: center;
+    /* Sets the stage number size and weight. */
+    font-size: 0.82rem; font-weight: 700;
+    /* Gives the badge a gray background and gray text. */
+    background: var(--gray-100); color: var(--gray-500);
+/* Closes the .ms-stage-num rule. */
+}
+/* Turns the current stage badge navy with a soft ring. */
+.ms-stage.is-current .ms-stage-num { background: var(--adzu-navy); color: #fff; box-shadow: 0 0 0 3px rgba(6, 2, 151, 0.10); }
+/* Turns the completed stage badge green. */
+.ms-stage.is-done .ms-stage-num { background: var(--success); color: #fff; }
+/* Styles the stage title in bold navy and lets it grow. */
+.ms-stage-title { font-size: 0.92rem; font-weight: 700; color: var(--adzu-navy); flex: 1; }
+/* Styles the milestone count text beside the stage title. */
+.ms-stage-count { font-size: 0.72rem; color: var(--gray-500); white-space: nowrap; }
+/* Styles the small arrow that shows a stage is collapsible. */
+.ms-stage-caret { color: var(--gray-400); font-size: 0.72rem; transition: transform .2s ease; }
+/* Flips the stage arrow when the stage is open. */
+.ms-stage.is-open .ms-stage-caret { transform: rotate(180deg); }
+
+/* Styles the body of an open stage with a top divider. */
+.ms-stage-body { padding: 0.25rem 1.1rem 1.1rem; border-top: 1px solid var(--gray-100); }
+/* Hides the stage body unless the stage is open. */
+.ms-stage:not(.is-open) .ms-stage-body { display: none; }
+
+/* Styles one milestone row with a divider under it. */
+.ms-step { display: flex; gap: 0.85rem; align-items: flex-start; padding: 0.7rem 0; border-bottom: 1px solid var(--gray-100); }
+/* Removes the divider from the last milestone row. */
+.ms-step:last-child { border-bottom: none; }
+/* Holds the milestone icon and connector in a column. */
+.ms-step-col { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; margin-top: 1px; }
+/* Draws the vertical line joining milestone icons. */
+.ms-step-line { width: 2px; flex: 1; min-height: 16px; background: var(--gray-200); border-radius: 1px; margin-top: 4px; }
+/* Colors that line green for completed milestones. */
+.ms-step-line.done { background: var(--success); }
+/* Lets the milestone text fill the remaining width. */
+.ms-step-body { flex: 1; min-width: 0; }
+/* Styles the milestone label row in semibold gray. */
+.ms-step-label { display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; font-size: 0.86rem; font-weight: 600; color: var(--gray-700); }
+/* Greys out the label of pending milestones. */
+.ms-step.is-pending .ms-step-label { color: var(--gray-400); font-weight: 500; }
+/* Colors the active milestone label navy. */
+.ms-step.is-active .ms-step-label { color: var(--adzu-navy); }
+/* Colors a flagged milestone label dark amber. */
+.ms-step.is-flagged .ms-step-label { color: #b45309; }
+/* Colors a submitted milestone label navy. */
+.ms-step.is-submitted .ms-step-label { color: var(--adzu-navy); }
+/* Colors the submitted milestone detail blue. */
+.ms-step.is-submitted .ms-step-detail { color: var(--info); }
+/* Styles the small description under a milestone. */
+.ms-step-detail { font-size: 0.78rem; color: var(--gray-500); margin: 0.2rem 0 0; line-height: 1.45; }
+/* Greys out the detail of pending milestones. */
+.ms-step.is-pending .ms-step-detail { color: var(--gray-400); }
+/* Colors the detail of flagged milestones dark amber. */
+.ms-step.is-flagged .ms-step-detail { color: #b45309; }
+/* Keeps the milestone action button from shrinking. */
+.ms-step-action { flex-shrink: 0; align-self: center; }
+/* Starts the small status tag shown beside a milestone. */
+.ms-step-tag {
+    /* Sets the tag text tiny and uppercase with spaced letters. */
+    font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em;
+    /* Makes the tag bold and pill shaped. */
+    font-weight: 700; padding: 2px 7px; border-radius: 99px;
+/* Closes the .ms-step-tag rule. */
+}
+/* Gives the active tag a faint navy background. */
+.ms-step-tag.active { background: rgba(6, 2, 151, 0.08); color: var(--adzu-navy); }
+/* Gives the done tag a faint green background. */
+.ms-step-tag.done { background: rgba(22, 163, 74, 0.10); color: #15803d; }
+/* Gives the flagged tag a faint amber background. */
+.ms-step-tag.flagged { background: rgba(217, 119, 6, 0.12); color: #b45309; }
+/* Gives the submitted tag a faint blue background. */
+.ms-step-tag.submitted { background: rgba(37, 99, 235, 0.10); color: #1d4ed8; }
+
+/* Notes that this block styles the student's next workflow step. */
+/* The next step of a student, in the order of their workflow. */
+/* Starts the box that tells a student what to do next. */
+.tpl-next-step {
+    /* Lays the next-step box contents out in a row. */
+    display: flex;
+    /* Aligns the box contents to the top. */
+    align-items: flex-start;
+    /* Adds space between the icon and text. */
+    gap: 0.6rem;
+    /* Leaves space below the next-step box. */
+    margin-bottom: 0.9rem;
+    /* Adds padding inside the box. */
+    padding: 0.6rem 0.75rem;
+    /* Draws a light border around the box. */
+    border: 1px solid var(--gray-200);
+    /* Adds a thicker navy line on the left edge. */
+    border-left: 3px solid var(--adzu-navy);
+    /* Rounds the box corners. */
+    border-radius: var(--radius);
+    /* Gives the box a light gray background. */
+    background: var(--gray-50);
+/* Closes the .tpl-next-step rule. */
+}
+/* Colors the next-step icon navy and nudges it down. */
+.tpl-next-step > i { color: var(--adzu-navy); margin-top: 0.15rem; }
+/* Stacks the next-step title and note vertically. */
+.tpl-next-step > div { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+/* Styles the next-step title in navy. */
+.tpl-next-step strong { font-size: 0.85rem; color: var(--adzu-navy); }
+/* Styles the next-step note in gray. */
+.tpl-next-step span { font-size: 0.78rem; color: var(--gray-500); }
+/* Uses gold accents when the next action belongs to the coordinator. */
+.tpl-next-step.is-coord { border-left-color: var(--adzu-gold); background: #fffbeb; }
+/* Colors the coordinator next-step icon gold. */
+.tpl-next-step.is-coord > i { color: var(--adzu-gold); }
+/* Notes that a flagged milestone needs student action now. */
+/* A flagged milestone (revision requested, result requires revision) is an
+   action the student has to do now, not a quiet next step. */
+/* Uses amber accents when the next step needs urgent revision. */
+.tpl-next-step.is-alert { border-left-color: #b45309; background: #fff7ed; }
+/* Colors the alert next-step icon dark amber. */
+.tpl-next-step.is-alert > i { color: #b45309; }
+/* Colors the alert next-step title dark amber. */
+.tpl-next-step.is-alert strong { color: #b45309; }
+/* Centers a short message shown when a stage has no milestones. */
+.ms-empty { text-align: center; color: var(--gray-400); font-size: 0.82rem; padding: 1rem 0; }
+/* Styles the gray requirements box on the student page. */
+.req-docs-box { margin-top: 1.5rem; padding: 1rem; background: var(--gray-50); border-radius: var(--radius-lg); border: 1px solid var(--gray-200); }
+/* Styles the small uppercase requirements heading. */
+.req-docs-box h4 { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500); margin-bottom: 0.75rem; }
+/* Styles one required document row. */
+.req-doc-row { display: flex; align-items: center; gap: 0.6rem; font-size: 0.83rem; margin-bottom: 0.5rem; }
+/* Colors and sizes the required document icon. */
+.req-doc-row i { color: var(--adzu-navy); opacity: 0.6; width: 16px; }
+/* Lets the document name fill the row width. */
+.req-doc-row span { flex: 1; color: var(--gray-700); }
+/* Notes that this block styles the requirements checklist. */
+/* Requirements checklist on the coordinator's Process Application page */
+/* Styles the gray requirements checklist on the coordinator page. */
+.req-checklist { margin-top: 1.5rem; padding: 1rem; background: var(--gray-50); border-radius: var(--radius-lg); border: 1px solid var(--gray-200); }
+/* Styles the small uppercase checklist heading. */
+.req-checklist h4 { font-size: 0.82rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500); margin-bottom: 0.75rem; }
+/* Gives checklist table headers a white background. */
+.req-checklist .data-table th { background: var(--white); }
+/* Gives checklist table cells a white background and divider. */
+.req-checklist .data-table td { background: var(--white); border-bottom: 1px solid var(--gray-100); }
+/* Tints a checklist row on hover. */
+.req-checklist .data-table tbody tr:hover > td { background: var(--gray-50); }
+/* Styles the dashed box that shows receipt details. */
+.receipt-box { margin-top: 1rem; padding: 1rem; background: rgba(6, 2, 151, 0.04); border-radius: var(--radius-lg); border: 1px dashed rgba(6, 2, 151, 0.25); }
+/* Starts the section for the newer gradient dashboard stat cards. */
+/* ---------- Dashboard stat cards v2 (gradient, clickable) ---------- */
+/* Lays out five dashboard stat cards in one row. */
+.dashstat-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+/* Starts one clickable gradient dashboard stat card. */
+.dashstat {
+    /* Keeps the card relative and clips its contents. */
+    position: relative; overflow: hidden;
+    /* Spaces the card text and icon apart in a row. */
+    display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+    /* Adds padding, rounded corners, and white text. */
+    padding: 1.25rem 1.25rem; border-radius: 14px; color: #fff; text-decoration: none;
+    /* Adds a soft navy shadow under the card. */
+    box-shadow: 0 6px 16px rgba(6, 2, 151, 0.14);
+    /* Animates the lift and shadow on hover. */
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+/* Closes the .dashstat rule. */
+}
+/* Lifts the card and deepens its shadow on hover. */
+.dashstat:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(6, 2, 151, 0.22); color: #fff; }
+/* Gives the rose card a red gradient background. */
+.dashstat-rose { background: linear-gradient(135deg, #f43f5e 0%, #be123c 100%); }
+/* Gives the amber card an orange gradient background. */
+.dashstat-amber { background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%); }
+/* Gives the blue card a blue to navy gradient. */
+.dashstat-blue { background: linear-gradient(135deg, #2563eb 0%, #060297 100%); }
+/* Gives the emerald card a green gradient background. */
+.dashstat-emerald { background: linear-gradient(135deg, #10b981 0%, #047857 100%); }
+/* Styles the big number on a dashboard stat card. */
+.dashstat-value { font-size: 2rem; font-weight: 800; line-height: 1; font-family: var(--font-heading); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
+/* Styles the label under the big number. */
+.dashstat-label { font-size: 0.82rem; font-weight: 700; opacity: 1; margin-top: 0.3rem; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+/* Styles the small link text at the bottom of a card. */
+.dashstat-link { font-size: 0.72rem; font-weight: 600; opacity: 0.95; margin-top: 0.5rem; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+/* Sizes the small arrow in the card link. */
+.dashstat-link i { font-size: 0.65rem; margin-left: 2px; }
+/* Starts the square icon box on the right of a stat card. */
+.dashstat-icon {
+    /* Centers the icon inside its box. */
+    display: flex; align-items: center; justify-content: center;
+    /* Sets the icon box to 56 by 56 pixels. */
+    width: 56px; height: 56px; flex-shrink: 0;
+    /* Gives the icon box a translucent white background. */
+    background: rgba(255, 255, 255, 0.22); border-radius: 16px;
+    /* Sizes the icon glyph. */
+    font-size: 1.5rem;
+/* Closes the .dashstat-icon rule. */
+}
+/* Shows three stat cards per row below 1300px. */
+@media (max-width: 1300px) { .dashstat-grid { grid-template-columns: repeat(3, 1fr); } }
+/* Shows two stat cards per row below 900px. */
+@media (max-width: 900px) { .dashstat-grid { grid-template-columns: repeat(2, 1fr); } }
+/* Shows one stat card per row below 560px. */
+@media (max-width: 560px) { .dashstat-grid { grid-template-columns: 1fr; } }
+/* Gives the purple card a violet gradient background. */
+.dashstat-purple { background: linear-gradient(135deg, #8b5cf6 0%, #5b21b6 100%); }
+/* Sets a four-column layout for compact stat grids. */
+.dashstat-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+/* Styles a longer text value on a stat card. */
+.dashstat-textvalue { font-size: 1rem; font-weight: 700; line-height: 1.35; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
+/* Gives status badges inside stat cards a white background. */
+.dashstat .status-badge { background: #ffffff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2); }
+/* Shows four-column stat grids in two columns below 1100px. */
+@media (max-width: 1100px) { .dashstat-grid.cols-4 { grid-template-columns: repeat(2, 1fr); } }
+/* Shows four-column stat grids in one column below 560px. */
+@media (max-width: 560px) { .dashstat-grid.cols-4 { grid-template-columns: 1fr; } }
+/* Sets a three-column layout for stat grids. */
+.dashstat-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+/* Stacks three-column stat grids on screens below 900px. */
+@media (max-width: 900px) { .dashstat-grid.cols-3 { grid-template-columns: 1fr; } }
+/* Starts the Ateneo navy and gold dashboard theme. */
+/* ---------- v3 Ateneo theme: navy + gold (toggle via .theme-ateneo) ---------- */
+/* Switches stat cards to the dark navy Ateneo theme. */
+.dashstat-grid.theme-ateneo .dashstat {
+    /* Uses a dark navy gradient for themed stat cards. */
+    background: linear-gradient(135deg, #2e3844 0%, #232b35 55%, #141a21 100%);
+    /* Adds a faint light line along the top edge. */
+    border-top: 2px solid rgba(255,255,255,0.12);
+/* Closes the themed stat card rule. */
+}
+/* Styles the icon box in the Ateneo theme. */
+.dashstat-grid.theme-ateneo .dashstat-icon {
+    /* Gives the icon a gold gradient background. */
+    background: linear-gradient(135deg, #FFB82B 0%, #e5a526 100%);
+    /* Colors the themed icon dark navy. */
+    color: #232b35;
+/* Closes the themed icon rule. */
+}
+/* Deepens the hover shadow for themed stat cards. */
+.dashstat-grid.theme-ateneo .dashstat:hover { box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35); }
+/* Styles the extra description line on a stat card. */
+.dashstat-desc { font-size: 0.82rem; font-weight: 400; line-height: 1.5; opacity: 0.92; margin-top: 0.3rem; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+
+/* Starts the white summary panel on the dashboard. */
+.quick-summary {
+    /* Leaves space below the summary panel. */
+    margin-bottom: 1.5rem;
+    /* Clips the panel contents to its rounded corners. */
+    overflow: hidden;
+    /* Rounds the summary panel corners. */
+    border-radius: var(--radius-lg);
+    /* Gives the summary panel a white background. */
+    background: var(--white);
+    /* Adds the shared soft shadow to the panel. */
+    box-shadow: var(--shadow);
+/* Closes the .quick-summary rule. */
+}
+/* Starts the header row of the quick summary panel. */
+.quick-summary-header {
+    /* Lays the header title and note out in a row. */
+    display: flex;
+    /* Vertically centers the header contents. */
+    align-items: center;
+    /* Pushes the title and note to opposite ends. */
+    justify-content: space-between;
+    /* Adds space between the title and note. */
+    gap: 1rem;
+    /* Adds padding inside the summary header. */
+    padding: 1rem 1.25rem;
+/* Closes the .quick-summary-header rule. */
+}
+/* Styles the summary panel title. */
+.quick-summary-header h3 {
+    /* Uses the heading font for the title. */
+    font-family: var(--font-heading);
+    /* Sets the title size. */
+    font-size: 1rem;
+    /* Makes the title semibold. */
+    font-weight: 600;
+    /* Colors the title navy. */
+    color: var(--adzu-navy);
+/* Closes the title rule. */
+}
+/* Styles the small note beside the summary title. */
+.quick-summary-header span {
+    /* Sets the note text small. */
+    font-size: 0.78rem;
+    /* Colors the note gray. */
+    color: var(--gray-500);
+/* Closes the note rule. */
+}
+/* Starts the gray body area of the quick summary. */
+.quick-summary-body {
+    /* Adds padding inside the summary body. */
+    padding: 1.25rem;
+    /* Gives the summary body a light gray background. */
+    background: var(--gray-50);
+/* Closes the .quick-summary-body rule. */
+}
+/* Starts the responsive grid of summary statistics. */
+.quick-summary-grid {
+    /* Uses grid layout for the summary statistics. */
+    display: grid;
+    /* Fits as many 220px columns as the width allows. */
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    /* Adds a gap between summary statistics. */
+    gap: 1rem;
+/* Closes the .quick-summary-grid rule. */
+}
+/* Starts one clickable summary statistic card. */
+.quick-summary-stat {
+    /* Lays the icon and text out in a row. */
+    display: flex;
+    /* Vertically centers the icon and text. */
+    align-items: center;
+    /* Adds space between the icon and text. */
+    gap: 1rem;
+    /* Adds padding inside the statistic card. */
+    padding: 1.1rem 1.25rem;
+    /* Rounds the statistic card corners. */
+    border-radius: var(--radius);
+    /* Gives the statistic card a white background. */
+    background: var(--white);
+    /* Adds a soft navy shadow to the statistic card. */
+    box-shadow: 0 1px 4px rgba(6, 2, 151, 0.1);
+    /* Removes link underlines from the statistic card. */
+    text-decoration: none;
+/* Closes the .quick-summary-stat rule. */
+}
+/* Targets the statistic card on hover, */
+.quick-summary-stat:hover,
+/* and on keyboard focus, opening a shared style block. */
+.quick-summary-stat:focus-visible {
+    /* Keeps the text color unchanged when focused. */
+    color: inherit;
+    /* Deepens the shadow when hovered or focused. */
+    box-shadow: 0 4px 12px rgba(6, 2, 151, 0.16);
+/* Closes the hover and focus rule. */
+}
+/* Starts the square icon box in a summary statistic. */
+.quick-summary-icon {
+    /* Sets the icon box width to 44 pixels. */
+    width: 44px;
+    /* Sets the icon box height to 44 pixels. */
+    height: 44px;
+    /* Keeps the icon box from shrinking. */
+    flex-shrink: 0;
+    /* Centers the icon inside the box. */
+    display: flex;
+    /* Centers the icon vertically. */
+    align-items: center;
+    /* Centers the icon horizontally. */
+    justify-content: center;
+    /* Rounds the icon box corners. */
+    border-radius: var(--radius);
+    /* Gives the icon box a navy background. */
+    background: var(--adzu-navy);
+    /* Colors the icon white. */
+    color: #ffffff;
+    /* Sizes the icon glyph. */
+    font-size: 1.05rem;
+/* Closes the .quick-summary-icon rule. */
+}
+/* Targets the text column beside the summary icon. */
+.quick-summary-stat > span:last-child {
+    /* Stacks the value and label vertically. */
+    display: flex;
+    /* Keeps the value above the label. */
+    flex-direction: column;
+/* Closes the text column rule. */
+}
+/* Styles the big number in a summary statistic. */
+.quick-summary-value {
+    /* Uses the heading font for the number. */
+    font-family: var(--font-heading);
+    /* Sets the number size. */
+    font-size: 1.75rem;
+    /* Makes the number bold. */
+    font-weight: 700;
+    /* Tightens the number line height. */
+    line-height: 1.1;
+    /* Colors the number navy. */
+    color: var(--adzu-navy);
+/* Closes the .quick-summary-value rule. */
+}
+/* Styles the uppercase label under the summary number. */
+.quick-summary-label {
+    /* Adds a small gap above the label. */
+    margin-top: 0.2rem;
+    /* Sets the label text small. */
+    font-size: 0.78rem;
+    /* Makes the label semibold. */
+    font-weight: 600;
+    /* Adds slight spacing between label letters. */
+    letter-spacing: 0.04em;
+    /* Uppercases the label text. */
+    text-transform: uppercase;
+    /* Colors the label gray. */
+    color: var(--gray-500);
+/* Closes the .quick-summary-label rule. */
+}
+

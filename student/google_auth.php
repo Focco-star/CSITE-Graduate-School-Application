@@ -10,11 +10,11 @@
  */
 
 // Loads the shared configuration, helpers and session settings.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the database class used to check whether the user already exists.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 // Loads the Google helper functions that check tokens and store profiles.
-require_once __DIR__ . '/../includes/google.php';
+require_once __DIR__ . '/../includes/integrations/google.php';
 
 // Tells the browser that the reply is JSON text in UTF-8.
 header('Content-Type: application/json; charset=utf-8');

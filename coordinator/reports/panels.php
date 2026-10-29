@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block that builds the panel participation report. */ ?>
 <?php
 // Loads shared settings and helper functions such as url().
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database connection and report helper functions.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Sets the browser page title to Panel Participation Reports.
 $pageTitle   = 'Panel Participation Reports';
@@ -18,7 +18,7 @@ $userName    = $mockCoordinator['name'];
 $panelReport = databasePanelParticipation();
 
 // Includes the shared header with menu and styles.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP and switches to HTML output.
 ?>
 
@@ -125,4 +125,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </div>
 
 <?php /* Includes the shared footer that closes the page layout. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

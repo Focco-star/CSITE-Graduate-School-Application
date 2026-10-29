@@ -1,11 +1,11 @@
 <?php /* Opens the PHP block that builds the reports dashboard page. */ ?>
 <?php
 // Loads shared settings and helper functions.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the database connection code used by the page.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 // Loads the helper that draws the program population chart.
-require_once __DIR__ . '/../../includes/program_chart.php';
+require_once __DIR__ . '/../../includes/components/program_chart.php';
 
 // Sets the browser page title to Reports.
 $pageTitle   = 'Reports';
@@ -28,7 +28,7 @@ $ongoing  = count(array_filter($students, static function ($s) {
 $completed = count($students) - $ongoing;
 
 // Includes the shared header with menu and styles.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP and switches to HTML output.
 ?>
 
@@ -122,4 +122,4 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php renderProgramPopulationChart($pdo ?? null); ?>
 
 <?php /* Includes the shared footer that closes the page layout. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

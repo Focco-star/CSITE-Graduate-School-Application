@@ -1,0 +1,813 @@
+/* Opens the comment header for the Applications table section. */
+/* ==========================================================================
+   Coordinator > Applications
+   A four-column reading order — student, milestone progress, application,
+   actions — so nothing important lives off the right edge. The same rows
+   turn into stacked cards on smaller screens; the filter script still owns
+   the row visibility, so the responsive rules never override it.
+   ========================================================================== */
+/* Styles the coordinator applications table. */
+#appsTable {
+    /* Uses fixed column widths so the four columns stay predictable. */
+    table-layout: fixed;
+    /* Makes the table fill the available content width. */
+    width: 100%;
+/* Closes the #appsTable rule. */
+}
+
+/* Gives the student column 19 percent of the table width. */
+#appsTable col.app-col-student { width: 19%; }
+/* Gives the milestone column 24 percent of the table width. */
+#appsTable col.app-col-milestones { width: 24%; }
+/* Gives the application details column 38 percent of the width. */
+#appsTable col.app-col-application { width: 38%; }
+/* Gives the actions column 19 percent of the table width. */
+#appsTable col.app-col-actions { width: 19%; }
+
+/* Sets shared behaviour for every cell in the table body. */
+#appsTable tbody td {
+    /* Aligns all cell contents to the top of the row. */
+    vertical-align: top;
+    /* Breaks very long text so cells never overflow. */
+    overflow-wrap: anywhere;
+/* Closes the table cell rule. */
+}
+
+/* Starts the rule for the student and actions cells. */
+#appsTable tbody td.app-cell-student,
+/* Vertically centres the student and actions cells only. */
+#appsTable tbody td.app-cell-actions { vertical-align: middle; }
+
+/* Section label comment for the student column styles. */
+/* Student ---------------------------------------------------------------- */
+/* Styles the student cell holding the avatar and name. */
+#appsTable .student-cell {
+    /* Aligns the avatar and student text to the top. */
+    align-items: flex-start;
+    /* Lets the student cell shrink inside its table column. */
+    min-width: 0;
+/* Closes the student cell rule. */
+}
+
+/* Stacks the student name and email in one column. */
+#appsTable .student-cell-main {
+    /* Uses a flex layout for the name and email. */
+    display: flex;
+    /* Stacks the name above the email address. */
+    flex-direction: column;
+    /* Keeps only one pixel between the name and email. */
+    gap: 1px;
+    /* Allows the name text to shrink inside the cell. */
+    min-width: 0;
+/* Closes the student text rule. */
+}
+
+/* Styles the clickable student name link. */
+#appsTable .student-name-link {
+    /* Keeps the link sized to its own text. */
+    display: inline-block;
+    /* Sets a comfortable line height for the name. */
+    line-height: 1.3;
+/* Closes the student name link rule. */
+}
+
+/* Styles the small email line under the student name. */
+#appsTable .student-cell-mail {
+    /* Sets the email text size. */
+    font-size: 0.72rem;
+    /* Shows the email in medium grey. */
+    color: var(--gray-500);
+    /* Breaks long email addresses so they never overflow. */
+    overflow-wrap: anywhere;
+/* Closes the student email rule. */
+}
+
+/* Section label comment for the milestone progress column. */
+/* Milestone progress ----------------------------------------------------- */
+/* Stacks the milestone progress summary inside its cell. */
+#appsTable .app-ms {
+    /* Uses a flex layout for the milestone block. */
+    display: flex;
+    /* Stacks the progress rows vertically. */
+    flex-direction: column;
+    /* Adds small space between the progress rows. */
+    gap: 0.3rem;
+    /* Lets the milestone block shrink inside the column. */
+    min-width: 0;
+/* Closes the milestone block rule. */
+}
+
+/* Puts the progress text and percentage on one row. */
+#appsTable .app-ms-top {
+    /* Uses a flexible row for the text and percentage. */
+    display: flex;
+    /* Aligns the text and percentage on their baselines. */
+    align-items: baseline;
+    /* Pushes the percentage to the right end. */
+    justify-content: space-between;
+    /* Adds space between the text and percentage. */
+    gap: 0.5rem;
+/* Closes the milestone top row rule. */
+}
+
+/* Lets the milestone summary text wrap normally. */
+#appsTable .app-ms .ms-overview-text {
+    /* Allows the summary text to wrap onto several lines. */
+    white-space: normal;
+    /* Sets the summary text size. */
+    font-size: 0.78rem;
+    /* Sets the summary text line height. */
+    line-height: 1.35;
+/* Closes the summary text rule. */
+}
+
+/* Styles the milestone percentage label. */
+#appsTable .app-ms-pct {
+    /* Keeps the percentage from shrinking. */
+    flex-shrink: 0;
+    /* Sets the percentage text size. */
+    font-size: 0.72rem;
+    /* Makes the percentage bold. */
+    font-weight: 700;
+    /* Shows the percentage in medium grey. */
+    color: var(--gray-500);
+    /* Aligns percentage digits so numbers do not jump. */
+    font-variant-numeric: tabular-nums;
+/* Closes the milestone percentage rule. */
+}
+
+/* Sizes the small progress bar in the milestone cell. */
+#appsTable .app-ms .ms-overview-bar {
+    /* Makes the progress bar fill the cell width. */
+    width: 100%;
+    /* Sets the progress bar height to seven pixels. */
+    height: 7px;
+/* Closes the progress bar rule. */
+}
+
+/* Styles the small stage label under the progress bar. */
+#appsTable .app-ms-stage {
+    /* Keeps the stage icon and text on one line. */
+    display: inline-flex;
+    /* Centres the stage icon and text vertically. */
+    align-items: center;
+    /* Spaces the stage icon from its text. */
+    gap: 0.3rem;
+    /* Sets the stage label size. */
+    font-size: 0.71rem;
+    /* Sets the stage label line height. */
+    line-height: 1.3;
+    /* Shows the stage label in medium grey. */
+    color: var(--gray-500);
+/* Closes the stage label rule. */
+}
+
+/* Styles the icon inside the stage label. */
+#appsTable .app-ms-stage i {
+    /* Sizes the stage icon. */
+    font-size: 0.62rem;
+    /* Shows the stage icon in light grey. */
+    color: var(--gray-400);
+/* Closes the stage icon rule. */
+}
+
+/* Styles the green state label for an active milestone. */
+#appsTable .app-ms-state {
+    /* Keeps the state icon and text on one line. */
+    display: inline-flex;
+    /* Centres the state icon and text vertically. */
+    align-items: center;
+    /* Spaces the state icon from its text. */
+    gap: 0.32rem;
+    /* Sets the state label size. */
+    font-size: 0.71rem;
+    /* Makes the state label bold. */
+    font-weight: 700;
+    /* Sets the state label line height. */
+    line-height: 1.3;
+    /* Shows the state label in the success green. */
+    color: var(--success);
+/* Closes the milestone state rule. */
+}
+
+/* Sizes the icon inside the milestone state label. */
+#appsTable .app-ms-state i { font-size: 0.7rem; }
+
+/* Styles the progress bar fill when all milestones are done. */
+#appsTable .app-ms.is-complete .ms-overview-fill {
+    /* Fills the completed bar with a green gradient. */
+    background: linear-gradient(90deg, #15803d, #22c55e);
+/* Closes the completed bar rule. */
+}
+
+/* Colours the percentage green when milestones are complete. */
+#appsTable .app-ms.is-complete .app-ms-pct { color: var(--success); }
+
+/* Styles the note shown when no milestones exist yet. */
+#appsTable .app-ms.is-empty .ms-overview-text {
+    /* Uses a medium weight for the empty note. */
+    font-weight: 500;
+    /* Shows the empty note in italics. */
+    font-style: italic;
+    /* Shows the empty note in light grey. */
+    color: var(--gray-400);
+/* Closes the empty milestone rule. */
+}
+
+/* Section label comment for the application details column. */
+/* Application ------------------------------------------------------------ */
+/* Stacks the application title and metadata in one column. */
+#appsTable .app-details {
+    /* Uses a flex layout for the application details. */
+    display: flex;
+    /* Stacks the title and metadata vertically. */
+    flex-direction: column;
+    /* Adds space between the title and metadata. */
+    gap: 0.4rem;
+    /* Lets the details block shrink inside the column. */
+    min-width: 0;
+/* Closes the application details rule. */
+}
+
+/* Puts the application title and badges on one row. */
+#appsTable .app-details-top {
+    /* Uses a flexible row for the title and badges. */
+    display: flex;
+    /* Centres the title and badges vertically. */
+    align-items: center;
+    /* Lets badges wrap onto another line when needed. */
+    flex-wrap: wrap;
+    /* Adds small space between the title and badges. */
+    gap: 0.35rem;
+/* Closes the application top row rule. */
+}
+
+/* Styles the application title text. */
+#appsTable .app-details-title {
+    /* Removes the default paragraph margin. */
+    margin: 0;
+    /* Sets the application title size. */
+    font-size: 0.85rem;
+    /* Makes the application title semibold. */
+    font-weight: 600;
+    /* Sets the application title line height. */
+    line-height: 1.35;
+    /* Shows the title in dark grey. */
+    color: var(--gray-800);
+    /* Breaks very long titles so they never overflow. */
+    overflow-wrap: anywhere;
+/* Closes the application title rule. */
+}
+
+/* Uses a lighter weight for the placeholder title when no application exists. */
+#appsTable .app-details-empty .app-details-title { font-weight: 500; }
+
+/* Sets up the two-column metadata list under the title. */
+#appsTable .app-details-meta {
+    /* Turns the metadata block into a grid container. */
+    display: grid;
+    /* Shows the application metadata in two equal columns. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Sets tight row gaps and wider column gaps for the metadata. */
+    gap: 0.22rem 0.9rem;
+/* Closes the metadata grid rule. */
+}
+
+/* Styles one label and value pair in the metadata list. */
+#appsTable .app-meta-item {
+    /* Keeps the icon, label, and value on one line. */
+    display: flex;
+    /* Aligns the icon, label, and value on their baselines. */
+    align-items: baseline;
+    /* Spaces the icon, label, and value apart slightly. */
+    gap: 0.32rem;
+    /* Allows the metadata row to shrink inside its column. */
+    min-width: 0;
+    /* Sets the metadata text size. */
+    font-size: 0.75rem;
+    /* Sets the metadata line height. */
+    line-height: 1.35;
+    /* Shows the metadata text in medium grey. */
+    color: var(--gray-500);
+/* Closes the metadata item rule. */
+}
+
+/* Styles the small icon at the start of each metadata pair. */
+#appsTable .app-meta-item > i {
+    /* Gives the metadata icon a fixed 13 pixel width. */
+    width: 13px;
+    /* Stops the metadata icon from shrinking. */
+    flex-shrink: 0;
+    /* Centres the metadata icon in its width. */
+    text-align: center;
+    /* Sizes the metadata icon glyph. */
+    font-size: 0.68rem;
+    /* Shows the metadata icon in light grey. */
+    color: var(--gray-400);
+/* Closes the metadata icon rule. */
+}
+
+/* Keeps the metadata label from shrinking or wrapping. */
+#appsTable .app-meta-label { flex-shrink: 0; }
+
+/* Styles the value text beside each metadata label. */
+#appsTable .app-meta-value {
+    /* Allows the value to shrink inside its grid cell. */
+    min-width: 0;
+    /* Hides text that spills out of the value cell. */
+    overflow: hidden;
+    /* Gives the value a medium font weight. */
+    font-weight: 500;
+    /* Shows the value in dark grey. */
+    color: var(--gray-700);
+    /* Adds an ellipsis when the value is too long. */
+    text-overflow: ellipsis;
+    /* Keeps the value on one line. */
+    white-space: nowrap;
+/* Closes the metadata value rule. */
+}
+
+/* Section label comment for the actions column styles. */
+/* Actions ---------------------------------------------------------------- */
+/* Stacks the action buttons inside the actions cell. */
+#appsTable .app-actions {
+    /* Uses a flex layout for the action buttons. */
+    display: flex;
+    /* Stacks the action controls vertically. */
+    flex-direction: column;
+    /* Aligns the action controls to the left. */
+    align-items: flex-start;
+    /* Adds space between the action controls. */
+    gap: 0.5rem;
+/* Closes the actions area rule. */
+}
+
+/* Styles the small gold Edit button in the table. */
+#appsTable .app-edit-btn {
+    /* Lets the button size itself to its label. */
+    width: auto;
+    /* Keeps the Edit button at least 5.5 rem wide. */
+    min-width: 5.5rem;
+    /* Keeps the Edit button at least 30 pixels tall. */
+    min-height: 30px;
+    /* Sets the Edit button inner padding. */
+    padding: 0.25rem 0.9rem;
+    /* Rounds the Edit button corners. */
+    border-radius: 8px;
+    /* Sets the Edit button text size. */
+    font-size: 0.78rem;
+    /* Adds a soft navy shadow under the Edit button. */
+    box-shadow: 0 1px 4px rgba(6, 2, 151, 0.14);
+/* Closes the Edit button rule. */
+}
+
+/* Sizes the pencil icon inside the Edit button. */
+#appsTable .app-edit-btn i { font-size: 0.75rem; }
+
+/* Starts the Edit button hover style. */
+#appsTable .app-edit-btn:hover {
+    /* Deepens the Edit button shadow on hover. */
+    box-shadow: 0 3px 9px rgba(6, 2, 151, 0.2);
+    /* Lifts the Edit button one pixel on hover. */
+    transform: translateY(-1px);
+/* Closes the Edit button hover rule. */
+}
+
+/* Styles the View Student button in the actions column. */
+#appsTable .app-view-student-btn {
+    /* Lets the View button size itself to its label. */
+    width: auto;
+    /* Keeps the View button at least 8 rem wide. */
+    min-width: 8rem;
+    /* Keeps the View button at least 30 pixels tall. */
+    min-height: 30px;
+    /* Sets the View button inner padding. */
+    padding: 0.25rem 0.9rem;
+    /* Sets the View button text size. */
+    font-size: 0.78rem;
+/* Closes the View Student button rule. */
+}
+
+/* Styles the archive toggle row under the action buttons. */
+#appsTable .app-archive-control {
+    /* Puts the archive label and switch on one row. */
+    display: flex;
+    /* Centres the archive label and switch vertically. */
+    align-items: center;
+    /* Aligns the archive controls to the left. */
+    justify-content: flex-start;
+    /* Spaces the archive label from the switch. */
+    gap: 0.55rem;
+    /* Adds a little space above the archive row. */
+    padding: 0.35rem 0 0;
+    /* Draws a thin divider above the archive row. */
+    border-top: 1px solid var(--gray-100);
+/* Closes the archive row rule. */
+}
+
+/* Styles the small Archive caption text. */
+#appsTable .app-archive-text {
+    /* Sets the archive caption size. */
+    font-size: 0.72rem;
+    /* Makes the archive caption semibold. */
+    font-weight: 600;
+    /* Shows the archive caption in medium grey. */
+    color: var(--gray-500);
+/* Closes the archive caption rule. */
+}
+
+/* Resets the archive toggle button to a plain wrapper. */
+#appsTable .app-switch {
+    /* Keeps the toggle track inline. */
+    display: inline-flex;
+    /* Centres the toggle track vertically. */
+    align-items: center;
+    /* Centres the toggle track horizontally. */
+    justify-content: center;
+    /* Removes the browser default button margin. */
+    margin: 0;
+    /* Adds two pixels of padding around the track. */
+    padding: 2px;
+    /* Removes the browser default button border. */
+    border: none;
+    /* Rounds the toggle button fully. */
+    border-radius: 99px;
+    /* Removes the button background so only the track shows. */
+    background: none;
+    /* Shows a pointer cursor over the toggle. */
+    cursor: pointer;
+/* Closes the archive toggle button rule. */
+}
+
+/* Styles the grey track of the archive switch. */
+#appsTable .app-switch-track {
+    /* Lets the white thumb be positioned inside the track. */
+    position: relative;
+    /* Makes the track behave as a block element. */
+    display: block;
+    /* Sets the track width to 40 pixels. */
+    width: 40px;
+    /* Sets the track height to 22 pixels. */
+    height: 22px;
+    /* Rounds the track into a pill shape. */
+    border-radius: 99px;
+    /* Fills the off-state track with light grey. */
+    background: var(--gray-300);
+    /* Fades the track colour when the state changes. */
+    transition: background 0.2s ease;
+/* Closes the switch track rule. */
+}
+
+/* Styles the round white thumb of the archive switch. */
+#appsTable .app-switch-thumb {
+    /* Lets the thumb be placed over the track. */
+    position: absolute;
+    /* Offsets the thumb three pixels from the top. */
+    top: 3px;
+    /* Offsets the thumb three pixels from the left. */
+    left: 3px;
+    /* Sets the thumb width to 16 pixels. */
+    width: 16px;
+    /* Sets the thumb height to 16 pixels. */
+    height: 16px;
+    /* Makes the thumb a circle. */
+    border-radius: 50%;
+    /* Fills the thumb with white. */
+    background: var(--white);
+    /* Adds a small shadow under the thumb. */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    /* Slides the thumb when the switch is toggled. */
+    transition: transform 0.2s ease;
+/* Closes the switch thumb rule. */
+}
+
+/* Darkens the track while the switch is hovered. */
+#appsTable .app-switch:hover .app-switch-track { background: var(--gray-400); }
+
+/* Turns the track red when archiving is switched on. */
+#appsTable .app-switch[aria-checked="true"] .app-switch-track { background: var(--danger); }
+
+/* Slides the thumb to the right when the switch is on. */
+#appsTable .app-switch[aria-checked="true"] .app-switch-thumb { transform: translateX(18px); }
+
+/* Starts the keyboard focus style for the archive switch. */
+#appsTable .app-switch:focus-visible {
+    /* Draws a navy focus outline around the switch. */
+    outline: 2px solid var(--adzu-navy);
+    /* Leaves three pixels between the outline and the switch. */
+    outline-offset: 3px;
+/* Closes the switch focus rule. */
+}
+
+/* Styles the cell shown when the table has no applications. */
+#appsTable .app-empty-cell {
+    /* Adds generous padding around the empty message. */
+    padding: 2rem;
+    /* Centres the empty message text. */
+    text-align: center;
+    /* Shows the empty message in light grey. */
+    color: var(--gray-400);
+/* Closes the empty cell rule. */
+}
+
+/* Section label comment for the stacked card layout. */
+/* Stacked cards ---------------------------------------------------------- */
+/* Starts the tablet media query for the applications table. */
+@media (max-width: 1100px) {
+    /* Stops the table wrapper from scrolling sideways on tablets. */
+    .apps-table-wrap { overflow-x: visible; }
+
+    /* Turns the table into stacked blocks with automatic widths. */
+    #appsTable { display: block; table-layout: auto; }
+    /* Hides the fixed column widths used on desktop. */
+    #appsTable colgroup { display: none; }
+    /* Hides the table header row on tablets. */
+    #appsTable thead { display: none; }
+    /* Makes the table body a plain block container. */
+    #appsTable tbody { display: block; }
+
+    /* Turns each table row into its own card. */
+    #appsTable tbody tr {
+        /* Treats each row as a block instead of a table row. */
+        display: block;
+        /* Makes each row card full width. */
+        width: 100%;
+        /* Adds space below each row card. */
+        margin: 0 0 0.9rem;
+        /* Gives every row card a white background. */
+        background: var(--white);
+        /* Adds a light grey border around each card. */
+        border: 1px solid var(--gray-200);
+        /* Rounds the row card corners. */
+        border-radius: var(--radius-lg);
+        /* Adds a soft shadow under each row card. */
+        box-shadow: 0 1px 2px rgba(6, 2, 151, 0.04), 0 8px 20px rgba(6, 2, 151, 0.05);
+        /* Clips card contents to the rounded corners. */
+        overflow: hidden;
+    /* Closes the row card rule. */
+    }
+
+    /* Removes the gap under the last row card. */
+    #appsTable tbody tr:last-child { margin-bottom: 0; }
+    /* Keeps striped rows white so cards look uniform. */
+    #appsTable tbody tr:nth-child(even) { background: var(--white); }
+    /* Keeps the card background white on row hover. */
+    #appsTable tbody tr:hover { background: var(--white); }
+
+    /* Keeps rows hidden by the filter script out of view. */
+    #appsTable tbody tr[hidden] { display: none; }
+
+    /* Hides the expandable child row by default. */
+    #appsTable tbody tr.app-child-row { display: none; }
+    /* Shows the child row when the script adds is-shown. */
+    #appsTable tbody tr.app-child-row.is-shown { display: block; }
+    /* Keeps a shown child row hidden if its hidden attribute is set. */
+    #appsTable tbody tr.app-child-row.is-shown[hidden] { display: none; }
+
+    /* Styles the expandable child row as an inset panel. */
+    #appsTable tbody tr.app-child-row {
+        /* Pulls the child card up slightly under its parent card. */
+        margin-top: -0.45rem;
+        /* Gives the child card a light grey background. */
+        background: var(--gray-50);
+        /* Adds a gold bar on the left edge of the child card. */
+        border-left: 3px solid var(--adzu-gold);
+    /* Closes the child row rule. */
+    }
+
+    /* Keeps the child card grey while it is hovered. */
+    #appsTable tbody tr.app-child-row:hover { background: var(--gray-50); }
+
+    /* Turns each cell into a label and value grid row. */
+    #appsTable tbody td {
+        /* Makes the cell a grid with a label column and value column. */
+        display: grid;
+        /* Gives the label column 6.4 rem and the value the rest. */
+        grid-template-columns: 6.4rem minmax(0, 1fr);
+        /* Aligns the label and value to the top of the cell. */
+        align-items: start;
+        /* Spaces the label column from the value column. */
+        gap: 0.55rem;
+        /* Sets the cell inner padding. */
+        padding: 0.55rem 0.95rem;
+        /* Draws a divider under each cell. */
+        border-bottom: 1px solid var(--gray-100);
+        /* Aligns cell contents to the top. */
+        vertical-align: top;
+    /* Closes the stacked cell rule. */
+    }
+
+    /* Styles the cells inside the expandable child row. */
+    #appsTable tbody tr.app-child-row > td {
+        /* Lets the child row cells show the card background. */
+        background: transparent;
+        /* Reduces the child row text size. */
+        font-size: 0.8rem;
+    /* Closes the child row cell rule. */
+    }
+
+    /* Removes the divider under the last cell in a card. */
+    #appsTable tbody td:last-child { border-bottom: none; }
+
+    /* Creates the small uppercase label before each cell value. */
+    #appsTable tbody td::before {
+        /* Uses the data-label attribute as the label text. */
+        content: attr(data-label);
+        /* Lifts the label slightly to line up with the value. */
+        padding-top: 0.12rem;
+        /* Sets the small label text size. */
+        font-size: 0.63rem;
+        /* Makes the cell label bold. */
+        font-weight: 700;
+        /* Sets the cell label line height. */
+        line-height: 1.5;
+        /* Spreads the cell label letters. */
+        letter-spacing: 0.06em;
+        /* Shows the cell label in capital letters. */
+        text-transform: uppercase;
+        /* Shows the cell label in light grey. */
+        color: var(--gray-400);
+    /* Closes the cell label rule. */
+    }
+
+    /* Makes the student cell a single full-width column. */
+    #appsTable tbody td.app-cell-student {
+        /* Gives the student cell one full-width column. */
+        grid-template-columns: minmax(0, 1fr);
+        /* Sets the student cell padding. */
+        padding: 0.9rem 0.95rem 0.6rem;
+        /* Draws a divider under the student cell. */
+        border-bottom: 1px solid var(--gray-100);
+    /* Closes the stacked student cell rule. */
+    }
+
+    /* Starts the rule that hides labels for special cells. */
+    #appsTable tbody td.app-cell-student::before,
+    /* Also matches the student cell inside the child row. */
+    #appsTable tbody tr.app-child-row td.app-cell-student::before,
+    /* Hides the generated label for student and empty cells. */
+    #appsTable tbody td.app-empty-cell::before { content: none; }
+
+    /* Enlarges the student name link on stacked cards. */
+    #appsTable tbody td.app-cell-student .student-name-link { font-size: 0.98rem; }
+
+    /* Lines the child row first cell up with its parent card. */
+    #appsTable tbody tr.app-child-row > td:first-child { padding-left: 0.95rem; }
+
+    /* Turns the actions cell into a wrapping button row. */
+    #appsTable tbody td.app-cell-actions {
+        /* Uses a flex layout for the actions cell. */
+        display: flex;
+        /* Lets the action controls wrap onto another line. */
+        flex-wrap: wrap;
+        /* Centres the action controls vertically. */
+        align-items: center;
+        /* Spaces the action controls apart. */
+        gap: 0.6rem;
+        /* Sets the actions cell padding. */
+        padding: 0.7rem 0.95rem 0.9rem;
+    /* Closes the stacked actions cell rule. */
+    }
+
+    /* Hides the generated label for the actions cell. */
+    #appsTable tbody td.app-cell-actions::before { content: none; }
+
+    /* Lays the action controls out in a row on cards. */
+    #appsTable .app-actions {
+        /* Places the action controls side by side. */
+        flex-direction: row;
+        /* Centres the action controls vertically. */
+        align-items: center;
+        /* Lets the action row use the full card width. */
+        width: 100%;
+        /* Adds space between the action controls. */
+        gap: 0.75rem;
+    /* Closes the card actions rule. */
+    }
+
+    /* Keeps the Edit button compact in the card actions row. */
+    #appsTable .app-edit-btn {
+        /* Lets the Edit button size to its label. */
+        width: auto;
+        /* Stops the Edit button from growing or shrinking. */
+        flex: 0 0 auto;
+        /* Keeps a 5.5 rem minimum width for the Edit button. */
+        min-width: 5.5rem;
+    /* Closes the card Edit button rule. */
+    }
+
+    /* Keeps the View Student button compact in the actions row. */
+    #appsTable .app-view-student-btn {
+        /* Lets the View button size to its label. */
+        width: auto;
+        /* Stops the View button from growing or shrinking. */
+        flex: 0 0 auto;
+        /* Keeps an 8 rem minimum width for the View button. */
+        min-width: 8rem;
+    /* Closes the card View button rule. */
+    }
+
+    /* Moves the archive control to the right of the actions row. */
+    #appsTable .app-archive-control {
+        /* Stops the archive control from growing or shrinking. */
+        flex: 0 0 auto;
+        /* Sets the gap between the archive text and switch. */
+        gap: 0.5rem;
+        /* Pushes the archive control to the right edge. */
+        margin-left: auto;
+        /* Adds left padding as a separator. */
+        padding: 0 0 0 0.75rem;
+        /* Removes the divider that sat above the archive row. */
+        border-top: none;
+        /* Uses a left divider instead of a top divider. */
+        border-left: 1px solid var(--gray-200);
+    /* Closes the card archive control rule. */
+    }
+
+    /* Styles the empty message cell on stacked cards. */
+    #appsTable .app-empty-cell {
+        /* Shows the empty cell as a plain block. */
+        display: block;
+        /* Tightens the empty cell padding on cards. */
+        padding: 1.75rem 1rem;
+    /* Closes the card empty cell rule. */
+    }
+/* Closes the stacked card media query. */
+}
+
+/* Starts the phone media query for the applications table. */
+@media (max-width: 560px) {
+    /* Stacks every cell label above its value on phones. */
+    #appsTable tbody td {
+        /* Gives each cell one full-width column. */
+        grid-template-columns: minmax(0, 1fr);
+        /* Reduces the gap between the label and value. */
+        gap: 0.18rem;
+        /* Tightens the cell padding on phones. */
+        padding: 0.55rem 0.85rem;
+    /* Closes the stacked phone cell rule. */
+    }
+
+    /* Tightens the student cell padding on phones. */
+    #appsTable tbody td.app-cell-student { padding: 0.85rem 0.85rem 0.55rem; }
+    /* Tightens the actions cell padding on phones. */
+    #appsTable tbody td.app-cell-actions { padding: 0.65rem 0.85rem 0.85rem; }
+
+    /* Shows the application metadata in one column on phones. */
+    #appsTable .app-details-meta { grid-template-columns: minmax(0, 1fr); }
+
+    /* Stacks the action controls vertically on phones. */
+    #appsTable .app-actions {
+        /* Places the action controls one under another. */
+        flex-direction: column;
+        /* Stretches the action controls to full width. */
+        align-items: stretch;
+        /* Adds space between the stacked controls. */
+        gap: 0.55rem;
+    /* Closes the phone actions rule. */
+    }
+
+    /* Starts the rule for the two main action buttons on phones. */
+    #appsTable .app-edit-btn,
+    /* Makes the Edit and View buttons full width on phones. */
+    #appsTable .app-view-student-btn { width: 100%; flex: 0 0 auto; }
+
+    /* Keeps the archive row full width under the buttons. */
+    #appsTable .app-archive-control {
+        /* Spaces the archive text and switch to the two edges. */
+        justify-content: space-between;
+        /* Lets the archive row use the full card width. */
+        width: 100%;
+        /* Removes the automatic left margin on phones. */
+        margin-left: 0;
+        /* Adds top padding above the archive row. */
+        padding: 0.5rem 0 0;
+        /* Restores the divider above the archive row. */
+        border-top: 1px solid var(--gray-200);
+        /* Removes the left divider used on wider cards. */
+        border-left: none;
+    /* Closes the phone archive rule. */
+    }
+
+    /* Stacks the applications filter bar on phones. */
+    .apps-filter-bar { flex-direction: column; align-items: stretch; }
+    /* Stops the search box from growing inside the column. */
+    .apps-filter-bar .filter-search { flex: 0 0 auto; }
+    /* Makes the filter selects full width on phones. */
+    .apps-filter-bar select { width: 100%; }
+/* Closes the phone media query. */
+}
+
+/* Starts the reduced-motion query for the applications table. */
+@media (prefers-reduced-motion: reduce) {
+    /* Starts the list of animated elements to simplify. */
+    #appsTable .app-switch-track,
+    /* Includes the switch thumb in the simplified elements. */
+    #appsTable .app-switch-thumb,
+    /* Removes the switch and Edit button transitions. */
+    #appsTable .app-edit-btn { transition: none; }
+    /* Removes the Edit button lift for reduced motion users. */
+    #appsTable .app-edit-btn:hover { transform: none; }
+/* Closes the reduced-motion media query. */
+}
+

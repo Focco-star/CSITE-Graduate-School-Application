@@ -1,0 +1,256 @@
+/* Opens the comment header for the in-page option, date, and time pickers. */
+/* ==========================================================================
+   In-page option lists, date picker and time picker
+   --------------------------------------------------------------------------
+   A native <select> list, the browser's date calendar and its time picker are
+   drawn outside the page. They are therefore missing when the browser tab is
+   shared (Teams, Zoom, Meet) or recorded, even though they are visible on the
+   presenter's own screen. The lists below are ordinary page elements, so they
+   are always part of what is shared.
+   ========================================================================== */
+
+/* Styles the custom dropdown list that replaces native select menus. */
+.cselect-menu {
+    /* Fixes the list to the viewport so it follows its field. */
+    position: fixed;
+    /* Draws the list above other page elements. */
+    z-index: 3000;
+    /* Keeps the list at least 160 pixels wide. */
+    min-width: 160px;
+    /* Caps the list width so it fits small screens. */
+    max-width: min(420px, calc(100vw - 16px));
+    /* Adds a little padding around the options. */
+    padding: 0.3rem;
+    /* Scrolls the list when it has many options. */
+    overflow-y: auto;
+    /* Stops page scrolling when the list reaches its end. */
+    overscroll-behavior: contain;
+    /* Gives the list a white background. */
+    background: var(--white);
+    /* Adds a light grey border around the list. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the list corners. */
+    border-radius: var(--radius);
+    /* Adds a deep shadow so the list floats above the page. */
+    box-shadow: 0 18px 44px rgba(2, 6, 23, 0.2);
+    /* Uses the site font inside the list. */
+    font-family: var(--font);
+    /* Sets the list text size. */
+    font-size: 0.875rem;
+    /* Shows the list text in dark grey. */
+    color: var(--gray-700);
+/* Closes the custom dropdown list rule. */
+}
+/* Keeps the custom dropdown hidden when the hidden attribute is set. */
+.cselect-menu[hidden] { display: none; }
+/* Styles the dark version of the custom dropdown list. */
+.cselect-menu.is-dark {
+    /* Fills the dark list with deep navy blue. */
+    background: #090f45;
+    /* Uses a faint white border on the dark list. */
+    border-color: rgba(255, 255, 255, 0.16);
+    /* Shows the dark list text in white. */
+    color: var(--white);
+    /* Adds a strong black shadow under the dark list. */
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+/* Closes the dark dropdown list rule. */
+}
+/* Styles one option row inside the custom dropdown. */
+.cselect-option {
+    /* Keeps the tick, icon, and label on one row. */
+    display: flex;
+    /* Centres the option contents vertically. */
+    align-items: center;
+    /* Spaces the tick from the option label. */
+    gap: 0.45rem;
+    /* Sets the option row padding. */
+    padding: 0.45rem 0.55rem;
+    /* Rounds the option highlight corners. */
+    border-radius: 6px;
+    /* Shows a pointer cursor over each option. */
+    cursor: pointer;
+/* Closes the dropdown option rule. */
+}
+/* Starts the hovered or keyboard-active option style. */
+.cselect-option.is-active,
+/* Highlights the active or hovered option in light grey. */
+.cselect-option:hover { background: var(--gray-100); }
+/* Starts the active option style for the dark dropdown. */
+.cselect-menu.is-dark .cselect-option.is-active,
+/* Highlights the active or hovered option in the dark list. */
+.cselect-menu.is-dark .cselect-option:hover { background: rgba(255, 255, 255, 0.12); }
+/* Marks the chosen option with a navy tint and bold text. */
+.cselect-option.is-selected { background: rgba(6, 2, 151, 0.07); color: var(--adzu-navy); font-weight: 600; }
+/* Marks the chosen option in the dark list with a gold tint. */
+.cselect-menu.is-dark .cselect-option.is-selected { background: rgba(255, 184, 43, 0.2); color: var(--white); }
+/* Shows a disabled option in grey with a blocked cursor. */
+.cselect-option.is-disabled { color: var(--gray-400); background: transparent; cursor: not-allowed; }
+/* Sizes the tick mark that appears on the chosen option. */
+.cselect-check { width: 0.85rem; flex-shrink: 0; font-size: 0.68rem; color: var(--adzu-navy); opacity: 0; }
+/* Colours the tick gold inside the dark dropdown. */
+.cselect-menu.is-dark .cselect-check { color: var(--adzu-gold); }
+/* Shows the tick only on the chosen option. */
+.cselect-option.is-selected .cselect-check { opacity: 1; }
+/* Styles the small group heading inside the dropdown. */
+.cselect-group {
+    /* Sets the group heading padding. */
+    padding: 0.35rem 0.55rem 0.15rem;
+    /* Sets the group heading text size. */
+    font-size: 0.68rem;
+    /* Makes the group heading bold. */
+    font-weight: 700;
+    /* Spreads the group heading letters. */
+    letter-spacing: 0.05em;
+    /* Shows the group heading in capital letters. */
+    text-transform: uppercase;
+    /* Shows the group heading in light grey. */
+    color: var(--gray-400);
+/* Closes the dropdown group heading rule. */
+}
+
+/* Lets the time picker popover anchor to its field. */
+.time-picker { position: relative; }
+/* Leaves room for the clock icon inside the time input. */
+.form-field .time-picker input { padding-right: 3rem; }
+
+/* Styles the floating time picker panel. */
+.tp-popover {
+    /* Fixes the time picker to the viewport. */
+    position: fixed;
+    /* Draws the time picker above the page content. */
+    z-index: 2000;
+    /* Sets the time picker width to 252 pixels. */
+    width: 252px;
+    /* Caps the time picker width on small screens. */
+    max-width: calc(100vw - 16px);
+    /* Sets the time picker inner padding. */
+    padding: 0.75rem;
+    /* Fills the time picker with dark slate. */
+    background: #232b35;
+    /* Shows the time picker text in light grey. */
+    color: #e8edf2;
+    /* Adds a faint white border around the panel. */
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    /* Rounds the time picker corners. */
+    border-radius: var(--radius-lg);
+    /* Adds a deep shadow under the time picker. */
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    /* Uses the site font inside the time picker. */
+    font-family: var(--font);
+    /* Keeps the time picker hidden until opened. */
+    display: none;
+/* Closes the time picker panel rule. */
+}
+/* Shows the time picker and fades it in when opened. */
+.tp-popover.open { display: block; animation: dp-in 0.15s ease-out; }
+/* Styles the small heading at the top of the time picker. */
+.tp-title {
+    /* Removes the top margin and spaces the heading below. */
+    margin: 0 0 0.5rem;
+    /* Sets the time picker heading size. */
+    font-size: 0.72rem;
+    /* Makes the time picker heading bold. */
+    font-weight: 700;
+    /* Spreads the heading letters. */
+    letter-spacing: 0.06em;
+    /* Shows the heading in capital letters. */
+    text-transform: uppercase;
+    /* Shows the heading in muted blue grey. */
+    color: #8fa0b5;
+/* Closes the time picker heading rule. */
+}
+/* Lays the hour, minute, and AM/PM columns side by side. */
+.tp-cols { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.4rem; }
+/* Styles one scrollable column of time cells. */
+.tp-col {
+    /* Uses a flex layout for the time column. */
+    display: flex;
+    /* Stacks the time cells vertically. */
+    flex-direction: column;
+    /* Adds two pixels between the time cells. */
+    gap: 2px;
+    /* Keeps each time column short enough to scroll. */
+    max-height: 168px;
+    /* Scrolls the column when it has many times. */
+    overflow-y: auto;
+    /* Stops page scrolling when the column reaches its end. */
+    overscroll-behavior: contain;
+    /* Leaves space for the column scrollbar. */
+    padding-right: 2px;
+/* Closes the time column rule. */
+}
+/* Lets the AM/PM column show both options without scrolling. */
+.tp-meridiem { gap: 0.35rem; overflow: visible; }
+/* Styles one clickable time cell. */
+.tp-cell {
+    /* Sets the time cell padding. */
+    padding: 0.35rem 0.3rem;
+    /* Removes the browser default button border. */
+    border: 0;
+    /* Rounds the time cell corners. */
+    border-radius: 6px;
+    /* Fills the time cell with dark slate. */
+    background: #2e3844;
+    /* Shows the time cell text in light grey. */
+    color: #e8edf2;
+    /* Uses the site font inside the time cell. */
+    font-family: var(--font);
+    /* Sets the time cell text size. */
+    font-size: 0.82rem;
+    /* Centres the time text in its cell. */
+    text-align: center;
+    /* Shows a pointer cursor over a time cell. */
+    cursor: pointer;
+    /* Fades the background and text colour on state changes. */
+    transition: background var(--transition), color var(--transition);
+/* Closes the time cell rule. */
+}
+/* Lightens the time cell while it is hovered. */
+.tp-cell:hover { background: #3a4654; }
+/* Marks the chosen time with gold and dark bold text. */
+.tp-cell.is-selected { background: var(--adzu-gold); color: #1a222c; font-weight: 700; }
+/* Spaces the footer buttons across the time picker. */
+.tp-foot { display: flex; justify-content: space-between; gap: 0.4rem; margin-top: 0.55rem; }
+/* Styles the footer buttons of the time picker. */
+.tp-foot button {
+    /* Sets the footer button padding. */
+    padding: 0.25rem 0.4rem;
+    /* Removes the browser default button border. */
+    border: 0;
+    /* Rounds the footer button corners. */
+    border-radius: 6px;
+    /* Makes the footer buttons transparent. */
+    background: transparent;
+    /* Shows the footer button text in muted blue grey. */
+    color: #8fa0b5;
+    /* Uses the site font inside the footer button. */
+    font-family: var(--font);
+    /* Sets the footer button text size. */
+    font-size: 0.78rem;
+    /* Shows a pointer cursor over the footer buttons. */
+    cursor: pointer;
+/* Closes the time picker footer button rule. */
+}
+/* Turns the footer button text white on hover. */
+.tp-foot button:hover { color: #fff; }
+
+/* Explains why the program list uses a solid dark background. */
+/* The program list sits on a translucent card over the page photo; a solid
+   panel keeps every option readable on a projector or a compressed stream. */
+/* Gives the program list card a nearly solid navy background. */
+.program-list { background: rgba(6, 4, 70, 0.94); }
+/* Shows program options in bright white text. */
+.program-option { color: rgba(255, 255, 255, 0.92); }
+/* Highlights a program option on hover. */
+.program-option:hover { background: rgba(255, 255, 255, 0.12); }
+/* Explains why a locked program track looks disabled. */
+/* A track that the program already decides is locked: show it as read-only
+   instead of looking like a list the student can still open. */
+/* Styles the locked track select that the program decides. */
+.login-card .input-icon-wrap select:disabled {
+    /* Fades the locked select so it looks read-only. */
+    opacity: 0.72;
+    /* Shows a blocked cursor on the locked select. */
+    cursor: not-allowed;
+/* Closes the locked select rule. */
+}

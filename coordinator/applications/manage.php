@@ -1,9 +1,9 @@
 <?php /* Opens the PHP block for the coordinator application management page. */ ?>
 <?php
 // Loads the shared config file with app settings and helper functions.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the shared database connection code.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Sets the page title shown in the browser tab.
 $pageTitle   = 'Applications';
@@ -241,7 +241,7 @@ $milestoneMarkup = static function (array $ms): string {
 };
 
 // Loads the shared page header, sidebar, and styles.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML layout can be written.
 ?>
 
@@ -816,7 +816,7 @@ require_once __DIR__ . '/../../includes/header.php';
 <?php /* Comment spacer line inside the filter explanation. */ ?>
 //
 <?php /* Comment: the shared filter hides rows one by one. */ ?>
-// The shared filter in assets/js/script.js hides rows one by one, which would
+// The shared filter in assets/js/shared/app.js hides rows one by one, which would
 <?php /* Comment: that would leave a student without their applications. */ ?>
 // leave a student visible without the applications that belong to them. Here
 <?php /* Comment: here the whole group is the unit of filtering. */ ?>
@@ -1071,4 +1071,4 @@ require_once __DIR__ . '/../../includes/header.php';
 </script>
 
 <?php /* Loads the shared footer and closing scripts. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

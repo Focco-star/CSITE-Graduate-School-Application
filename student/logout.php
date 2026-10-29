@@ -1,7 +1,7 @@
 <?php /* Opens PHP for the student logout script. */ ?>
 <?php
 // Loads config.php once for site settings and the url() helper.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 
 // Checks whether a session is already active.
 if (session_status() === PHP_SESSION_NONE) {

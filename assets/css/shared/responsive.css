@@ -1,0 +1,18 @@
+/* Labels the responsive top menu bar rules. */
+/* ---------- Responsive menu bar ---------- */
+/* Starts the tablet media query for the top menu bar. */
+@media (max-width: 768px) {
+    /* Tightens the top bar padding and gaps on tablets. */
+    .topbar { padding: 0 1rem; gap: 0.65rem; }
+    /* Reduces the portal title size on tablets. */
+    .topbar-portal { font-size: 0.95rem; letter-spacing: 0.06em; }
+/* Closes the tablet media query. */
+}
+/* Starts the phone media query for the top menu bar. */
+@media (max-width: 560px) {
+    /* Reduces the portal title size further on phones. */
+    .topbar-portal { font-size: 0.86rem; }
+    /* Tightens the logout button padding on phones. */
+    .topbar .topbar-logout { padding: 0.42rem 0.6rem; }
+/* Closes the phone media query. */
+}

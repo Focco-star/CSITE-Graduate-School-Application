@@ -1,13 +1,13 @@
 <?php /* Opens the PHP block for the coordinator dashboard. */ ?>
 <?php
 // Loads the shared config with helpers and demo data.
-require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/config/config.php';
 // Loads the DB class for database access.
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/config/db.php';
 // Loads the helper that draws the program population chart.
-require_once __DIR__ . '/../includes/program_chart.php';
+require_once __DIR__ . '/../includes/components/program_chart.php';
 // Loads the helper that renders the schedule calendar.
-require_once __DIR__ . '/../includes/calendar.php';
+require_once __DIR__ . '/../includes/components/calendar.php';
 
 // Checks whether a session is not running yet.
 if (session_status() === PHP_SESSION_NONE) {
@@ -64,7 +64,7 @@ $academicYearStart = (int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 
 $academicYearLabel = $academicYearStart . '-' . ($academicYearStart + 1);
 
 // Loads the shared header with sidebar.
-require_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/layout/header.php';
 // Closes PHP so the HTML below is printed.
 ?>
 
@@ -120,4 +120,4 @@ require_once __DIR__ . '/../includes/header.php';
 </div>
 
 <?php /* Loads the shared footer scripts and closes PHP. */ ?>
-<?php require_once __DIR__ . '/../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../includes/layout/footer.php'; ?>

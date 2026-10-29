@@ -1,9 +1,9 @@
 <?php /* Starts the PHP block for the coordinator template library page. */ ?>
 <?php
 // Loads the shared configuration, helper functions, and constants.
-require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/config/config.php';
 // Loads the shared database connection class.
-require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/config/db.php';
 
 // Sets the browser page title to 'Manage Templates'.
 $pageTitle   = 'Manage Templates';
@@ -15,7 +15,7 @@ $currentPage = 'templates';
 $userName    = $mockCoordinator['name'];
 
 // Loads the shared header, sidebar, and page shell.
-require_once __DIR__ . '/../../includes/header.php';
+require_once __DIR__ . '/../../includes/layout/header.php';
 // Closes PHP so the HTML sections below are printed.
 ?>
 
@@ -505,7 +505,7 @@ foreach (PROGRAMS as $programCode => $programName) {
 <?php /* Wrapper around the rendered template library tiles. */ ?>
 <div id="tplLibrary">
 <?php /* Includes the shared library partial that draws tracks and documents. */ ?>
-<?php require_once __DIR__ . '/../../includes/template_library.php'; ?>
+<?php require_once __DIR__ . '/../../includes/components/template_library.php'; ?>
 
 <?php /* Empty state card shown when no tile matches the filters. */ ?>
 <div class="card empty-state" data-filter-empty hidden style="text-align:center;padding:3rem 1.5rem;color:var(--gray-400);">
@@ -633,4 +633,4 @@ window.CSITE_COURSE_TRACKS = <?= json_encode($courseTrackMap) ?>;
 </script>
 
 <?php /* Loads the shared footer and closes the page. */ ?>
-<?php require_once __DIR__ . '/../../includes/footer.php'; ?>
+<?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

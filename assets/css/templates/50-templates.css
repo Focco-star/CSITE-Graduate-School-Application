@@ -1,0 +1,949 @@
+/* Starts the responsive grid that holds template cards. */
+.template-grid {
+    /* Uses grid layout for the template cards. */
+    display: grid;
+    /* Fills rows with 280px-wide cards and stretches to fit. */
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    /* Adds a gap between template cards. */
+    gap: 1rem;
+/* Closes the .template-grid rule. */
+}
+
+/* Starts the card that represents one document template. */
+.template-item {
+    /* Draws a light border around the card. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the card corners. */
+    border-radius: var(--radius-lg);
+    /* Adds padding inside the card. */
+    padding: 1.25rem;
+    /* Stacks the card contents vertically with flexbox. */
+    display: flex;
+    /* Keeps the card items in a column. */
+    flex-direction: column;
+    /* Adds space between the card items. */
+    gap: 0.75rem;
+    /* Animates shadow changes on hover. */
+    transition: box-shadow var(--transition);
+/* Closes the .template-item rule. */
+}
+
+/* Adds a stronger shadow when the user hovers a template card. */
+.template-item:hover { box-shadow: var(--shadow-md); }
+
+/* Styles the round icon at the top of a template card. */
+.template-item .template-icon {
+    /* Sets the icon box to 44 by 44 pixels. */
+    width: 44px; height: 44px;
+    /* Gives the icon a faint navy tint. */
+    background: rgba(6, 2, 151, 0.08);
+    /* Rounds the icon box corners. */
+    border-radius: var(--radius);
+    /* Centers the icon with flexbox. */
+    display: flex;
+    /* Centers the icon vertically. */
+    align-items: center;
+    /* Centers the icon horizontally. */
+    justify-content: center;
+    /* Colors the icon navy. */
+    color: var(--adzu-navy);
+    /* Sizes the icon glyph. */
+    font-size: 1.1rem;
+/* Closes the .template-icon rule. */
+}
+
+/* Styles a template card title in navy. */
+.template-item h4 { font-size: 0.9rem; font-weight: 600; color: var(--adzu-navy); }
+/* Styles the card description in gray and lets it fill space. */
+.template-item p { font-size: 0.8rem; color: var(--gray-500); flex: 1; }
+/* Styles the small metadata line such as file type or date. */
+.template-item .template-meta { font-size: 0.75rem; color: var(--gray-400); }
+
+/* Introduces the template updates section that lists synced Drive files. */
+/* --------------------------------------------------------------------------
+ * Template updates
+ *
+ * The list of files the teacher added or replaced in the Google Drive
+ * template folder. It is shown on the Templates page of both portals.
+ * -------------------------------------------------------------------------- */
+/* Adds a gold left border to the template updates card. */
+.tpl-updates-card { border-left: 3px solid var(--adzu-gold); }
+/* Notes that the latest synced files get their own card. */
+/* The files that were synced the last time, shown on their own so the
+   coordinator sees them at once. */
+/* Adds a navy left border to the latest synced files card. */
+.tpl-latest-card { border-left: 3px solid var(--adzu-navy); }
+/* Notes that clicking the history header opens the list. */
+/* The header of the history opens it. */
+/* Starts the clickable header that expands the update history. */
+.tpl-updates-toggle {
+    /* Lays the header contents out in a row. */
+    display: flex;
+    /* Vertically centers the header contents. */
+    align-items: center;
+    /* Adds space between the header items. */
+    gap: 0.6rem;
+    /* Lets the header fill the card width. */
+    width: 100%;
+    /* Removes the default button background. */
+    background: none;
+    /* Removes the default button border. */
+    border: none;
+    /* Keeps the header text left aligned. */
+    text-align: left;
+    /* Shows a pointer cursor on the header. */
+    cursor: pointer;
+    /* Uses the page font instead of the button font. */
+    font: inherit;
+    /* Inherits the surrounding text color. */
+    color: inherit;
+    /* Removes extra padding from the button. */
+    padding: 0;
+/* Closes the .tpl-updates-toggle rule. */
+}
+/* Makes the heading flex so its icon and text line up. */
+.tpl-updates-toggle h3 { display: flex; align-items: center; gap: 0.5rem; margin: 0; flex: 1; }
+/* Styles the small arrow that shows the history is collapsible. */
+.tpl-updates-caret { color: var(--gray-400); font-size: 0.75rem; transition: transform 0.15s ease; }
+/* Flips the arrow when the history is open. */
+.tpl-updates-toggle.is-open .tpl-updates-caret { transform: rotate(180deg); }
+/* Turns the arrow navy on hover. */
+.tpl-updates-toggle:hover .tpl-updates-caret { color: var(--adzu-navy); }
+/* Starts the rounded pill that shows how many updates exist. */
+.tpl-update-count {
+    /* Sets the count text small. */
+    font-size: 0.75rem;
+    /* Makes the count bold. */
+    font-weight: 700;
+    /* Colors the count navy. */
+    color: var(--adzu-navy);
+    /* Gives the pill a light gray background. */
+    background: var(--gray-100);
+    /* Adds padding inside the pill. */
+    padding: 0.15rem 0.55rem;
+    /* Fully rounds the pill ends. */
+    border-radius: 999px;
+/* Closes the .tpl-update-count rule. */
+}
+/* Styles the helper sentence under the history header. */
+.tpl-update-hint { font-size: 0.8rem; color: var(--gray-500); margin-bottom: 0.75rem; }
+/* Starts the unstyled list of synced file updates. */
+.tpl-update-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+/* Starts one row in the synced file list. */
+.tpl-update-item {
+    /* Lays the row contents out in a row. */
+    display: flex;
+    /* Aligns row contents to the top. */
+    align-items: flex-start;
+    /* Adds space between the row items. */
+    gap: 0.65rem;
+    /* Adds padding inside the row. */
+    padding: 0.6rem 0.75rem;
+    /* Draws a light border around the row. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the row corners. */
+    border-radius: var(--radius);
+    /* Gives the row a light gray background. */
+    background: var(--gray-50);
+/* Closes the .tpl-update-item rule. */
+}
+/* Highlights a newly detected file with a yellow tint. */
+.tpl-update-item.is-new { border-color: #fde68a; background: var(--warning-bg); }
+/* Colors the file icon navy and keeps it from shrinking. */
+.tpl-update-item > i { color: var(--adzu-navy); margin-top: 0.15rem; flex: 0 0 auto; }
+/* Colors the icon orange for new files. */
+.tpl-update-item.is-new > i { color: var(--warning); }
+/* Stacks the file name and metadata vertically. */
+.tpl-update-body { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; flex: 1; }
+/* Starts the file name line in the update row. */
+.tpl-update-name {
+    /* Sets the file name small. */
+    font-size: 0.85rem;
+    /* Colors the file name navy. */
+    color: var(--adzu-navy);
+    /* Breaks very long file names so they do not overflow. */
+    word-break: break-word;
+/* Closes the .tpl-update-name rule. */
+}
+/* Styles the small date or size text under a file name. */
+.tpl-update-meta { font-size: 0.75rem; color: var(--gray-500); }
+/* Starts the NEW badge shown on newly synced files. */
+.tpl-update-new {
+    /* Keeps the badge at its natural size. */
+    flex: 0 0 auto;
+    /* Centers the badge vertically in the row. */
+    align-self: center;
+    /* Makes the badge text tiny. */
+    font-size: 0.65rem;
+    /* Makes the badge text extra bold. */
+    font-weight: 800;
+    /* Adds slight spacing between the badge letters. */
+    letter-spacing: 0.04em;
+    /* Uppercases the badge text. */
+    text-transform: uppercase;
+    /* Colors the badge text dark amber. */
+    color: #854d0e;
+    /* Gives the badge a yellow background. */
+    background: #fde68a;
+    /* Adds padding inside the badge. */
+    padding: 0.1rem 0.45rem;
+    /* Fully rounds the badge ends. */
+    border-radius: 999px;
+/* Closes the .tpl-update-new rule. */
+}
+/* Styles the last-synced label and stops it from wrapping. */
+.tpl-sync-status { font-size: 0.78rem; color: var(--gray-400); white-space: nowrap; }
+/* Colors the small clock icon next to the sync status. */
+.tpl-sync-status i { color: var(--gray-400); margin-right: 0.2rem; }
+
+/* Introduces the pending-sync section for files still on Google Drive. */
+/* --------------------------------------------------------------------------
+ * Files waiting to be synchronized
+ *
+ * The badge on the "Sync from Google Drive" button and the notice below it.
+ * They tell the coordinator that Google Drive holds a file that is not in
+ * the system yet, before anything is downloaded.
+ * -------------------------------------------------------------------------- */
+/* Starts the red counter badge on the Google Drive sync button. */
+.tpl-pending-badge {
+    /* Keeps the badge inline with the button text. */
+    display: inline-flex;
+    /* Centers the number vertically. */
+    align-items: center;
+    /* Centers the number horizontally. */
+    justify-content: center;
+    /* Keeps the badge wide enough for one or two digits. */
+    min-width: 1.25rem;
+    /* Fixes the badge height so it stays round. */
+    height: 1.25rem;
+    /* Adds a small gap between the button label and badge. */
+    margin-left: 0.4rem;
+    /* Adds side padding for wider numbers. */
+    padding: 0 0.35rem;
+    /* Fully rounds the badge. */
+    border-radius: 999px;
+    /* Uses red so the pending count stands out. */
+    background: #e02424;
+    /* Makes the count text white. */
+    color: #ffffff;
+    /* Sets the count text small. */
+    font-size: 0.68rem;
+    /* Makes the count extra bold. */
+    font-weight: 800;
+    /* Keeps the number on one tight line. */
+    line-height: 1;
+    /* Aligns the badge with the middle of the button text. */
+    vertical-align: middle;
+/* Closes the .tpl-pending-badge rule. */
+}
+/* Hides the badge completely when the hidden attribute is set. */
+.tpl-pending-badge[hidden] { display: none; }
+/* Starts the notice telling the coordinator that files await syncing. */
+.tpl-pending-notice {
+    /* Lays the notice contents out in a row. */
+    display: flex;
+    /* Vertically centers the notice contents. */
+    align-items: center;
+    /* Adds space between the notice items. */
+    gap: 0.6rem;
+    /* Lets the notice items wrap on narrow screens. */
+    flex-wrap: wrap;
+    /* Leaves space below the notice. */
+    margin-bottom: 1rem;
+    /* Adds padding inside the notice. */
+    padding: 0.7rem 0.9rem;
+    /* Draws a pale yellow border around the notice. */
+    border: 1px solid #fde68a;
+    /* Adds a thicker orange line on the left edge. */
+    border-left: 3px solid var(--warning);
+    /* Rounds the notice corners. */
+    border-radius: var(--radius);
+    /* Gives the notice a soft yellow background. */
+    background: var(--warning-bg);
+    /* Colors the notice text dark amber. */
+    color: #854d0e;
+    /* Sets the notice text size. */
+    font-size: 0.85rem;
+/* Closes the .tpl-pending-notice rule. */
+}
+/* Colors the warning icon orange. */
+.tpl-pending-notice > i { color: var(--warning); }
+/* Lets the notice message grow and wrap as needed. */
+.tpl-pending-notice > span { flex: 1 1 260px; }
+/* Starts the box listing the files that still need syncing. */
+.tpl-pending-files {
+    /* Pulls the box up a little and leaves space below. */
+    margin: -0.5rem 0 1rem;
+    /* Adds padding inside the file list box. */
+    padding: 0.75rem 0.9rem;
+    /* Draws a light border around the box. */
+    border: 1px solid var(--gray-200);
+    /* Rounds the box corners. */
+    border-radius: var(--radius);
+    /* Gives the box a light gray background. */
+    background: var(--gray-50);
+/* Closes the .tpl-pending-files rule. */
+}
+/* Hides the pending file list when the hidden attribute is set. */
+.tpl-pending-files[hidden] { display: none; }
+/* Starts the unstyled list of pending files. */
+.tpl-pending-files ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+/* Styles each pending file row and aligns its icon with the text. */
+.tpl-pending-files li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--gray-600); }
+/* Colors the file icon navy. */
+.tpl-pending-files li > i { color: var(--adzu-navy); }
+/* Makes the pending file name bold and navy. */
+.tpl-pending-name { font-weight: 600; color: var(--adzu-navy); }
+/* Styles the small file metadata in gray. */
+.tpl-pending-meta { color: var(--gray-400); font-size: 0.75rem; }
+
+/* Introduces the workflow records section for read-only receipt details. */
+/* --------------------------------------------------------------------------
+ * Workflow records
+ *
+ * The receipt details are entered by the student and only read here, so the
+ * coordinator sees the values without being able to change them.
+ * -------------------------------------------------------------------------- */
+/* Starts the read-only value for an entered receipt detail. */
+.workflow-record-value {
+    /* Removes the default paragraph margin. */
+    margin: 0;
+    /* Sets the value text slightly smaller than body text. */
+    font-size: 0.9rem;
+    /* Makes the value semibold. */
+    font-weight: 600;
+    /* Colors the value navy. */
+    color: var(--adzu-navy);
+/* Closes the .workflow-record-value rule. */
+}
+/* Removes extra margin around the receipt records block. */
+.tpl-doc-records { margin: 0; }
+/* Starts the collapsible summary that shows recorded details. */
+.tpl-doc-records > summary {
+    /* Shows a pointer cursor so users know it opens. */
+    cursor: pointer;
+    /* Removes the default triangle marker. */
+    list-style: none;
+    /* Keeps the summary inline so it hugs its text. */
+    display: inline-flex;
+    /* Centers the summary icon and text. */
+    align-items: center;
+    /* Adds space between the icon and text. */
+    gap: 0.35rem;
+/* Closes the summary rule. */
+}
+/* Hides the WebKit arrow marker on the summary. */
+.tpl-doc-records > summary::-webkit-details-marker { display: none; }
+/* Colors the summary label navy. */
+.tpl-doc-records > summary strong { color: var(--adzu-navy); }
+/* Underlines the summary label on hover. */
+.tpl-doc-records > summary:hover strong { text-decoration: underline; }
+/* Styles the small arrow that flips when opened. */
+.tpl-doc-records > summary > i { font-size: 0.65rem; color: var(--gray-400); transition: transform 0.15s ease; }
+/* Flips the arrow when the details block is open. */
+.tpl-doc-records[open] > summary > i { transform: rotate(180deg); }
+/* Starts the panel that shows the recorded receipt values. */
+.tpl-doc-records-body {
+    /* Adds space above and below the panel. */
+    margin: 0.5rem 0 0.25rem;
+    /* Adds padding inside the panel. */
+    padding: 0.55rem 0.7rem;
+    /* Adds a gold line on the left edge. */
+    border-left: 3px solid var(--adzu-gold);
+    /* Rounds the right corners only. */
+    border-radius: 0 var(--radius) var(--radius) 0;
+    /* Gives the panel a light gray background. */
+    background: var(--gray-50);
+    /* Lays the recorded values out in a row. */
+    display: flex;
+    /* Lets the recorded values wrap onto new lines. */
+    flex-wrap: wrap;
+    /* Adds gaps between the recorded values. */
+    gap: 0.35rem 1.25rem;
+/* Closes the .tpl-doc-records-body rule. */
+}
+/* Lays out each label and value pair in a row. */
+.tpl-doc-records-body > div { display: flex; align-items: baseline; gap: 0.35rem; }
+/* Styles the uppercase label before each recorded value. */
+.tpl-doc-records-body span { font-size: 0.7rem; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.04em; }
+/* Styles each recorded value in navy. */
+.tpl-doc-records-body strong { font-size: 0.85rem; color: var(--adzu-navy); }
+
+/* Starts the section that styles the template library. */
+/* --------------------------------------------------------------------------
+ * Template library
+ *
+ * The track sections of the Templates page. Both portals use the same
+ * grouping: a track, the courses that follow it, the workflow stages of the
+ * track and its reference documents.
+ * -------------------------------------------------------------------------- */
+/* Leaves space below each track section on the Templates page. */
+.tpl-track-section { margin-bottom: 1.75rem; }
+/* Starts the header row for one track section. */
+.tpl-track-head {
+    /* Lays the track header items out in a row. */
+    display: flex;
+    /* Lets the header items wrap on narrow screens. */
+    flex-wrap: wrap;
+    /* Vertically centers the header items. */
+    align-items: center;
+    /* Adds gaps between the header items. */
+    gap: 0.5rem 1rem;
+    /* Leaves space below the header. */
+    margin-bottom: 0.85rem;
+    /* Adds space between the header text and its underline. */
+    padding-bottom: 0.6rem;
+    /* Draws a gold underline under the track header. */
+    border-bottom: 2px solid var(--adzu-gold);
+/* Closes the .tpl-track-head rule. */
+}
+/* Starts the track title with its icon. */
+.tpl-track-title {
+    /* Sets the track title size. */
+    font-size: 1.05rem;
+    /* Makes the track title bold. */
+    font-weight: 700;
+    /* Colors the track title navy. */
+    color: var(--adzu-navy);
+    /* Puts the track icon and text on one line. */
+    display: flex;
+    /* Centers the icon and title vertically. */
+    align-items: center;
+    /* Adds space between icon and title. */
+    gap: 0.5rem;
+    /* Removes the default heading margin. */
+    margin: 0;
+/* Closes the .tpl-track-title rule. */
+}
+/* Colors the track icon gold. */
+.tpl-track-title i { color: var(--adzu-gold); }
+/* Starts the row of course chips under a track title. */
+.tpl-track-courses {
+    /* Lays the course chips out in a row. */
+    display: flex;
+    /* Lets the chips wrap onto new lines. */
+    flex-wrap: wrap;
+    /* Vertically centers the chips. */
+    align-items: center;
+    /* Adds space between chips. */
+    gap: 0.4rem;
+/* Closes the .tpl-track-courses rule. */
+}
+/* Starts the small label that precedes the course chips. */
+.tpl-track-courses-label {
+    /* Sets the label text small. */
+    font-size: 0.7rem;
+    /* Makes the label bold. */
+    font-weight: 700;
+    /* Adds slight spacing between label letters. */
+    letter-spacing: 0.05em;
+    /* Uppercases the label text. */
+    text-transform: uppercase;
+    /* Colors the label light gray. */
+    color: var(--gray-400);
+/* Closes the .tpl-track-courses-label rule. */
+}
+/* Starts the rounded chip that shows one course code. */
+.tpl-course-chip {
+    /* Keeps the chip inline with its text. */
+    display: inline-flex;
+    /* Aligns the code and name on their baselines. */
+    align-items: baseline;
+    /* Adds space between the course code and name. */
+    gap: 0.35rem;
+    /* Adds padding inside the chip. */
+    padding: 0.2rem 0.6rem;
+    /* Draws a light border around the chip. */
+    border: 1px solid var(--gray-200);
+    /* Fully rounds the chip ends. */
+    border-radius: 999px;
+    /* Gives the chip a light gray background. */
+    background: var(--gray-50);
+    /* Sets the chip text small. */
+    font-size: 0.75rem;
+    /* Colors the chip text gray. */
+    color: var(--gray-600);
+/* Closes the .tpl-course-chip rule. */
+}
+/* Makes the course code bold and navy inside the chip. */
+.tpl-course-chip strong { color: var(--adzu-navy); font-size: 0.72rem; }
+/* Highlights the student's own course chip with a gold tint. */
+.tpl-course-chip.is-own { border-color: var(--adzu-gold); background: #fffbeb; }
+/* Starts the small text showing how many stages a track has. */
+.tpl-stage-count {
+    /* Sets the stage count text small. */
+    font-size: 0.72rem;
+    /* Colors the stage count light gray. */
+    color: var(--gray-400);
+    /* Makes the stage count semibold. */
+    font-weight: 600;
+/* Closes the .tpl-stage-count rule. */
+}
+/* Starts the inline note warning that templates need review. */
+.tpl-review-note {
+    /* Sets the note text small. */
+    font-size: 0.78rem;
+    /* Colors the note text dark amber. */
+    color: #854d0e;
+    /* Gives the note a soft yellow background. */
+    background: var(--warning-bg);
+    /* Draws a pale yellow border around the note. */
+    border: 1px solid #fde68a;
+    /* Rounds the note corners. */
+    border-radius: var(--radius);
+    /* Adds padding inside the note. */
+    padding: 0.3rem 0.6rem;
+    /* Keeps the note inline with its icon. */
+    display: inline-flex;
+    /* Centers the note icon and text. */
+    align-items: center;
+    /* Adds space between the note icon and text. */
+    gap: 0.4rem;
+/* Closes the .tpl-review-note rule. */
+}
+/* Starts the small chip marking a template that needs review. */
+.tpl-review-chip {
+    /* Keeps the chip inline with its text. */
+    display: inline-flex;
+    /* Centers the chip icon and label. */
+    align-items: center;
+    /* Adds space between the chip icon and label. */
+    gap: 0.3rem;
+    /* Stops the chip from stretching in a flex column. */
+    align-self: flex-start;
+    /* Sets the chip text tiny. */
+    font-size: 0.65rem;
+    /* Makes the chip text bold. */
+    font-weight: 700;
+    /* Colors the chip text dark amber. */
+    color: #854d0e;
+    /* Gives the chip a soft yellow background. */
+    background: var(--warning-bg);
+    /* Draws a pale yellow border around the chip. */
+    border: 1px solid #fde68a;
+    /* Adds small padding inside the chip. */
+    padding: 0.1rem 0.45rem;
+    /* Fully rounds the chip ends. */
+    border-radius: 999px;
+/* Closes the .tpl-review-chip rule. */
+}
+/* Tints a template card yellow when it needs review. */
+.template-item.needs-review { border-color: #fde68a; background: #fffbeb; }
+/* Lays out the template card buttons in a wrapping row. */
+.template-actions { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-top: auto; }
+/* Keeps each action button at its natural size. */
+.template-actions .btn { align-self: flex-start; }
+
+/* Starts the placeholder shown when a list has no data. */
+.empty-state {
+    /* Centers the empty state text. */
+    text-align: center;
+    /* Adds generous padding around the empty message. */
+    padding: 3rem 1.5rem;
+    /* Colors the empty state text light gray. */
+    color: var(--gray-400);
+/* Closes the .empty-state rule. */
+}
+
+/* Makes the empty state icon large with space below it. */
+.empty-state i { font-size: 2.5rem; margin-bottom: 1rem; }
+/* Styles the empty state heading in gray. */
+.empty-state h4 { font-size: 1rem; color: var(--gray-500); margin-bottom: 0.35rem; }
+/* Sets the empty state paragraph text size. */
+.empty-state p { font-size: 0.875rem; }
+
+/* Starts print-only rules applied when the page is printed. */
+@media print {
+    /* Hides navigation, buttons, and footer from printouts. */
+    .sidebar, .topbar, .sidebar-toggle, .app-footer, .form-actions, .btn { display: none !important; }
+    /* Removes the sidebar offset so content fills the printed page. */
+    .main-wrapper { margin-left: 0 !important; }
+    /* Removes page padding when printing. */
+    .main-content { padding: 0 !important; }
+    /* Prints cards without shadows, keeping a thin border. */
+    .card { box-shadow: none; border: 1px solid #ccc; }
+/* Closes the print media block. */
+}
+
+/* Hides print-only content on screen. */
+.print-only { display: none; }
+/* Shows print-only content and hides no-print content when printing. */
+@media print { .print-only { display: block; } .no-print { display: none !important; } }
+
+/* Starts tablet rules for screens up to 992px wide. */
+@media (max-width: 992px) {
+    /* Slides the sidebar off-screen on tablets. */
+    .sidebar { transform: translateX(-100%); }
+    /* Slides the sidebar back in when it has the open class. */
+    .sidebar.open { transform: translateX(0); }
+    /* Shows the dark overlay behind the open sidebar. */
+    .sidebar-overlay.active { display: block; }
+    /* Removes the sidebar offset from the main wrapper. */
+    .main-wrapper { margin-left: 0; }
+    /* Shows the hamburger button that toggles the sidebar. */
+    .sidebar-toggle { display: inline-flex; }
+/* Closes the 992px media block. */
+}
+
+/* Starts small-screen rules for widths up to 768px. */
+@media (max-width: 768px) {
+    /* Reduces the main content padding on small screens. */
+    .main-content { padding: 1rem; }
+    /* Shrinks the hero heading on small screens. */
+    .hero h1 { font-size: 1.5rem; }
+    /* Reduces the hero section padding on small screens. */
+    .hero { padding: 3rem 0 4rem; }
+    /* Shows the stats grid in two columns. */
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    /* Hides elements marked hide-mobile on small screens. */
+    .hide-mobile { display: none; }
+    /* Stacks form action buttons vertically. */
+    .form-actions { flex-direction: column; }
+    /* Makes form action buttons full width. */
+    .form-actions .btn { width: 100%; }
+/* Closes the 768px media block. */
+}
+
+/* Starts a sidebar menu row that can expand a submenu. */
+.nav-parent-item {
+    /* Lays the row label and arrow out in a row. */
+    display: flex;
+    /* Vertically centers the row contents. */
+    align-items: center;
+    /* Pushes the arrow to the right end. */
+    justify-content: space-between;
+    /* Adds padding around the menu row. */
+    padding: 0.7rem 1.25rem;
+    /* Colors the row text light slate. */
+    color: #cbd5e1;
+    /* Sets the menu row text size. */
+    font-size: 0.875rem;
+    /* Gives the row text medium weight. */
+    font-weight: 500;
+    /* Adds a transparent left bar reserved for the active state. */
+    border-left: 3px solid transparent;
+    /* Animates all style changes on the row. */
+    transition: all var(--transition);
+    /* Shows a pointer cursor so the row looks clickable. */
+    cursor: pointer;
+    /* Stops text from being selected when clicking the row. */
+    user-select: none;
+/* Closes the .nav-parent-item rule. */
+}
+/* Lightens the menu row background on hover. */
+.nav-parent-item:hover { background: #2e3844; color: #ffffff; }
+/* Starts the active state for the current menu section. */
+.nav-parent-item.active {
+    /* Uses a darker background for the active row. */
+    background: #1a222c;
+    /* Makes the active row text white. */
+    color: #ffffff;
+    /* Shows a navy bar on the left of the active row. */
+    border-left-color: var(--adzu-navy);
+    /* Makes the active row text bolder. */
+    font-weight: 600;
+/* Closes the .nav-parent-item.active rule. */
+}
+/* Groups the menu icon and label in a row. */
+.nav-parent-content { display: flex; align-items: center; gap: 0.75rem; }
+/* Fixes the menu icon width and centers it. */
+.nav-parent-content i { width: 20px; text-align: center; font-size: 0.95rem; color: #8fa0b5; }
+/* Styles the small arrow that indicates a submenu. */
+.nav-chevron { font-size: 0.7rem; transition: transform 0.28s ease; color: #8a94a6; }
+/* Rotates the arrow when its submenu is open. */
+.nav-chevron.open { transform: rotate(180deg); }
+/* Hides the submenu by default in a darker panel. */
+.nav-submenu { display: none; contain: layout style; background: #1c242e; }
+/* Shows the submenu when it has the open class. */
+.nav-submenu.open { display: block; }
+/* Indents submenu links further than parent links. */
+.nav-submenu a { padding-left: 3rem !important; font-size: 0.825rem !important; }
+
+/* Starts the custom program picker used on the register form. */
+.program-picker {
+    /* Draws a faint white border around the picker. */
+    border: 1px solid rgba(255,255,255,0.15);
+    /* Rounds the picker corners. */
+    border-radius: 10px;
+    /* Clips the option list to the rounded corners. */
+    overflow: hidden;
+    /* Gives the picker a faint white overlay background. */
+    background: rgba(255,255,255,0.06);
+/* Closes the .program-picker rule. */
+}
+/* Starts the button that opens and closes the program list. */
+.program-picker-toggle {
+    /* Lays the button contents out in a row. */
+    display: flex;
+    /* Vertically centers the button contents. */
+    align-items: center;
+    /* Adds space between the button items. */
+    gap: 0.75rem;
+    /* Makes the button fill the picker width. */
+    width: 100%;
+    /* Adds padding inside the button. */
+    padding: 0.8rem 1rem;
+    /* Makes the button background transparent. */
+    background: transparent;
+    /* Removes the default button border. */
+    border: none;
+    /* Shows a pointer cursor on the button. */
+    cursor: pointer;
+    /* Keeps the button text left aligned. */
+    text-align: left;
+    /* Uses the page font for the button. */
+    font-family: var(--font);
+    /* Shows placeholder text in faint white. */
+    color: rgba(255,255,255,0.35);
+/* Closes the .program-picker-toggle rule. */
+}
+/* Shows solid white once a program has been chosen. */
+.program-picker-toggle.has-value { color: var(--white); }
+/* Starts the scrollable program list, hidden by default. */
+.program-list { border-top: 1px solid rgba(255,255,255,0.1); max-height: 220px; overflow-y: auto; display: none; }
+/* Shows the program list when it has the open class. */
+.program-list.open { display: block; }
+/* Starts one selectable program row in the list. */
+.program-option {
+    /* Lays the row contents out in a row. */
+    display: flex;
+    /* Vertically centers the row contents. */
+    align-items: center;
+    /* Adds space between the row items. */
+    gap: 0.75rem;
+    /* Makes each option fill the list width. */
+    width: 100%;
+    /* Adds padding inside the option row. */
+    padding: 0.65rem 1rem;
+    /* Makes the option background transparent. */
+    background: transparent;
+    /* Removes the default button border. */
+    border: none;
+    /* Draws a faint divider under each option. */
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    /* Shows a pointer cursor on options. */
+    cursor: pointer;
+    /* Keeps option text left aligned. */
+    text-align: left;
+    /* Colors option text soft white. */
+    color: rgba(255,255,255,0.75);
+    /* Sets the option text size. */
+    font-size: 0.875rem;
+    /* Uses the page font for options. */
+    font-family: var(--font);
+/* Closes the .program-option rule. */
+}
+/* Lightens the option background on hover. */
+.program-option:hover { background: rgba(255,255,255,0.08); }
+/* Marks the chosen program with a gold tint and white text. */
+.program-option.selected { background: rgba(255,184,43,0.15); color: var(--white); }
+
+/* Creates a two-column grid for register form fields. */
+.register-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.25rem; }
+/* Creates a three-column grid with narrower first columns. */
+.register-grid-3 { display: grid; grid-template-columns: 0.5fr 0.7fr 1fr; gap: 0 1.25rem; }
+
+/* Starts phone rules for widths up to 640px. */
+@media (max-width: 640px) {
+    /* Stacks the register grids into one column on phones. */
+    .register-grid-2, .register-grid-3 { grid-template-columns: 1fr; }
+/* Closes the 640px media block. */
+}
+
+/* Starts narrow phone rules for widths up to 480px. */
+@media (max-width: 480px) {
+    /* Shows the stats grid in one column. */
+    .stats-grid { grid-template-columns: 1fr; }
+    /* Reduces login card padding on very small screens. */
+    .login-card { padding: 2rem 1.25rem; }
+/* Closes the 480px media block. */
+}
+
+/* Hides the public footer on the login page. */
+body.login-body .public-footer { display: none; }
+/* Makes the login page main area fill the screen. */
+body.login-body .public-main { min-height: 100vh; padding: 0; }
+/* Reserves space for the eye icon inside password fields. */
+.input-icon-wrap input.has-toggle { padding-right: 2.75rem; }
+
+/* Notes that the stage stepper is centered and formal. */
+/* Stage stepper (dashboard + process tracker): centered, formal, simple */
+/* Starts the centered step tracker used on dashboards. */
+.stage-stepper {
+    /* Lays the steps out in a row. */
+    display: flex;
+    /* Centers the steps horizontally. */
+    justify-content: center;
+    /* Aligns the steps to the top of the row. */
+    align-items: flex-start;
+    /* Allows horizontal scrolling when steps overflow. */
+    overflow-x: auto;
+    /* Adds a little vertical padding to the tracker. */
+    padding: 0.25rem 0;
+/* Closes the .stage-stepper rule. */
+}
+/* Starts one step wrapper inside the tracker. */
+.stage-stepper-item {
+    /* Allows the connector line to be positioned within the step. */
+    position: relative;
+    /* Lets steps share the row width equally. */
+    flex: 1 1 0;
+    /* Keeps each step at least 120px wide. */
+    min-width: 120px;
+    /* Stops a step from growing past 220px. */
+    max-width: 220px;
+    /* Stacks the circle and label vertically. */
+    display: flex;
+    /* Keeps the step contents in a column. */
+    flex-direction: column;
+    /* Centers the step contents. */
+    align-items: center;
+/* Closes the .stage-stepper-item rule. */
+}
+/* Starts the clickable button inside each step. */
+.stage-stepper-btn {
+    /* Stacks the circle and label vertically. */
+    display: flex;
+    /* Keeps the button contents in a column. */
+    flex-direction: column;
+    /* Centers the button contents. */
+    align-items: center;
+    /* Adds space between the circle and label. */
+    gap: 0.45rem;
+    /* Makes the button fill the step width. */
+    width: 100%;
+    /* Adds small side padding. */
+    padding: 0 0.5rem;
+    /* Removes the default button background. */
+    background: none;
+    /* Removes the default button border. */
+    border: none;
+    /* Centers the button text. */
+    text-align: center;
+    /* Removes link underlines. */
+    text-decoration: none;
+    /* Inherits the surrounding text color. */
+    color: inherit;
+    /* Shows a pointer cursor on the step. */
+    cursor: pointer;
+/* Closes the .stage-stepper-btn rule. */
+}
+/* Starts the round numbered circle for each step. */
+.stage-stepper-num {
+    /* Allows the circle to stack above the connector line. */
+    position: relative;
+    /* Raises the circle above the connector line. */
+    z-index: 1;
+    /* Sets the circle width to 40 pixels. */
+    width: 40px;
+    /* Sets the circle height to 40 pixels. */
+    height: 40px;
+    /* Makes the circle perfectly round. */
+    border-radius: 50%;
+    /* Uses flex to center the number. */
+    display: flex;
+    /* Centers the number vertically. */
+    align-items: center;
+    /* Centers the number horizontally. */
+    justify-content: center;
+    /* Gives the circle a white background. */
+    background: var(--white);
+    /* Colors the number gray. */
+    color: var(--gray-500);
+    /* Draws a gray circle border. */
+    border: 2px solid var(--gray-300);
+    /* Makes the step number bold. */
+    font-weight: 700;
+    /* Sets the step number size. */
+    font-size: 0.95rem;
+/* Closes the .stage-stepper-num rule. */
+}
+/* Fills the active step circle navy with white text. */
+.stage-stepper-num.active { background: var(--adzu-navy); color: #fff; border-color: var(--adzu-navy-dark); }
+/* Targets completed steps along with highlighted ones. */
+.stage-stepper-num.done,
+/* Fills done step circles green with white text. */
+.stage-stepper-num.highlighted { background: var(--success); color: #fff; border-color: var(--success); }
+/* Starts the label under each step circle. */
+.stage-stepper-label {
+    /* Stops the label from growing wider than 150px. */
+    max-width: 150px;
+    /* Sets the label text small. */
+    font-size: 0.82rem;
+    /* Makes the step label semibold. */
+    font-weight: 600;
+    /* Tightens the line spacing of the label. */
+    line-height: 1.25;
+    /* Colors the step label gray. */
+    color: var(--gray-600);
+    /* Centers the step label text. */
+    text-align: center;
+/* Closes the .stage-stepper-label rule. */
+}
+/* Turns the label navy when the user hovers a step link. */
+a.stage-stepper-btn:hover .stage-stepper-label { color: var(--adzu-navy); }
+/* Makes the current step label bold navy. */
+.stage-stepper-label.is-active { font-weight: 700; color: var(--adzu-navy); }
+/* Colors completed step labels green. */
+.stage-stepper-label.is-done { color: var(--success); }
+/* Adds a small gap above a status badge inside a step. */
+.stage-stepper-btn .status-badge { margin-top: 0.1rem; }
+/* Notes that the connector line links one step circle to the next. */
+/* connector runs from this step's circle to the next step's circle */
+/* Starts the connector line drawn between step circles. */
+.stage-stepper-line {
+    /* Positions the line absolutely inside the step. */
+    position: absolute;
+    /* Aligns the line with the circle center vertically. */
+    top: 19px;
+    /* Starts the line just right of this step's circle. */
+    left: calc(50% + 28px);
+    /* Ends the line just left of the next step's circle. */
+    right: calc(-50% + 28px);
+    /* Sets the connector line thickness. */
+    height: 2px;
+    /* Removes any default margin from the line. */
+    margin: 0;
+    /* Colors the pending connector gray. */
+    background: var(--gray-200);
+    /* Rounds the connector line ends. */
+    border-radius: 2px;
+/* Closes the .stage-stepper-line rule. */
+}
+/* Colors the connector green once the step is done. */
+.stage-stepper-line.done { background: var(--success); }
+/* Starts phone rules for the step tracker. */
+@media (max-width: 640px) {
+    /* Aligns steps to the left so they can scroll. */
+    .stage-stepper { justify-content: flex-start; }
+    /* Narrows each step so more fit on phones. */
+    .stage-stepper-item { min-width: 104px; }
+/* Closes the tracker phone media block. */
+}
+/* Draws a small round icon used beside each workflow step. */
+.step-icon { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+/* Shows a green filled icon for completed steps. */
+.step-icon-done { background: var(--success); color: #fff; font-size: 0.65rem; }
+/* Shows an orange filled icon for flagged steps. */
+.step-icon-flagged { background: var(--warning); color: #fff; font-size: 0.65rem; }
+/* Shows a navy ring for the current step. */
+.step-icon-active { border: 2px solid var(--adzu-navy); background: #fff; }
+/* Draws a small navy dot for unstarted steps. */
+.step-icon-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--adzu-navy); }
+/* Shows a gray ring for pending steps. */
+.step-icon-pending { border: 2px solid var(--gray-300); background: var(--gray-50); }
+/* Shows a blue filled icon for submitted steps. */
+.step-icon-submitted { background: var(--info); color: #fff; font-size: 0.6rem; }
+/* Starts the vertical list of sub-steps. */
+.substep-list { display: flex; flex-direction: column; gap: 0.75rem; }
+/* Styles one sub-step row with a divider underneath. */
+.substep-row { display: flex; gap: 0.85rem; align-items: flex-start; padding-bottom: 0.75rem; border-bottom: 1px solid var(--gray-100); }
+/* Holds the icon and connecting line in a column. */
+.substep-icon-col { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; margin-top: 1px; }
+/* Draws the vertical line linking sub-step icons. */
+.substep-line { width: 2px; height: 20px; background: var(--gray-200); border-radius: 1px; margin-top: 2px; }
+/* Colors that sub-step line green when done. */
+.substep-line.done { background: var(--success); }
+/* Styles the small gray coordinator chip beside a step. */
+.coord-chip { font-size: 0.65rem; background: var(--gray-100); color: var(--gray-500); padding: 1px 6px; border-radius: 99px; font-weight: 500; }
+
