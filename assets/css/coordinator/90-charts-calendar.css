@@ -583,6 +583,8 @@
 .psc-swatch-confirmed { background: #8e9bff; box-shadow: 0 0 0 3px rgba(142, 155, 255, 0.2); }
 /* Colours the pending swatch gray with a soft ring. */
 .psc-swatch-pending { background: #b6bcc5; box-shadow: 0 0 0 3px rgba(182, 188, 197, 0.2); }
+/* Colours the completed swatch green, matching the completed event background. */
+.psc-swatch-completed { background: #8fd9b8; box-shadow: 0 0 0 3px rgba(143, 217, 184, 0.2); }
 /* Toolbar row holding the month controls and the today button. */
 .psc-toolbar { justify-content: space-between; margin: 0; padding: 1rem 1.5rem 0.75rem; }
 /* Adds a gap between the previous and next controls. */

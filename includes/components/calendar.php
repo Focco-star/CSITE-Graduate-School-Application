@@ -688,6 +688,8 @@ if (!function_exists('renderScheduleCalendar')) {
             <li><span class="psc-swatch psc-swatch-confirmed" aria-hidden="true"></span>Confirmed</li>
 <?php /*             Shows the pending colour swatch in the legend. */ ?>
             <li><span class="psc-swatch psc-swatch-pending" aria-hidden="true"></span>Pending</li>
+<?php /*             Shows the completed colour swatch in the legend. */ ?>
+            <li><span class="psc-swatch psc-swatch-completed" aria-hidden="true"></span>Completed</li>
 <?php /*         Closes the legend list. */ ?>
         </ul>
 <?php /*     Closes the calendar header. */ ?>
