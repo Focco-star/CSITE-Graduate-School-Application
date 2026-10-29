@@ -36,11 +36,14 @@ $students = storeGet('students');
 try {
     // Runs the student query and stores the result in $databaseStudents.
     $databaseStudents = DB::query(
-        // Selects student id, name parts, program, track, adviser and email.
+        // Selects student details and prefers the adviser saved on the application.
         "SELECT s.student_id, s.first_name, s.last_name, s.middle_initial,
-                s.program, s.track, s.adviser_name AS adviser, u.email
+                s.program, s.track,
+                COALESCE(NULLIF(TRIM(ad.adviser), ''), s.adviser_name) AS adviser,
+                u.email
          FROM students s
          INNER JOIN users u ON u.user_id = s.user_id
+         LEFT JOIN application_drafts ad ON ad.user_id = s.user_id
          WHERE s.archived_at IS NULL AND u.role = 'student'
          ORDER BY s.last_name, s.first_name"
     // Fetches all matching rows as an array of student rows.
@@ -164,11 +167,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             // Prepares a query that finds one student row by email address.
             $studentStmt = DB::getConnection()->prepare(
-                // Selects the student name parts, program, track, adviser and email.
+                // Selects student details and prefers the adviser saved on the application.
                 'SELECT s.student_id, s.first_name, s.last_name, s.middle_initial,
-                        s.program, s.track, s.adviser_name AS adviser, u.email
+                        s.program, s.track,
+                        COALESCE(NULLIF(TRIM(ad.adviser), ""), s.adviser_name) AS adviser,
+                        u.email
                  FROM students s
                  INNER JOIN users u ON u.user_id = s.user_id
+                 LEFT JOIN application_drafts ad ON ad.user_id = s.user_id
                  WHERE u.email = :email AND s.archived_at IS NULL
                  LIMIT 1'
             // Closes the prepare call after the SQL text ends.
