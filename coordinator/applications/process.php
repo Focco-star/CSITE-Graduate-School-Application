@@ -1635,24 +1635,51 @@ require_once __DIR__ . '/../../includes/layout/header.php';
             <div class="card-body">
 <?php /*                 Checks that a schedule exists and has a date. */ ?>
                 <?php if ($panel['schedule'] && !empty($panel['schedule']['date'])): ?>
-<?php /*                 Sets $scheduleStatus to confirmed, otherwise pending. */ ?>
-                <?php $scheduleStatus = ($panel['schedule']['status'] ?? '') === 'confirmed' ? 'confirmed' : 'pending'; ?>
-<?php /*                 Opens an alert coloured green when confirmed and yellow otherwise. */ ?>
-                <div class="alert <?= $scheduleStatus === 'confirmed' ? 'alert-success' : 'alert-warning' ?>" style="margin-bottom:1rem;">
-<?php /*                     Shows a check or hourglass icon that matches the schedule status. */ ?>
-                    <i class="fas <?= $scheduleStatus === 'confirmed' ? 'fa-check-circle' : 'fa-hourglass-half' ?>"></i>
+<?php
+// Reads the stage status so a completed stage is shown as completed even if the schedule row is stale.
+$scheduleStageStatus = strtolower(trim((string) ($panel['status'] ?? '')));
+// Reads the stored schedule status.
+$storedScheduleStatus = strtolower(trim((string) ($panel['schedule']['status'] ?? '')));
+// Treats a completed or approved stage as a completed schedule.
+if (in_array($scheduleStageStatus, ['completed', 'approved'], true)) {
+    $scheduleStatus = 'completed';
+// Otherwise keeps one of the valid schedule statuses.
+} elseif (in_array($storedScheduleStatus, ['pending', 'confirmed', 'completed', 'cancelled'], true)) {
+    $scheduleStatus = $storedScheduleStatus;
+// Falls back to pending for a missing or unknown status.
+} else {
+    $scheduleStatus = 'pending';
+}
+// Defines the alert style, icon and label for each schedule status.
+$scheduleAlerts = [
+    'completed' => ['alert-success', 'fa-check-circle', 'Completed'],
+    'confirmed' => ['alert-success', 'fa-check-circle', 'Confirmed'],
+    'pending'   => ['alert-warning', 'fa-hourglass-half', 'Pending Confirmation'],
+    'cancelled' => ['alert-danger', 'fa-times-circle', 'Cancelled'],
+];
+// Reads the values for the current status.
+[$scheduleAlertClass, $scheduleAlertIcon, $scheduleStatusLabel] = $scheduleAlerts[$scheduleStatus];
+?>
+<?php /*                 Opens an alert coloured by the schedule status. */ ?>
+                <div class="alert <?= $scheduleAlertClass ?>" style="margin-bottom:1rem;">
+<?php /*                     Shows an icon that matches the schedule status. */ ?>
+                    <i class="fas <?= $scheduleAlertIcon ?>"></i>
 <?php /*                     Opens the wrapper for the schedule alert text. */ ?>
                     <div>
 <?php /*                         Shows the scheduled date, time and venue when they are set. */ ?>
                         Presentation scheduled: <strong><?= htmlspecialchars((string) $panel['schedule']['date']) ?><?= !empty($panel['schedule']['time']) ? ' — ' . htmlspecialchars((string) $panel['schedule']['time']) : '' ?></strong><?= !empty($panel['schedule']['venue']) ? ', ' . htmlspecialchars((string) $panel['schedule']['venue']) : '' ?>.
-<?php /*                         Shows whether the schedule is confirmed or pending confirmation. */ ?>
-                        Schedule status: <strong><?= $scheduleStatus === 'confirmed' ? 'Confirmed' : 'Pending Confirmation' ?></strong>
+<?php /*                         Shows the exact schedule status. */ ?>
+                        Schedule status: <strong><?= $scheduleStatusLabel ?></strong>
 <?php /*                         Explains how the Presentation Scheduled milestone is treated. */ ?>
-                        — the <strong>Presentation Scheduled</strong> milestone is
-<?php /*                         Says Verified when confirmed, or Pending until confirmed. */ ?>
-                        <?= $scheduleStatus === 'confirmed' ? '<strong>Verified</strong>' : '<strong>Pending</strong> until the schedule is confirmed' ?>
-<?php /*                         Notes that the milestone state shows in both trackers. */ ?>
-                        in both the Coordinator and Student trackers.
+                        <?php if ($scheduleStatus === 'completed'): ?>
+                        — the <strong>Presentation Scheduled</strong> milestone is <strong>Verified</strong> and the presentation is <strong>Complete</strong> in both the Coordinator and Student trackers.
+                        <?php elseif ($scheduleStatus === 'cancelled'): ?>
+                        — the schedule is <strong>Cancelled</strong>, so the <strong>Presentation Scheduled</strong> milestone is not verified in either tracker.
+                        <?php elseif ($scheduleStatus === 'confirmed'): ?>
+                        — the <strong>Presentation Scheduled</strong> milestone is <strong>Verified</strong> in both the Coordinator and Student trackers.
+                        <?php else: ?>
+                        — the <strong>Presentation Scheduled</strong> milestone is <strong>Pending</strong> until the schedule is confirmed.
+                        <?php endif; ?>
 <?php /*                     Closes the schedule alert text wrapper. */ ?>
                     </div>
 <?php /*                 Closes the schedule alert. */ ?>
