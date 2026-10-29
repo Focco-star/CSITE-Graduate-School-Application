@@ -144,8 +144,6 @@ foreach ($students as $s) {
         'track' => getTrackLabel($track),
         // Keeps the program code for the form's Program field.
         'program' => $s['program'],
-        // Keeps the adviser's saved selection for the adviser drop-down.
-        'adviser' => trim((string) ($s['adviser'] ?? '')),
         // Asks for the stage choices with their lock state and reasons.
         'stages' => studentPresentationStageChoices($s['email'], $s),
         // Asks for the label of the stage the student is currently working on.
@@ -625,13 +623,13 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                     Label for the adviser field, marked as required. */ ?>
                     <label>Adviser <span class="required">*</span></label>
 <?php /*                     Adviser drop-down that submits the chosen adviser name. */ ?>
-                    <select name="adviser" id="schedAdviser" required>
+                    <select name="adviser" required>
 <?php /*                         Placeholder option shown before an adviser is picked. */ ?>
                         <option value="">Select adviser</option>
 <?php /*                         Loops over adviser rows and flags those marked unavailable. */ ?>
                         <?php foreach ($adviserOpts as $adviser): $isUnavailable = ($adviser['availability'] ?? '') !== 'available'; ?>
 <?php /*                         Option is disabled when the adviser is not available. */ ?>
-                        <option value="<?= htmlspecialchars($adviser['name'], ENT_QUOTES, 'UTF-8') ?>" data-unavailable="<?= $isUnavailable ? 'true' : 'false' ?>" <?= $isUnavailable ? 'disabled' : '' ?>><?= htmlspecialchars($adviser['name']) ?><?= $isUnavailable ? ' [Unavailable]' : '' ?></option>
+                        <option <?= $isUnavailable ? 'disabled' : '' ?>><?= htmlspecialchars($adviser['name']) ?><?= $isUnavailable ? ' [Unavailable]' : '' ?></option>
 <?php /*                         Closes the loop over the adviser options. */ ?>
                         <?php endforeach; ?>
 <?php /*                         Shows a disabled note when the adviser pool has no rows. */ ?>
@@ -738,7 +736,6 @@ require_once __DIR__ . '/../../includes/layout/header.php';
     const student = document.getElementById('schedStudent');
 <?php /*     Gets the stage drop-down element. */ ?>
     const stage = document.getElementById('schedStage');
-    const adviser = document.getElementById('schedAdviser');
 <?php /*     Gets the read-only course type input. */ ?>
     const track = document.getElementById('schedTrack');
 <?php /*     Gets the read-only program input. */ ?>
@@ -776,31 +773,6 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*     Closes the showLockNotice function. */ ?>
     }
 
-    function selectStudentAdviser(name) {
-        Array.from(adviser.options).forEach(option => {
-            if (option.dataset.studentAdviser === 'true') {
-                option.remove();
-                return;
-            }
-            option.disabled = option.dataset.unavailable === 'true';
-        });
-
-        const adviserName = (name || '').trim();
-        if (!adviserName) {
-            adviser.value = '';
-            return;
-        }
-
-        let option = Array.from(adviser.options).find(item => item.value === adviserName);
-        if (!option) {
-            option = new Option(adviserName, adviserName);
-            option.dataset.studentAdviser = 'true';
-            adviser.add(option);
-        }
-        option.disabled = false;
-        adviser.value = adviserName;
-    }
-
 <?php /*     Function that fills the track, program and stage fields. */ ?>
     function fill() {
 <?php /*         Looks up the selected student's information in the stage map. */ ?>
@@ -815,7 +787,6 @@ require_once __DIR__ . '/../../includes/layout/header.php';
             track.value = '';
 <?php /*             Empties the program box. */ ?>
             program.value = '';
-            selectStudentAdviser('');
 <?php /*             Empties the hint text. */ ?>
             hint.textContent = '';
 <?php /*             Adds the 'Select a student first' placeholder option. */ ?>
@@ -828,7 +799,6 @@ require_once __DIR__ . '/../../includes/layout/header.php';
         track.value = info.track;
 <?php /*         Shows the program code in the program box. */ ?>
         program.value = info.program;
-        selectStudentAdviser(info.adviser);
 <?php /*         Reads the stage entries array, or an empty array. */ ?>
         const stageEntries = info.stages || [];
 <?php /*         Note (1 of 2): the stage the student is working on is preselected. */ ?>
