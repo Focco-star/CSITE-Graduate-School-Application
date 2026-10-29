@@ -123,27 +123,6 @@ $isPdf = ($mimeType === 'application/pdf') || ($extension === 'pdf');
 // Treats the file as Word .docx when its extension or MIME type says so.
 $isDocx = ($extension === 'docx') || (str_contains($mimeType, 'wordprocessingml'));
 
-// Exact Word-faithful rendering: convert .docx to PDF via LibreOffice when
-// installed (cached in storage/converted). Falls back to mammoth.js below.
-// Starts as null; filled with a PDF link when conversion is possible.
-$printPdfUrl = null;
-// Only try PDF conversion for .docx files when the helper exists.
-if ($isDocx && function_exists('convertedPdfPath')) {
-    // Starts a try block because LibreOffice conversion can fail.
-    try {
-        // Asks the helper for a cached PDF version of the document.
-        $converted = convertedPdfPath($path);
-        // If a PDF version exists, the viewer can show it instead of the .docx.
-        if ($converted) {
-            // Builds the download link that requests the converted PDF (pdf=1).
-            $printPdfUrl = url('student/download.php?id=' . urlencode($id) . '&pdf=1');
-        // Closes the if block that checked for a converted PDF.
-        }
-    // Catches conversion errors so the viewer falls back gracefully.
-    } catch (Throwable $e) {}
-// Closes the if block that handled .docx PDF conversion.
-}
-
 // File URLs
 // Builds the link used to open the original file inline.
 $fileUrl = url('student/download.php?id=' . urlencode($id) . '&view=1');
@@ -231,10 +210,10 @@ $downloadUrl = url('student/download.php?id=' . urlencode($id));
 <?php /*     Closes the viewer top bar. */ ?>
     </header>
 
-<?php /*     If the file is a PDF or has a PDF version, show it in a frame. */ ?>
-    <?php if ($isPdf || $printPdfUrl): ?>
+<?php /*     If the file is a PDF, show it in a frame. */ ?>
+    <?php if ($isPdf): ?>
 <?php /*         Shows the PDF inside a frame that fills the window. */ ?>
-        <iframe src="<?= $printPdfUrl ?? $fileUrl ?>" class="viewer-container"></iframe>
+        <iframe src="<?= $fileUrl ?>" class="viewer-container"></iframe>
 <?php /*     Otherwise, when the file is a Word .docx, render it as HTML. */ ?>
     <?php elseif ($isDocx): ?>
 <?php /*         Starts the scrolling area for the rendered Word document. */ ?>
@@ -298,7 +277,7 @@ $downloadUrl = url('student/download.php?id=' . urlencode($id));
 <?php /*             Explains that inline viewing works best for PDF files. */ ?>
             <p>Direct inline viewing is optimized for PDF files.</p>
 <?php /*             Explains that old .doc files must be downloaded to view. */ ?>
-            <p style="font-size:0.8rem;">Legacy Word (.doc) files need Microsoft Word or LibreOffice to view.</p>
+            <p style="font-size:0.8rem;">Legacy Word (.doc) files need Microsoft Word to view.</p>
 <?php /*             Starts a button that downloads the document. */ ?>
             <a href="<?= $downloadUrl ?>" class="btn-download">
 <?php /*                 Shows a download icon in the button. */ ?>

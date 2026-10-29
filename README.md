@@ -6,16 +6,28 @@ It is a plain PHP + MySQL application that runs on XAMPP. There is no build step
 
 ---
 
+## Group Members
+
+- Marc Laurence M. Arbilera
+- Rhett Ushley E. Epino
+- John Matthew S.J. Gler
+- Sean Benedict D. Recto
+- Robbie Ryan A. Torres
+
+---
+
 ## Table of Contents
+
+[Group Members](#group-members)
 
 1. [Purpose](#1-purpose)
 2. [Features](#2-features)
 3. [How the Workflow Works](#3-how-the-workflow-works)
-4. [Technologies Used](#4-technologies-used)
+4. [Tools and Software Used](#4-tools-and-software-used)
 5. [Requirements](#5-requirements)
 6. [Installation](#6-installation)
 7. [How to Run](#7-how-to-run)
-8. [Default Accounts](#8-default-accounts)
+8. [Test Accounts](#8-test-accounts)
 9. [Project Structure](#9-project-structure)
 10. [Configuration](#10-configuration)
 11. [Optional Integrations](#11-optional-integrations)
@@ -73,7 +85,6 @@ Every application follows a fixed set of stages based on the student's program a
 - **Pools** for advisers, panel members, and documenters.
 - **Template library management**, including syncing the official forms from Google Drive.
 - **Archived applications** that can be restored to the active list or permanently deleted.
-- **Reports** for overall progress, panel workload, and per-student status.
 
 ---
 
@@ -116,19 +127,30 @@ Key rules built into the system:
 
 ---
 
-## 4. Technologies Used
+## 4. Tools and Software Used
+
+### Development and hosting tools
+
+| Tool | Version used | Purpose |
+|---|---|---|
+| **XAMPP** | Apache 2.4.58, PHP 8.2.12, MariaDB 10.4.32 | Local development environment. One control panel starts Apache and MySQL together. |
+| **PHP** | 8.2.12 | Server-side language for every page and helper in this project. |
+| **MySQL** | MariaDB 10.4.32 (MySQL compatible) | Stores students, applications, documents, schedules, panels, and payments. |
+| **phpMyAdmin** | 5.2.1 | Creates the database, imports `csite_grad_school.sql`, and inspects or edits tables. |
+| **InfinityFree** | Free PHP/MySQL hosting | Hosts the published copy of the system. See the note below. |
+
+### Application stack
 
 | Layer | Technology |
 |---|---|
-| **Server** | Apache (XAMPP) |
-| **Backend** | PHP 8.2 (tested on 8.2.12), no framework |
-| **Database** | MariaDB 10.4.32 (MySQL compatible), accessed with PDO prepared statements |
+| **Web server** | Apache (bundled with XAMPP) |
+| **Backend** | PHP 8.2, no framework |
+| **Database access** | PDO prepared statements |
 | **Frontend** | HTML5, CSS3, vanilla JavaScript (no build tools) |
-| **Icons and fonts** | Font Awesome, bundled web fonts |
+| **Icons and fonts** | Font Awesome 6, bundled web fonts |
 | **Word preview** | Mammoth.js (in-browser DOCX preview) |
 | **Sign-in** | Google Identity Services (optional) |
 | **Template sync** | Google Drive public folder read through cURL (optional) |
-| **Document conversion** | LibreOffice, used when available (optional) |
 
 ### PHP extensions used
 
@@ -136,11 +158,17 @@ Key rules built into the system:
 
 These are enabled by default in a standard XAMPP installation.
 
+### Hosted copy
+
+The system was published on **InfinityFree** at <http://csite-grad-school.infinityfree.me/>.
+
+That online copy is **outdated and incomplete**. Many changes have been made since it was published, so features and fixes that already exist in this repository are missing from it, and its data does not match the local database. Treat the local XAMPP copy as the current, reference version of the system.
+
 ---
 
 ## 5. Requirements
 
-- Windows, macOS, or Linux with **XAMPP** installed (Apache + PHP 8.1 or newer + MySQL/MariaDB).
+- Windows, macOS, or Linux with **XAMPP** installed (Apache + PHP 8.2 + MySQL/MariaDB). The project was tested on XAMPP with PHP 8.2.12.
 - A web browser (Chrome, Edge, or Firefox).
 - About 350 MB of free disk space (the project plus its bundled uploads), with room to grow as students submit more files.
 - Internet access only for the optional Google features.
@@ -215,16 +243,15 @@ $port = '3306';
 
 The defaults match a standard XAMPP installation, where the `root` user has an empty password.
 
-### Step 6: Make sure the storage folders are writable
+### Step 6: Make sure the storage folder is writable
 
-These folders must exist and be writable by the web server:
+This folder must exist and be writable by the web server:
 
 ```text
 storage/uploads     (student document uploads)
-storage/converted   (converted previews)
 ```
 
-They are included in the project. On Windows with XAMPP they normally work without changes.
+It is included in the project. On Windows with XAMPP it normally works without changes.
 
 ### Step 7: Open the site
 
@@ -233,6 +260,18 @@ http://localhost/CSITE-Graduate-School-Application/
 ```
 
 The root `index.php` redirects to `public/index.php`, which is the public home page.
+
+### Optional: deploy to InfinityFree
+
+The free hosting account does not allow triggers and does not need the two unused `v_*` views, so it uses a prepared dump instead of the main one:
+
+1. Upload the project files to the InfinityFree `htdocs` folder.
+2. Create a database in the InfinityFree control panel.
+3. Import `deploy/csite_grad_school.infinityfree.sql` through phpMyAdmin.
+4. Put the InfinityFree database host, name, user, and password in `includes/config/db.php`.
+5. Open the domain. `BASE_URL` detects the hosted folder automatically.
+
+The version online now was published this way and has not been updated since. Repeat these steps to publish the current code.
 
 ---
 
@@ -250,6 +289,12 @@ The root `index.php` redirects to `public/index.php`, which is the public home p
 4. Log in using the accounts in the next section.
 
 Do not open the PHP files directly from the file system. They must be served by Apache through `http://localhost/...`.
+
+### Live copy (InfinityFree)
+
+The published copy is at <http://csite-grad-school.infinityfree.me/>.
+
+It is kept for demonstration only and is **outdated and incomplete**. Features and fixes added to this repository after that upload are not there, and its data is older. Run the local XAMPP copy when you need the current version.
 
 ### Everyday use
 
@@ -270,17 +315,57 @@ Do not open the PHP files directly from the file system. They must be served by 
 
 ---
 
-## 8. Default Accounts
+## 8. Test Accounts
 
-The bundled database dump includes demo accounts.
+All demo accounts below are part of `csite_grad_school.sql`, so a fresh import gives exactly these logins. Every account uses the password **`Password123`**.
 
-| Role | Email | Password |
-|---|---|---|
-| Coordinator | `gpc-csite@adzu.edu.ph` | `Password123` |
-| Student | `co230159@adzu.edu.ph` | `Password123` |
-| Student | `co240527@adzu.edu.ph` | `Password123` |
+### Accounts by role
 
-All student accounts in the demo data use the same password.
+| Role | Username (email) | Password | Access |
+|---|---|---|---|
+| **Coordinator** | `gpc-csite@adzu.edu.ph` | `Password123` | Full coordinator portal: applications, document verification, payments, schedules, panels, templates |
+| **Student** | any account in the table below (32 total) | `Password123` | Student portal: dashboard, application, templates, profile |
+
+Panel members and advisers **cannot log in**. They are records in the panel and adviser pools that the coordinator assigns to a presentation schedule.
+
+### Student accounts
+
+| Username (email) | Password | Student | Program | Track |
+|---|---|---|---|---|
+| `co222222@adzu.edu.ph` | `Password123` | Afus, Mila | MSCS | Thesis |
+| `co230159@adzu.edu.ph` | `Password123` | Torres, Robbie | Master of Science in Computer Science (Thesis) | Thesis |
+| `co240234@adzu.edu.ph` | `Password123` | Epino, Rhett | MSCS | Thesis |
+| `co240527@adzu.edu.ph` | `Password123` | Arbilera, Marc | Master of Science in Computer Science (Thesis) | Thesis |
+| `co251001@adzu.edu.ph` | `Password123` | Alonzo, Maria Clara | Master of Science in Computer Science | Thesis |
+| `co251002@adzu.edu.ph` | `Password123` | Benedicto, Rafael | Master of Science in Computer Science | Thesis |
+| `co251003@adzu.edu.ph` | `Password123` | Cabrera, Liza Marie | Master of Library and Information Science | Thesis |
+| `co251004@adzu.edu.ph` | `Password123` | Dizon, Angelo | Master of Science in Computer Science | Thesis |
+| `co251005@adzu.edu.ph` | `Password123` | Estrada, Hannah Jane | Master of Science in Computer Science | Thesis |
+| `co251006@adzu.edu.ph` | `Password123` | Fajardo, Miguel Antonio | Master of Library and Information Science | Thesis |
+| `co251007@adzu.edu.ph` | `Password123` | Galvez, Patricia Anne | Master of Science in Computer Science | Thesis |
+| `co251008@adzu.edu.ph` | `Password123` | Hernandez, Kevin Paul | Master of Library and Information Science | Thesis |
+| `co251009@adzu.edu.ph` | `Password123` | Ibarra, Sofia Nicole | Master of Science in Computer Science | Thesis |
+| `co333333@adzu.edu.ph` | `Password123` | Kramer, Leighton | MSLIS | Thesis |
+| `co240092@adzu.edu.ph` | `Password123` | Gler, John | Master in Information Technology | Capstone |
+| `co250250@adzu.edu.ph` | `Password123` | Austin, James | Master in Science Education major in Chemistry (Capstone) | Capstone |
+| `co251010@adzu.edu.ph` | `Password123` | Javier, Carlo Emmanuel | Master in Information Technology | Capstone |
+| `co251011@adzu.edu.ph` | `Password123` | Katigbak, Angela Rose | Master in Information Technology | Capstone |
+| `co251012@adzu.edu.ph` | `Password123` | Lagman, Robert John | Master in Library and Information System | Capstone |
+| `co251013@adzu.edu.ph` | `Password123` | Magbanua, Denise Claire | Master in Information Technology | Capstone |
+| `co251014@adzu.edu.ph` | `Password123` | Ocampo, Christian James | Master in Information Technology | Capstone |
+| `co251015@adzu.edu.ph` | `Password123` | Peralta, Jasmine Mae | Master in Science Education major in Chemistry | Capstone |
+| `co251016@adzu.edu.ph` | `Password123` | Quijano, Mark Anthony | Master in Science Education major in Biology | Capstone |
+| `co251017@adzu.edu.ph` | `Password123` | Rivera, Erika Lyn | Master in Library and Information System | Capstone |
+| `co251018@adzu.edu.ph` | `Password123` | Salvador, Paolo Miguel | Master of Science in Mechanical Engineering | Capstone |
+| `co2402323@adzu.edu.ph` | `Password123` | Lee, Kay | MATH | Seminar |
+| `co251019@adzu.edu.ph` | `Password123` | Tamayo, Alyssa Marie | Master in Mathematics Education | Seminar |
+| `co251020@adzu.edu.ph` | `Password123` | Uy, Samantha Joy | Master in Mathematics Education | Seminar |
+| `co251021@adzu.edu.ph` | `Password123` | Valdez, Patricia Nicole | Master in Science Education major in Physics | Seminar |
+| `co251022@adzu.edu.ph` | `Password123` | Wenceslao, John Patrick | Master in Science Education major in General Science | Seminar |
+| `co251023@adzu.edu.ph` | `Password123` | Yumul, Rachel Anne | Master in Science Education major in Chemistry | Seminar |
+| `jajisahaa@adzu.edu.ph` | `Password123` | Jaji, Shalimar | MATH | Seminar |
+
+The track column is the most useful thing to test with: each track has its own stages and required documents.
 
 > These are demonstration accounts only. Change or remove them before using the system with real student data.
 
@@ -312,8 +397,7 @@ CSITE-Graduate-School-Application/
 │   ├── templates/             Template library management
 │   ├── advisers/              Adviser pool
 │   ├── panel/                 Panel members
-│   ├── documenter/            Documenter pool
-│   └── reports/               Progress, panel, and student reports
+│   └── documenter/            Documenter pool
 │
 ├── includes/
 │   ├── config/                Settings, helpers, database, Google client ID
@@ -334,8 +418,7 @@ CSITE-Graduate-School-Application/
 │   └── vendor/                Font Awesome, fonts, Mammoth.js
 │
 ├── storage/
-│   ├── uploads/               Student-submitted documents (runtime data)
-│   └── converted/             Generated previews (runtime data)
+│   └── uploads/               Student-submitted documents (runtime data)
 │
 ├── database_migrations/       Ordered SQL migrations (newest changes)
 ├── deploy/                    Deployment helpers and hosting-specific SQL dumps
@@ -384,10 +467,6 @@ Mirrors the official forms folder into the portal and shows a notification badge
 - The folder must be shared as **Anyone with the link**.
 - Templates are re-checked at most every 15 minutes.
 - The endpoint `template_sync.php` performs a sync when the Templates page is opened.
-
-### LibreOffice
-
-When LibreOffice is installed, Word documents can be converted and previewed inside the browser with faithful formatting. Without it, the portal falls back to the built-in preview.
 
 ---
 

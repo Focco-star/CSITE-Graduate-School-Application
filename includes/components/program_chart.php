@@ -3,9 +3,9 @@
 /**
  * Shared "Student Population by Academic Program" component.
  *
- * Used by coordinator/dashboard.php and coordinator/reports/dashboard.php so
- * both pages show the same data, colors and chart behavior. The heading can be
- * adapted per page through the optional $options array.
+ * Used by coordinator/dashboard.php so the coordinator sees the same data,
+ * colors and chart behavior. The heading can be adapted per page through the
+ * optional $options array.
  *
  * Usage:  renderProgramPopulationChart($pdo ?? null);
  *         renderProgramPopulationChart($pdo ?? null, ['title' => '...']);
@@ -99,19 +99,17 @@ if (!function_exists('programPopulationPalette')) {
     // // Closes programPopulationInk.
     }
 
-    // /** Documents programPopulationLabels, the code-to-name map. */
+    // /** Documents programPopulationLabels, the optional code-to-name map. */
+    /**
+     * Optional display names. If students.program stores short codes, map them here,
+     * e.g. ['CODE' => 'Full program name']. Left empty on purpose: nothing is invented.
+     */
     // // Declares programPopulationLabels, which returns program display names.
     function programPopulationLabels(): array
     // // Opens the body of programPopulationLabels.
     {
-        return [
-            'mscs' => 'Master of Science in Computer Science',
-            'master of science in computer science' => 'Master of Science in Computer Science',
-            'mslis' => 'Master of Library and Information Science',
-            'master of library and information science' => 'Master of Library and Information Science',
-            'math' => 'Master in Mathematics Education',
-            'master in mathematics education' => 'Master in Mathematics Education',
-        ];
+        // // Returns an empty map, so stored program values are shown as they are.
+        return [];
     // // Closes programPopulationLabels.
     }
 
@@ -255,13 +253,6 @@ if (!function_exists('programPopulationPalette')) {
         $counts = programPopulationCounts($pdo);
         // // Gets optional display names for program codes.
         $labels = programPopulationLabels();
-        $normalizedCounts = [];
-        foreach ($counts as $name => $count) {
-            $name = trim((string) $name);
-            $label = $labels[strtolower($name)] ?? ($name !== '' ? $name : 'Unspecified Program');
-            $normalizedCounts[$label] = ($normalizedCounts[$label] ?? 0) + (int) $count;
-        }
-        $counts = $normalizedCounts;
 
         // // Turns the program keys into strings for sorting.
         $names = array_map('strval', array_keys($counts));
@@ -312,8 +303,8 @@ if (!function_exists('programPopulationPalette')) {
             $programs[] = [
                 // // Stores the raw program name as the slice key.
                 'key'     => $name,
-                // // Uses the normalized full program name.
-                'label'   => $name,
+                // // Uses the display label when mapped, otherwise the raw name.
+                'label'   => (string) ($labels[$name] ?? $name),
                 // // Stores the number of students.
                 'count'   => $count,
                 // // Stores the share of all students, with one decimal place.

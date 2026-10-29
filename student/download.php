@@ -104,47 +104,6 @@ if (!$path || !file_exists($path)) {
 // Closes the if block that handled a missing file on disk.
 }
 
-// 4b. Exact-rendering PDF for Word documents (converted via LibreOffice).
-// Falls through to the original file when no conversion is available.
-// When the URL asks for pdf=1 and conversion exists, serve a PDF copy.
-if (($_GET['pdf'] ?? '') === '1' && function_exists('convertedPdfPath')) {
-    // Starts a try block because PDF conversion can fail.
-    try {
-        // Asks the helper for the cached PDF version of this document.
-        $convertedPdf = convertedPdfPath($path);
-    // Catches any conversion error so the script can fall back to the original.
-    } catch (Throwable $e) {
-        // Uses null to signal that no converted PDF is available.
-        $convertedPdf = null;
-    // Closes the catch block for conversion errors.
-    }
-    // Only send the PDF when a converted file was actually found.
-    if (!empty($convertedPdf)) {
-        // Checks whether output buffering is active before sending headers.
-        if (ob_get_level()) {
-            // Clears buffered output so the PDF bytes are not corrupted.
-            ob_end_clean();
-        // Closes the if block that cleared output buffers.
-        }
-        // Tells the browser that the response is a PDF file.
-        header('Content-Type: application/pdf');
-        // Suggests an inline PDF name based on the original file name.
-        header('Content-Disposition: inline; filename="' . rawurlencode(pathinfo((string) ($upload['fileName'] ?? 'document'), PATHINFO_FILENAME) . '.pdf') . '"');
-        // Sends the exact size of the PDF so the browser can show progress.
-        header('Content-Length: ' . filesize($convertedPdf));
-        // Tells the browser and proxies not to cache this private document.
-        header('Cache-Control: private, max-age=0, must-revalidate');
-        // Legacy header that marks the response as public (HTTP/1.0 style).
-        header('Pragma: public');
-        // Streams the converted PDF file contents to the browser.
-        readfile($convertedPdf);
-        // Stops the script so nothing extra is printed after the PDF.
-        exit;
-    // Closes the if block that sent the converted PDF.
-    }
-// Closes the if block that handled the pdf=1 request.
-}
-
 // 5. Clean output buffers and stream file headers
 // Checks again for active output buffering before the normal download.
 if (ob_get_level()) {
