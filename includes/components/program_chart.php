@@ -113,6 +113,32 @@ if (!function_exists('programPopulationPalette')) {
     // // Closes programPopulationLabels.
     }
 
+    // // Maps a stored program code or full name to its canonical program name.
+    function programPopulationCanonicalName(string $program): string
+    // // Opens the body of programPopulationCanonicalName.
+    {
+        // // Collapses inconsistent spacing before comparing program names.
+        $name = trim(preg_replace('/\s+/', ' ', $program) ?? $program);
+        // // Removes a track label appended to some stored program names.
+        $name = trim(preg_replace('/\s*\((?:thesis|capstone|seminar(?: paper)?)\)\s*$/i', '', $name) ?? $name);
+
+        // // Reads the shared code-to-name map when site settings are loaded.
+        $programs = defined('PROGRAMS') && is_array(PROGRAMS) ? PROGRAMS : [];
+        // // Compares the value with each known code and full program name.
+        foreach ($programs as $code => $fullName) {
+            // // Returns the full program name for either matching representation.
+            if (strcasecmp($name, (string) $code) === 0 || strcasecmp($name, trim((string) $fullName)) === 0) {
+                return (string) $fullName;
+            // // Closes the code/name match check.
+            }
+        // // Closes the known program loop.
+        }
+
+        // // Keeps unrecognized program labels separate and unchanged.
+        return $name;
+    // // Closes programPopulationCanonicalName.
+    }
+
     // // Declares programPopulationConnection, which returns a usable PDO connection.
     function programPopulationConnection(?PDO $pdo): ?PDO
     // // Opens the body of programPopulationConnection.
@@ -183,8 +209,9 @@ if (!function_exists('programPopulationPalette')) {
                 $counts = [];
                 // // Loops over every row returned by the query.
                 foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                    // // Stores the count for this program name as an integer.
-                    $counts[(string) $row['program_name']] = (int) $row['total'];
+                    // // Uses the full program name as the group key and combines aliases.
+                    $name = programPopulationCanonicalName((string) $row['program_name']);
+                    $counts[$name] = ($counts[$name] ?? 0) + (int) $row['total'];
                 // // Closes the row loop.
                 }
                 // // Returns the counts keyed by program name.
@@ -220,7 +247,9 @@ if (!function_exists('programPopulationPalette')) {
                         $name = 'Unspecified Program';
                     // // Closes the empty program check.
                     }
-                    // // Adds one to the count for this program.
+                    // // Groups shorthand codes and track-suffixed names together.
+                    $name = programPopulationCanonicalName($name);
+                    // // Adds one to the count for this canonical program.
                     $counts[$name] = ($counts[$name] ?? 0) + 1;
                 // // Closes the stored student loop.
                 }
