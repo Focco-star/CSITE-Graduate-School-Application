@@ -1,219 +1,248 @@
-<?php /* Starts the PHP code that shows a document in the browser. */ ?>
+<?php /* Opens the page that shows an uploaded student document inside the browser. */ ?>
 <?php
-// Loads the shared config one folder up from the coordinator folder.
+// Loads the shared configuration and helper functions.
 require_once __DIR__ . '/../includes/config/config.php';
-// Loads the database helper to look up the document record.
+// Loads the database class used to find the upload record.
 require_once __DIR__ . '/../includes/config/db.php';
 
-// Checks whether no session has been started yet.
+// Checks whether a session is already running before starting one.
 if (session_status() === PHP_SESSION_NONE) {
-    // Starts the session so login state can be checked.
+    // Starts the session so the signed-in user can be checked.
     session_start();
-// Closes the session start check.
+// Closes the session-start check.
 }
 
-// Ensure authorized coordinator/admin session
-
-// 1. Fetch document parameter and record from database
-// Reads the document id from the URL, or 0 when missing.
-$id = (int) ($_GET['id'] ?? 0);
-// Starts the document variable empty until the record is loaded.
-$doc = null;
-
-// Only looks up the document when a real id was given.
-if ($id > 0) {
-    // Opens a try block around the database lookup.
-    try {
-        // Gets the shared database connection.
-        $pdo = DB::getConnection();
-        // Begins the SQL that selects one document row by id.
-        $stmt = $pdo->prepare("
-            SELECT 
-                d.document_id AS id,
-                d.application_id,
-                d.original_name AS fileName,
-                d.document_type AS docType,
-                d.stored_name,
-                d.mime_type AS mimeType,
-                d.status,
-                d.uploaded_at AS date
-            FROM application_documents d
-            WHERE d.document_id = :id
-            LIMIT 1
-        ");
-        // Runs the query with the document id.
-        $stmt->execute([':id' => $id]);
-        // Fetches the document row as an associative array.
-        $doc = $stmt->fetch(PDO::FETCH_ASSOC);
-    // Catches any error from the document lookup.
-    } catch (Exception $e) {
-        // Leaves the document empty so the 404 message shows.
-        $doc = null;
-    // Closes the lookup error handler.
-    }
-// Closes the document id check.
+// Blocks the request unless the user is signed in as coordinator or admin.
+if (empty($_SESSION['user']) || !in_array($_SESSION['user']['role'] ?? '', ['coordinator', 'admin'], true)) {
+    // Sends an HTTP 403 status meaning access is forbidden.
+    http_response_code(403);
+    // Stops the script and explains who may open the document.
+    exit('Access denied. Please sign in as the Graduate Program Coordinator.');
+// Closes the access check.
 }
 
-// Runs when no document record was found.
-if (!$doc) {
-    // Sets the HTTP status code to 404 Not Found.
+// Reads the document id from the URL and keeps it as text.
+$id = (string) ($_GET['id'] ?? '');
+// Looks up the uploaded document by id in MySQL, then the session store.
+$upload = findUpload($id);
+
+// Stops with a 404 when no matching upload record exists.
+if (!$upload) {
+    // Sends the HTTP 404 Not Found status code.
     http_response_code(404);
-    // Stops the script with a 'not found' message.
-    exit('Document not found in database.');
-// Closes the missing document check.
+    // Stops the script and explains the record is missing.
+    exit('Document not found in the database or storage.');
+// Closes the missing-record check.
 }
 
-// 2. Resolve disk path dynamically
-// Starts the file path empty until it is resolved.
-$filePath = '';
-
-// Checks whether the storage path helper function exists.
-if (function_exists('uploadStoragePath')) {
-    // Asks the helper for the disk path of the stored file.
-    $filePath = uploadStoragePath($doc);
-// Closes the helper check.
-}
-
-// Runs when no path was found or the file is missing.
-if (!$filePath || !file_exists($filePath)) {
-    // Reads the stored file name from the document row.
-    $storedName = $doc['stored_name'] ?? '';
-    // Builds a list of folders where the file might live.
-    $possiblePaths = [
-        // Candidate path inside the app's uploads folder.
-        __DIR__ . '/../uploads/' . $storedName,
-        // Candidate path two folders up in uploads.
-        __DIR__ . '/../../uploads/' . $storedName,
-        // Candidate path inside public/uploads.
-        __DIR__ . '/../public/uploads/' . $storedName,
-        // Candidate path inside the storage/uploads folder.
-        __DIR__ . '/../storage/uploads/' . $storedName,
-    // Closes the list of candidate paths.
-    ];
-
-    // Loops over each candidate path to test it.
-    foreach ($possiblePaths as $p) {
-        // Uses the path when a name exists and the file is really there.
-        if ($storedName !== '' && file_exists($p)) {
-            // Saves the working path for later use.
-            $filePath = $p;
-            // Stops the loop once a real file is found.
-            break;
-        // Closes the candidate check.
-        }
-    // Closes the candidate path loop.
-    }
-// Closes the fallback path search block.
-}
-
-// Runs when the file still cannot be found on disk.
-if (!$filePath || !file_exists($filePath)) {
-    // Sets the HTTP status code to 404 Not Found.
+// Finds the real file location for this upload.
+$path = uploadStoragePath($upload);
+// Stops with a 404 when the file is missing from the server.
+if (!$path || !file_exists($path)) {
+    // Sends the HTTP 404 Not Found status code.
     http_response_code(404);
-    // Stops the script saying the original file is unavailable.
+    // Stops the script and explains the original file is unavailable.
     exit('The original file is unavailable on the server.');
-// Closes the missing file check.
+// Closes the missing-file check.
 }
 
-// Gets the original file name for the header and title.
-$fileName  = $doc['fileName'] ?? 'Document';
-// Gets the file mime type in lowercase.
-$mimeType  = strtolower((string) ($doc['mimeType'] ?? ''));
-// Gets the file extension in lowercase from its name.
+// Reads the original file name, falling back to a simple label.
+$fileName = (string) ($upload['fileName'] ?? 'Document');
+// Reads the stored MIME type in lowercase for comparisons.
+$mimeType = strtolower((string) ($upload['mimeType'] ?? ''));
+// Reads the file extension in lowercase for comparisons.
 $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 
-// Check if document can be rendered inline as PDF
-// Marks the document as a PDF so it can be shown inline.
+// Treats the file as a PDF when its MIME type or extension says so.
 $isPdf = ($mimeType === 'application/pdf') || ($extension === 'pdf');
+// Treats the file as a Word .docx when its MIME type or extension says so.
+$isDocx = ($extension === 'docx') || str_contains($mimeType, 'wordprocessingml');
+// Treats the file as an image when its MIME type or extension says so.
+$isImage = str_starts_with($mimeType, 'image/') || in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'], true);
+// Treats the file as plain text when its MIME type or extension says so.
+$isText = str_starts_with($mimeType, 'text/') || in_array($extension, ['txt', 'csv', 'log'], true);
 
-// Action URLs
-// Builds the inline viewer URL that opens the file in the browser.
-$fileUrl     = url('coordinator/download.php?id=' . urlencode((string)$id) . '&mode=inline');
-// Builds the download URL that forces a file download.
-$downloadUrl = url('coordinator/download.php?id=' . urlencode((string)$id));
-// Closes PHP so the HTML page below can be printed.
+// Builds the link that shows the original file inline in the browser.
+$fileUrl = url('coordinator/download.php?id=' . urlencode((string) ($upload['id'] ?? $id)) . '&mode=inline');
+// Builds the link that downloads the original file as an attachment.
+$downloadUrl = url('coordinator/download.php?id=' . urlencode((string) ($upload['id'] ?? $id)));
+// Closes PHP so the HTML viewer page can be printed.
 ?>
-<?php /* Declares the page as an HTML5 document. */ ?>
+<?php /* Declares the document as an HTML5 page. */ ?>
 <!DOCTYPE html>
-<?php /* Opens the HTML element and sets the page language to English. */ ?>
+<?php /* Sets the page language to English. */ ?>
 <html lang="en">
-<?php /* Opens the head section with page metadata. */ ?>
+<?php /* Starts the head section with the page title and styles. */ ?>
 <head>
-<?php /*     Sets the character encoding to UTF-8. */ ?>
+<?php /*     Tells the browser to use UTF-8 so names show correctly. */ ?>
     <meta charset="UTF-8">
-<?php /*     Makes the page scale correctly on phones and tablets. */ ?>
+<?php /*     Makes the viewer fit mobile and desktop screen widths. */ ?>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<?php /*     Sets the browser tab title using the document name. */ ?>
+<?php /*     Sets the browser tab title to View Document plus the file name. */ ?>
     <title>View Document - <?= htmlspecialchars($fileName) ?></title>
-<?php /*     Loads the Font Awesome icon stylesheet from a CDN. */ ?>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<?php /*     Opens the CSS block that styles the viewer. */ ?>
+<?php /*     Loads the Font Awesome icons used in the header buttons. */ ?>
+    <link rel="stylesheet" href="<?= asset('vendor/fontawesome/all.min.css') ?>">
+<?php /*     Starts the CSS rules for the dark document viewer. */ ?>
     <style>
-<?php /*         Resets spacing and sets a system font for all elements. */ ?>
+<?php /*         Resets spacing and sets a clean system font for every element. */ ?>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-<?php /*         Makes the body a full-height dark column layout. */ ?>
+<?php /*         Makes the page a full-height column with a dark background. */ ?>
         body { display: flex; flex-direction: column; height: 100vh; background-color: #1e1e1e; color: #fff; }
-<?php /*         Styles the dark header bar with file info and download button. */ ?>
-        .viewer-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.5rem; background-color: #2d2d2d; border-bottom: 1px solid #3f3f3f; height: 57px; }
-<?php /*         Lays out the file icon and name in a row, hiding overflow. */ ?>
-        .file-info { display: flex; align-items: center; gap: 0.75rem; overflow: hidden; }
-<?php /*         Styles the file name to cut off with an ellipsis. */ ?>
+<?php /*         Styles the top bar holding the file name and the buttons. */ ?>
+        .viewer-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 1.5rem; background-color: #2d2d2d; border-bottom: 1px solid #3f3f3f; min-height: 57px; flex-wrap: wrap; }
+<?php /*         Lays out the file icon and file name in a flexible row. */ ?>
+        .file-info { display: flex; align-items: center; gap: 0.75rem; overflow: hidden; min-width: 0; }
+<?php /*         Styles the file name, cutting it off with an ellipsis when long. */ ?>
         .file-name { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-<?php /*         Styles the blue download button with rounded corners. */ ?>
+<?php /*         Lays out the header buttons in a row. */ ?>
+        .viewer-actions { display: flex; align-items: center; gap: 0.5rem; }
+<?php /*         Styles the blue Download File button. */ ?>
         .btn-download { display: inline-flex; align-items: center; gap: 0.5rem; background-color: #2563eb; color: #fff; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: background 0.2s; }
-<?php /*         Darkens the download button when the mouse hovers. */ ?>
+<?php /*         Darkens the download button when the mouse hovers over it. */ ?>
         .btn-download:hover { background-color: #1d4ed8; }
-<?php /*         Makes the viewer fill the remaining page height. */ ?>
+<?php /*         Styles the grey Back button. */ ?>
+        .btn-back { display: inline-flex; align-items: center; gap: 0.5rem; background-color: #3f3f3f; color: #fff; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: background 0.2s; }
+<?php /*         Lightens the Back button when the mouse hovers over it. */ ?>
+        .btn-back:hover { background-color: #525252; }
+<?php /*         Makes the PDF iframe fill the rest of the window. */ ?>
         .viewer-container { flex: 1; width: 100%; height: calc(100vh - 57px); border: none; }
-<?php /*         Styles the centered fallback message for non-PDF files. */ ?>
+<?php /*         Centres images inside the remaining window space. */ ?>
+        .image-stage { flex: 1; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 1.5rem; background-color: #141414; }
+<?php /*         Keeps images inside the visible window. */ ?>
+        .image-stage img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 4px 24px rgba(0,0,0,0.45); }
+<?php /*         Centres the fallback message for files that cannot be shown. */ ?>
         .fallback-message { display: flex; flex-direction: column; align-items: center; justify-content: center; height: calc(100vh - 57px); gap: 1rem; color: #aaa; text-align: center; padding: 2rem; }
-<?php /*     Closes the CSS block. */ ?>
+<?php /*         Adds a scrolling area for rendered Word documents. */ ?>
+        .docx-scroll { flex: 1; overflow-y: auto; padding: 1.5rem; }
+<?php /*         Styles the small status line above a rendered document. */ ?>
+        .docx-status { max-width: 850px; margin: 0 auto 1rem; color: #aaa; font-size: 0.9rem; text-align: center; }
+<?php /*         Styles the white paper sheet that holds the rendered document. */ ?>
+        .docx-paper { background: #fff; color: #1e293b; border-radius: 8px; padding: 2.5rem 3rem; max-width: 850px; margin: 0 auto; box-shadow: 0 4px 24px rgba(0,0,0,0.45); font-size: 0.95rem; line-height: 1.65; }
+<?php /*         Styles document headings inside the rendered page. */ ?>
+        .docx-paper h1, .docx-paper h2, .docx-paper h3, .docx-paper h4 { color: #0f172a; margin: 1.25em 0 0.5em; line-height: 1.3; }
+<?php /*         Sets heading sizes for h1 and h2 inside the rendered page. */ ?>
+        .docx-paper h1 { font-size: 1.5rem; } .docx-paper h2 { font-size: 1.25rem; }
+<?php /*         Adds space below paragraphs in the rendered document. */ ?>
+        .docx-paper p { margin: 0 0 0.75em; }
+<?php /*         Indents lists inside the rendered document. */ ?>
+        .docx-paper ul, .docx-paper ol { margin: 0 0 0.75em 1.5rem; }
+<?php /*         Makes tables in the rendered document collapse their borders. */ ?>
+        .docx-paper table { border-collapse: collapse; margin: 0 0 1em; max-width: 100%; }
+<?php /*         Adds thin borders and padding to table cells. */ ?>
+        .docx-paper th, .docx-paper td { border: 1px solid #cbd5e1; padding: 0.4rem 0.6rem; font-size: 0.85rem; }
+<?php /*         Keeps images inside the rendered document at the paper width. */ ?>
+        .docx-paper img { max-width: 100%; height: auto; }
+<?php /*     Closes the CSS block for the viewer. */ ?>
     </style>
 <?php /* Closes the head section. */ ?>
 </head>
-<?php /* Opens the page body. */ ?>
+<?php /* Starts the visible page body. */ ?>
 <body>
 
-<?php /*     Opens the dark header bar of the viewer. */ ?>
+<?php /*     Starts the top bar of the viewer. */ ?>
     <header class="viewer-header">
-<?php /*         Opens the box holding the file icon and name. */ ?>
+<?php /*         Groups the file icon and file name together. */ ?>
         <div class="file-info">
-<?php /*             Shows a blue file icon. */ ?>
+<?php /*             Shows a document icon. */ ?>
             <i class="fas fa-file-alt" style="color: #60a5fa;"></i>
-<?php /*             Shows the document's file name. */ ?>
+<?php /*             Shows the document file name in the top bar. */ ?>
             <span class="file-name"><?= htmlspecialchars($fileName) ?></span>
-<?php /*         Closes the file info box. */ ?>
+<?php /*         Closes the file info group. */ ?>
         </div>
-<?php /*         Download link pointing to the download URL. */ ?>
-        <a href="<?= $downloadUrl ?>" class="btn-download">
-<?php /*             Shows a download icon inside the link. */ ?>
-            <i class="fas fa-download"></i> Download File
-<?php /*         Closes the download link. */ ?>
-        </a>
-<?php /*     Closes the header bar. */ ?>
+<?php /*         Groups the Back and Download buttons. */ ?>
+        <div class="viewer-actions">
+<?php /*             Returns the coordinator to the application page. */ ?>
+            <a href="javascript:history.back()" class="btn-back"><i class="fas fa-arrow-left"></i> Back</a>
+<?php /*             Starts the download link for the file. */ ?>
+            <a href="<?= $downloadUrl ?>" class="btn-download"><i class="fas fa-download"></i> Download File</a>
+<?php /*         Closes the header buttons group. */ ?>
+        </div>
+<?php /*     Closes the viewer top bar. */ ?>
     </header>
 
-<?php /*     Only shows the inline viewer when the file is a PDF. */ ?>
+<?php /*     Shows PDF files inside a frame. */ ?>
     <?php if ($isPdf): ?>
-<?php /*         Embedded frame that displays the PDF inline. */ ?>
-        <iframe src="<?= $fileUrl ?>" class="viewer-container"></iframe>
-<?php /*     Runs when the file is not a PDF. */ ?>
+<?php /*         Shows the PDF inside a frame that fills the window. */ ?>
+        <iframe src="<?= $fileUrl ?>" class="viewer-container" title="<?= htmlspecialchars($fileName) ?>"></iframe>
+<?php /*     Shows image files directly on the page. */ ?>
+    <?php elseif ($isImage): ?>
+<?php /*         Opens the stage that centres the image. */ ?>
+        <div class="image-stage">
+<?php /*             Shows the uploaded image at its natural aspect ratio. */ ?>
+            <img src="<?= $fileUrl ?>" alt="<?= htmlspecialchars($fileName) ?>">
+<?php /*         Closes the image stage. */ ?>
+        </div>
+<?php /*     Shows plain text files inside a frame. */ ?>
+    <?php elseif ($isText): ?>
+<?php /*         Shows the text file inside a frame that fills the window. */ ?>
+        <iframe src="<?= $fileUrl ?>" class="viewer-container" title="<?= htmlspecialchars($fileName) ?>"></iframe>
+<?php /*     Renders Word .docx files as HTML. */ ?>
+    <?php elseif ($isDocx): ?>
+<?php /*         Starts the scrolling area for the rendered Word document. */ ?>
+        <div class="docx-scroll">
+<?php /*             Shows a rendering spinner while mammoth.js works. */ ?>
+            <div id="docxStatus" class="docx-status"><i class="fas fa-spinner fa-spin"></i> Rendering document…</div>
+<?php /*             Holds the rendered document; hidden until rendering finishes. */ ?>
+            <article id="docxBody" class="docx-paper" style="display:none;"></article>
+<?php /*         Closes the scrolling area. */ ?>
+        </div>
+<?php /*         Loads the mammoth.js library that converts .docx to HTML. */ ?>
+        <script src="<?= asset('vendor/mammoth.browser.min.js') ?>"></script>
+<?php /*         Starts the script that renders the Word document in the browser. */ ?>
+        <script>
+<?php /*         Starts a self-running function so its variables stay private. */ ?>
+        (function () {
+<?php /*             Gets the status line element by its id. */ ?>
+            var statusEl = document.getElementById('docxStatus');
+<?php /*             Gets the paper element where the document will be inserted. */ ?>
+            var bodyEl = document.getElementById('docxBody');
+<?php /*             Fetches the document file from the server as binary data. */ ?>
+            fetch(<?= json_encode($fileUrl) ?>, { credentials: 'same-origin' })
+<?php /*                 Handles the response once it arrives. */ ?>
+                .then(function (res) {
+<?php /*                     Throws an error when the server did not return the file. */ ?>
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+<?php /*                     Reads the response body as an ArrayBuffer for mammoth. */ ?>
+                    return res.arrayBuffer();
+<?php /*                 Closes the response handler. */ ?>
+                })
+<?php /*                 Converts the Word bytes to HTML with mammoth.js. */ ?>
+                .then(function (buf) { return mammoth.convertToHtml({ arrayBuffer: buf }); })
+<?php /*                 Handles the converted result. */ ?>
+                .then(function (result) {
+<?php /*                     Reads the generated HTML and trims surrounding spaces. */ ?>
+                    var html = (result.value || '').trim();
+<?php /*                     Shows the HTML, or a friendly note when the document is empty. */ ?>
+                    bodyEl.innerHTML = html !== '' ? html : '<p><em>This document appears to be empty.</em></p>';
+<?php /*                     Makes the rendered paper visible. */ ?>
+                    bodyEl.style.display = '';
+<?php /*                     Hides the loading spinner. */ ?>
+                    statusEl.style.display = 'none';
+<?php /*                 Closes the result handler. */ ?>
+                })
+<?php /*                 Catches any rendering error. */ ?>
+                .catch(function () {
+<?php /*                     Shows a message with a link to download the file instead. */ ?>
+                    statusEl.innerHTML = 'Could not render this document in the browser. <a href="<?= $downloadUrl ?>" style="color:#60a5fa;">Download it instead.</a>';
+<?php /*                 Closes the error handler chain. */ ?>
+                });
+<?php /*         Closes the self-running function. */ ?>
+        })();
+<?php /*         Ends the document rendering script. */ ?>
+        </script>
+<?php /*     Shows a download fallback for file types the browser cannot preview. */ ?>
     <?php else: ?>
-<?php /*         Opens the centered fallback message box. */ ?>
+<?php /*         Starts the fallback message box. */ ?>
         <div class="fallback-message">
-<?php /*             Shows a large Word file icon. */ ?>
-            <i class="fas fa-file-word fa-3x" style="color: #60a5fa;"></i>
-<?php /*             Explains that inline viewing works best for PDFs. */ ?>
-            <p>Direct inline viewing is optimized for PDF files.</p>
-<?php /*             Download link for the non-PDF file. */ ?>
-            <a href="<?= $downloadUrl ?>" class="btn-download">
-<?php /*                 Shows a download icon inside the fallback link. */ ?>
-                <i class="fas fa-download"></i> Download to View Document
-<?php /*             Closes the fallback download link. */ ?>
-            </a>
+<?php /*             Shows a large file icon. */ ?>
+            <i class="fas fa-file fa-3x" style="color: #60a5fa;"></i>
+<?php /*             Explains that this file type cannot be shown directly. */ ?>
+            <p>This file type cannot be previewed directly in the browser.</p>
+<?php /*             Starts a button that downloads the document. */ ?>
+            <a href="<?= $downloadUrl ?>" class="btn-download"><i class="fas fa-download"></i> Download to View Document</a>
 <?php /*         Closes the fallback message box. */ ?>
         </div>
-<?php /*     Ends the PDF / fallback check. */ ?>
+<?php /*     Closes the viewer selection block. */ ?>
     <?php endif; ?>
 
 <?php /* Closes the page body. */ ?>

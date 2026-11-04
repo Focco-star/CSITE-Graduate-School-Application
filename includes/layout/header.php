@@ -2,6 +2,8 @@
 <?php
 // Loads config.php once for site settings and helper functions.
 require_once __DIR__ . '/../config/config.php';
+// Loads the database class so account validation can be checked on every portal page.
+require_once __DIR__ . '/../config/db.php';
 
 // Checks whether a session has already been started.
 if (session_status() === PHP_SESSION_NONE) {
@@ -18,6 +20,30 @@ $role        = $role ?? ($_SESSION['user']['role'] ?? 'public');
 $currentPage = $currentPage ?? '';
 // Uses the body class if provided, otherwise an empty value.
 $bodyClass   = $bodyClass ?? '';
+
+// Signs out a student whose account was not approved by the coordinator.
+if ($role === 'student' && function_exists('enforceStudentAccountApproval')) {
+    // Checks the live account status before the page is shown.
+    enforceStudentAccountApproval();
+// Closes the student account check.
+}
+
+// Starts the coordinator notification count at zero.
+$pendingAccountCount = 0;
+// Counts the students waiting for validation on coordinator pages.
+if ($role === 'coordinator' && function_exists('pendingStudentAccountCount')) {
+    // Starts a guarded block so a database problem cannot break the layout.
+    try {
+        // Reads the number of pending student accounts.
+        $pendingAccountCount = pendingStudentAccountCount();
+    // Ignores errors and leaves the badge empty.
+    } catch (Throwable $e) {
+        // Falls back to zero when the count cannot be read.
+        $pendingAccountCount = 0;
+    // Closes the catch block.
+    }
+// Closes the coordinator notification count check.
+}
 
 // Checks for a coordinator page when the session user is not a coordinator.
 if ($role === 'coordinator' && (empty($_SESSION['user']) || ($_SESSION['user']['role'] ?? '') !== 'coordinator')) {
@@ -121,6 +147,22 @@ unset($csiteStyleSections, $csiteStyleSection, $csiteStyleFile);
             </div>
 <?php /*             Starts the area that holds the profile and logout controls. */ ?>
             <div class="topbar-user">
+<?php /*                 Shows the account validation bell to coordinators only. */ ?>
+                <?php if ($role === 'coordinator'): ?>
+<?php /*                 Opens the list of students waiting for account validation. */ ?>
+                <a href="<?= url('coordinator/students/pending.php') ?>" class="topbar-notification<?= $pendingAccountCount > 0 ? ' has-count' : '' ?>" title="<?= (int) $pendingAccountCount ?> student account<?= $pendingAccountCount === 1 ? '' : 's' ?> waiting for validation" aria-label="<?= (int) $pendingAccountCount ?> student account<?= $pendingAccountCount === 1 ? '' : 's' ?> waiting for validation">
+<?php /*                     Bell icon that marks the notification area. */ ?>
+                    <i class="fas fa-bell" aria-hidden="true"></i>
+<?php /*                     Shows the badge only when students are waiting. */ ?>
+                    <?php if ($pendingAccountCount > 0): ?>
+<?php /*                     Caps the visible count at 9+. */ ?>
+                    <span class="topbar-notification-badge"><?= $pendingAccountCount > 9 ? '9+' : (int) $pendingAccountCount ?></span>
+<?php /*                     Closes the badge check. */ ?>
+                    <?php endif; ?>
+<?php /*                 Closes the notification link. */ ?>
+                </a>
+<?php /*                 Closes the coordinator notification check. */ ?>
+                <?php endif; ?>
 <?php /*                 Checks whether the current user is a student. */ ?>
                 <?php if ($role === 'student'): ?>
 <?php /*                 Links the avatar to the student profile page. */ ?>

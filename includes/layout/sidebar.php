@@ -86,6 +86,8 @@ $coordinatorLinks = [
         'submenu' => [
             // Adds the Applications child link.
             ['key' => 'applications',          'label' => 'Applications',         'icon' => 'fa-inbox',       'href' => url('coordinator/applications/manage.php')],
+            // Adds the Account Validation child link for new student accounts.
+            ['key' => 'account_validation',    'label' => 'Account Validation',   'icon' => 'fa-user-check',  'href' => url('coordinator/students/pending.php')],
             // Adds the Archived Application child link.
             ['key' => 'archived_applications', 'label' => 'Archived Application', 'icon' => 'fa-box-archive', 'href' => url('coordinator/applications/archived.php')],
         // Closes the child link list.

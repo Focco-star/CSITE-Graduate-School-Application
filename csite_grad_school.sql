@@ -208,6 +208,7 @@ CREATE TABLE `application_documents` (
   `document_type` varchar(150) NOT NULL,
   `original_name` varchar(255) NOT NULL,
   `stored_name` varchar(255) NOT NULL,
+  `share_token` varchar(64) DEFAULT NULL,
   `mime_type` varchar(100) DEFAULT NULL,
   `file_size` int(11) NOT NULL DEFAULT 0,
   `status` enum('submitted','verified','incomplete','revision') NOT NULL DEFAULT 'submitted',
@@ -1019,6 +1020,9 @@ CREATE TABLE `users` (
   `email` varchar(100) NOT NULL,
   `password` varchar(255) NOT NULL,
   `role` enum('student','coordinator','panel','adviser') NOT NULL,
+  `account_status` enum('pending','approved','rejected') NOT NULL DEFAULT 'approved',
+  `account_reviewed_at` datetime DEFAULT NULL,
+  `account_reviewed_by` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -1176,6 +1180,7 @@ ALTER TABLE `application_comments`
 --
 ALTER TABLE `application_documents`
   ADD PRIMARY KEY (`document_id`),
+  ADD UNIQUE KEY `uniq_application_documents_share_token` (`share_token`),
   ADD KEY `application_documents_application_id` (`application_id`),
   ADD KEY `idx_application_documents_user_id` (`user_id`);
 
@@ -1295,7 +1300,8 @@ ALTER TABLE `tracks`
 ALTER TABLE `users`
   ADD PRIMARY KEY (`user_id`),
   ADD UNIQUE KEY `email` (`email`),
-  ADD KEY `idx_users_full_name` (`full_name`);
+  ADD KEY `idx_users_full_name` (`full_name`),
+  ADD KEY `idx_users_account_status` (`account_status`);
 
 --
 -- Indexes for table `workflow_stages`

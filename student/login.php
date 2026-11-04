@@ -41,6 +41,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Sets an error saying the account is not registered as a student.
                 $loginError = 'Access denied. Account is not registered as a student.';
             // Else branch: the account is a student, so start the login session.
+            } elseif (studentAccountStatus($user) !== 'approved') {
+                // Reads the account status so the right explanation is shown.
+                $accountStatus = studentAccountStatus($user);
+                // Blocks pending and rejected accounts from signing in.
+                $loginError = studentAccountStatusMessage($accountStatus);
+            // Else branch: the account is an approved student, so start the login session.
             } else {
 
                 // Finds the student profile row that belongs to this user id.

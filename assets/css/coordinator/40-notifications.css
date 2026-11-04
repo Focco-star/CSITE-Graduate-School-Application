@@ -491,6 +491,128 @@
 /* Filtering: the generic filter component hides rows via the hidden attribute.
    Any author style that sets display (e.g. .template-item { display:flex }) would
    otherwise override the UA sheet, so enforce hidden everywhere. */
+/* Starts the bell link that opens the account validation list. */
+.topbar .topbar-notification {
+    /* Lets the count badge sit on the corner of the bell. */
+    position: relative;
+    /* Centers the bell inside a round button. */
+    display: inline-flex;
+    /* Centers the bell vertically. */
+    align-items: center;
+    /* Centers the bell horizontally. */
+    justify-content: center;
+    /* Sets the round button size. */
+    width: 38px;
+    height: 38px;
+    /* Rounds the bell button into a circle. */
+    border-radius: 50%;
+    /* Gives the bell a light background. */
+    background: var(--gray-50);
+    /* Draws a light border around the bell. */
+    border: 1px solid var(--gray-200);
+    /* Colors the bell navy. */
+    color: var(--adzu-navy);
+    /* Removes the link underline. */
+    text-decoration: none;
+    /* Animates the hover colours. */
+    transition: background var(--transition), border-color var(--transition), color var(--transition);
+/* Closes the notification bell rule. */
+}
+
+/* Highlights the bell on hover. */
+.topbar .topbar-notification:hover {
+    /* Turns the bell background white. */
+    background: var(--white);
+    /* Strengthens the border on hover. */
+    border-color: var(--gray-300);
+    /* Keeps the bell navy on hover. */
+    color: var(--adzu-navy);
+/* Closes the notification bell hover rule. */
+}
+
+/* Uses a soft gold ring when students are waiting. */
+.topbar .topbar-notification.has-count {
+    /* Gives the bell a warm waiting background. */
+    background: #fff8e8;
+    /* Draws a gold border while accounts are waiting. */
+    border-color: rgba(255, 184, 43, 0.65);
+/* Closes the waiting bell rule. */
+}
+
+/* Starts the red count badge on the bell. */
+.topbar .topbar-notification-badge {
+    /* Pins the badge to the top right corner. */
+    position: absolute;
+    /* Sits the badge slightly outside the bell. */
+    top: -4px;
+    right: -4px;
+    /* Sets a minimum width so two digits fit. */
+    min-width: 1.1rem;
+    /* Sets the badge height. */
+    height: 1.1rem;
+    /* Adds a little horizontal room for the count. */
+    padding: 0 0.25rem;
+    /* Makes the badge a pill shape. */
+    border-radius: 999px;
+    /* Colors the badge red. */
+    background: #e02424;
+    /* Makes the count text white. */
+    color: var(--white);
+    /* Uses a tiny, bold count. */
+    font-size: 0.62rem;
+    font-weight: 800;
+    /* Centers the count text vertically. */
+    line-height: 1.1rem;
+    /* Centers the count text horizontally. */
+    text-align: center;
+    /* Adds a white ring so the badge stands out. */
+    box-shadow: 0 0 0 2px var(--white);
+/* Closes the notification badge rule. */
+}
+
+/* Lays the approve and reject buttons out side by side. */
+.account-review-form {
+    /* Uses a flex row for the two buttons. */
+    display: flex;
+    /* Wraps the buttons on narrow screens. */
+    flex-wrap: wrap;
+    /* Spaces the buttons apart. */
+    gap: 0.35rem;
+/* Closes the review form rule. */
+}
+
+/* Keeps the review buttons from stretching the table cell. */
+.account-review-form .btn { white-space: nowrap; }
+
+/* Adds a little space above the account validation notice. */
+.account-validation-notice { margin-bottom: 1rem; }
+
+/* Starts the small pill that shows a reviewed account decision. */
+.account-status-pill {
+    /* Makes the pill fit its text. */
+    display: inline-flex;
+    /* Centers the label inside the pill. */
+    align-items: center;
+    /* Adds compact padding inside the pill. */
+    padding: 0.18rem 0.55rem;
+    /* Rounds the pill fully. */
+    border-radius: 999px;
+    /* Sets a small label size. */
+    font-size: 0.7rem;
+    /* Makes the label bold. */
+    font-weight: 700;
+    /* Adds a transparent border so every pill keeps its size. */
+    border: 1px solid transparent;
+/* Closes the account status pill rule. */
+}
+
+/* Colors an approved account pill green. */
+.account-status-pill.is-approved { background: var(--success-bg); border-color: #bbf7d0; color: #166534; }
+/* Colors a rejected account pill red. */
+.account-status-pill.is-rejected { background: var(--danger-bg); border-color: #fecaca; color: #991b1b; }
+/* Colors a pending account pill amber. */
+.account-status-pill.is-pending { background: var(--warning-bg); border-color: #fde68a; color: #854d0e; }
+
 /* Forces any element with the hidden attribute to stay hidden. */
 [hidden] { display: none !important; }
 

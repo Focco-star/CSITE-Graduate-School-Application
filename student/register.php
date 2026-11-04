@@ -77,6 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             // Opens the shared PDO database connection.
             $pdo = DB::getConnection();
+            // Adds the account validation columns when they are missing.
+            ensureAccountValidationSchema();
 
             // Looks for an existing user row with the same email.
             $existingUser = DB::find('users', ['email' => $email]);
@@ -118,7 +120,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Hashes the password before saving it, never plain text.
                 'password'  => password_hash($password, PASSWORD_DEFAULT),
                 // Gives the new account the student role.
-                'role'      => 'student'
+                'role'      => 'student',
+                // Keeps the new account locked until the coordinator validates it.
+                'account_status' => 'pending'
             // Closes the user column array and runs the insert.
             ]);
 
@@ -179,42 +183,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Saves both inserts permanently.
             $pdo->commit();
 
-            // Refreshes the student info stored in the session.
-            upsertSessionStudent([
-                // Stores the email in the session student data.
-                'email' => $email,
-                // Stores the first name in the session student data.
-                'first_name' => $first,
-                // Stores the last name in the session student data.
-                'last_name' => $last,
-                // Stores the middle initial in the session student data.
-                'middle_initial' => $middleInitial,
-                // Stores the age in the session student data.
-                'age' => $age,
-                // Stores the gender in the session student data.
-                'gender' => $gender,
-                // Stores the program in the session student data.
-                'program' => $program,
-                // Stores today's date as the enrollment date.
-                'enrollment_date' => date('Y-m-d'),
-            // Closes the session student array.
-            ]);
-
-            // Logs the new user in by saving their row in the session.
-            $_SESSION['user'] = $user;
-            // Stores the user id as an integer.
-            $_SESSION['user_id'] = (int) $user['user_id'];
-            // Stores the email in the session.
-            $_SESSION['email'] = $email;
-            // Stores the full name in the session.
-            $_SESSION['full_name'] = $user['full_name'];
-            // Marks the session role as student.
-            $_SESSION['role'] = 'student';
             // Clears the temporary Google profile from the session.
             googleClearProfile();
-            // Queues a success message for the login page.
-            setFlash('success', 'Account created successfully. Please sign in to continue.');
-            // Sends the student to the login page.
+            // Queues the message that explains the account needs validation.
+            setFlash('success', 'Account created successfully. The coordinator must validate your account before you can sign in.');
+            // Sends the student to the login page without signing them in.
             redirectTo('student/login.php');
 
         // Catches any exception thrown while saving the account.
@@ -306,7 +279,7 @@ $trackHints = [
 <?php /*         Main heading telling the student to complete their profile. */ ?>
         <h1>Student Profile Setup</h1>
 <?php /*         Subtitle explaining the form is the last step. */ ?>
-        <p class="login-subtitle">Complete your profile to get started</p>
+        <p class="login-subtitle">Create your account. The coordinator validates it before your first sign-in.</p>
 
 <?php /*         If the previous attempt had an error, show it. */ ?>
         <?php if ($registerError): ?>
@@ -556,10 +529,18 @@ $trackHints = [
                 Password must be at least 5 characters and include at least 1 number. Longer passwords are accepted.
 <?php /*             Closes the password note paragraph. */ ?>
             </p>
+<?php /*             Explains that a coordinator must approve the new account. */ ?>
+            <div class="alert alert-info" style="margin-bottom:1.25rem;font-size:0.78rem;">
+<?php /*                 Clock icon marking the approval step. */ ?>
+                <i class="fas fa-clock"></i>
+<?php /*                 Tells the student who validates the account. */ ?>
+                <span>After you submit, the Graduate Program Coordinator will validate your account. You can sign in only after it is approved.</span>
+<?php /*             Closes the approval note. */ ?>
+            </div>
 <?php /*             Big submit button that sends the whole form. */ ?>
             <button type="submit" class="btn btn-primary btn-lg">
-<?php /*                 Check icon and the text Complete Setup & Continue. */ ?>
-                <i class="fas fa-check-circle"></i> Complete Setup &amp; Continue
+<?php /*                 Check icon and the text Create Account. */ ?>
+                <i class="fas fa-check-circle"></i> Create Account
 <?php /*             Closes the submit button. */ ?>
             </button>
 <?php /*         Closes the registration form. */ ?>

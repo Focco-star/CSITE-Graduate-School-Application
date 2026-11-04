@@ -1471,6 +1471,10 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                                 $isReceipt = (bool) $document
                                     // Classifies the document type to see whether it is a receipt.
                                     && classifyUploadDocType((string) ($document['docType'] ?? '')) === 'receipt';
+                                // Finds the stored file once, so the row can show its actions.
+                                $documentFilePath = $document ? uploadStoragePath($document) : null;
+                                // Builds the shareable link copied by the Copy Link button.
+                                $shareUrl = $documentFilePath ? documentShareUrl($document) : '';
                             // Closes the PHP block that prepared the row values.
                             ?>
 <?php /*                             Opens one table row for this document or requirement. */ ?>
@@ -1518,7 +1522,12 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                                     Checks whether the student uploaded this document. */ ?>
                                     <?php if ($document): ?>
 <?php /*                                         Checks whether the uploaded file still exists in storage. */ ?>
-                                        <?php if (uploadStoragePath($document)): ?>
+                                        <?php if ($documentFilePath): ?>
+<?php /*                                         Copy Link button copies a shareable address for this exact file. */ ?>
+                                        <?php if ($shareUrl !== ''): ?>
+                                        <a class="btn btn-sm btn-outline" href="<?= htmlspecialchars($shareUrl) ?>" data-copy-doc-url="<?= htmlspecialchars($shareUrl) ?>" title="Copy a shareable link to this document"><i class="fas fa-link"></i> Copy Link</a>
+<?php /*                                         Closes the copy-link availability check. */ ?>
+                                        <?php endif; ?>
 <?php /*                                         Download button opens the coordinator download script for the file. */ ?>
                                         <a class="btn btn-sm btn-outline" href="<?= url('coordinator/download.php?id=' . urlencode($document['id'])) ?>"><i class="fas fa-download"></i> Download</a>
 <?php /*                                         Starts the branch used when the file is missing from storage. */ ?>
@@ -2301,6 +2310,151 @@ $scheduleAlerts = [
 <?php /* Runs and closes the page script wrapper. */ ?>
 })();
 <?php /* Closes the script block. */ ?>
+</script>
+
+<?php /* Starts the script that copies a document share link to the clipboard. */ ?>
+<script>
+<?php /* Wraps the copy helper in an IIFE so its variables stay private. */ ?>
+(function () {
+<?php /*     Copies text with the clipboard API, or the older browser command. */ ?>
+    function copyText(text) {
+<?php /*         Uses the modern clipboard API when the browser allows it. */ ?>
+        if (navigator.clipboard && window.isSecureContext) {
+<?php /*             Returns the clipboard promise from the modern API. */ ?>
+            return navigator.clipboard.writeText(text);
+<?php /*         Closes the modern clipboard check. */ ?>
+        }
+<?php /*         Starts a promise for the fallback copy method. */ ?>
+        return new Promise(function (resolve, reject) {
+<?php /*             Creates a temporary text area that holds the link. */ ?>
+            var area = document.createElement('textarea');
+<?php /*             Puts the link inside the temporary text area. */ ?>
+            area.value = text;
+<?php /*             Keeps the text area invisible but selectable. */ ?>
+            area.style.position = 'fixed';
+<?php /*             Hides the text area from view. */ ?>
+            area.style.opacity = '0';
+<?php /*             Adds the text area to the page. */ ?>
+            document.body.appendChild(area);
+<?php /*             Selects the link text. */ ?>
+            area.select();
+<?php /*             Tries the older copy command used by browsers without the clipboard API. */ ?>
+            try {
+<?php /*                 Resolves when the copy command reports success. */ ?>
+                if (document.execCommand('copy')) { resolve(); } else { reject(new Error('Copy failed')); }
+<?php /*             Catches browsers that block the older copy command. */ ?>
+            } catch (error) {
+<?php /*                 Rejects so the page can show the manual copy prompt. */ ?>
+                reject(error);
+<?php /*             Closes the fallback copy try block. */ ?>
+            }
+<?php /*             Removes the temporary text area from the page. */ ?>
+            document.body.removeChild(area);
+<?php /*         Closes the fallback copy promise. */ ?>
+        });
+<?php /*     Closes the copyText function. */ ?>
+    }
+
+<?php /*     Shows a small box with the link when the browser blocks copying. */ ?>
+    function showCopyFallback(url) {
+<?php /*         Creates the dark backdrop that covers the page. */ ?>
+        var backdrop = document.createElement('div');
+<?php /*         Positions the backdrop over the whole window. */ ?>
+        backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:1rem;';
+<?php /*         Creates the white box that holds the link. */ ?>
+        var box = document.createElement('div');
+<?php /*         Styles the box and keeps it usable on small screens. */ ?>
+        box.style.cssText = 'background:#fff;color:#1e293b;border-radius:10px;padding:1.25rem;max-width:560px;width:100%;box-shadow:0 18px 45px rgba(0,0,0,.3);font-family:system-ui,sans-serif;';
+<?php /*         Creates the heading for the manual copy box. */ ?>
+        var heading = document.createElement('h3');
+<?php /*         Sets the heading text. */ ?>
+        heading.textContent = 'Copy this document link';
+<?php /*         Styles the heading inside the box. */ ?>
+        heading.style.cssText = 'margin:0 0 .5rem;font-size:1.05rem;color:#0f172a;';
+<?php /*         Explains why the box appeared. */ ?>
+        var hint = document.createElement('p');
+<?php /*         Sets the short explanation text. */ ?>
+        hint.textContent = 'Your browser blocked automatic copying. Select the link below and copy it.';
+<?php /*         Styles the explanation text. */ ?>
+        hint.style.cssText = 'margin:0 0 .75rem;font-size:.85rem;color:#475569;';
+<?php /*         Creates the read-only field that holds the link. */ ?>
+        var field = document.createElement('input');
+<?php /*         Sets the field type so the link can be selected. */ ?>
+        field.type = 'text';
+<?php /*         Puts the shareable link in the field. */ ?>
+        field.value = url;
+<?php /*         Makes the field read only so the link is not edited by accident. */ ?>
+        field.readOnly = true;
+<?php /*         Styles the field so the whole link is easy to select. */ ?>
+        field.style.cssText = 'width:100%;padding:.6rem .7rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.85rem;color:#0f172a;background:#f8fafc;';
+<?php /*         Creates the row that holds the box buttons. */ ?>
+        var actions = document.createElement('div');
+<?php /*         Aligns the buttons to the right. */ ?>
+        actions.style.cssText = 'display:flex;justify-content:flex-end;gap:.5rem;margin-top:.9rem;';
+<?php /*         Creates the close button. */ ?>
+        var close = document.createElement('button');
+<?php /*         Prevents the button from submitting the surrounding form. */ ?>
+        close.type = 'button';
+<?php /*         Sets the close button label. */ ?>
+        close.textContent = 'Close';
+<?php /*         Styles the close button. */ ?>
+        close.style.cssText = 'border:1px solid #cbd5e1;background:#fff;color:#334155;padding:.45rem .9rem;border-radius:6px;cursor:pointer;font-size:.85rem;';
+<?php /*         Removes the box when the close button is clicked. */ ?>
+        close.addEventListener('click', function () { backdrop.remove(); });
+<?php /*         Removes the box when the dark backdrop is clicked. */ ?>
+        backdrop.addEventListener('click', function (event) { if (event.target === backdrop) backdrop.remove(); });
+<?php /*         Adds the buttons to the action row. */ ?>
+        actions.appendChild(close);
+<?php /*         Adds the heading, hint, field and buttons to the box. */ ?>
+        box.appendChild(heading);
+<?php /*         Adds the explanation to the box. */ ?>
+        box.appendChild(hint);
+<?php /*         Adds the link field to the box. */ ?>
+        box.appendChild(field);
+<?php /*         Adds the button row to the box. */ ?>
+        box.appendChild(actions);
+<?php /*         Adds the box to the backdrop. */ ?>
+        backdrop.appendChild(box);
+<?php /*         Adds the backdrop to the page. */ ?>
+        document.body.appendChild(backdrop);
+<?php /*         Selects the link so the teacher can copy it immediately. */ ?>
+        field.focus();
+<?php /*         Highlights the whole link. */ ?>
+        field.select();
+<?php /*     Closes the fallback box function. */ ?>
+    }
+
+<?php /*     Listens for clicks on any Copy Link button on the page. */ ?>
+    document.addEventListener('click', function (event) {
+<?php /*         Finds the Copy Link button that was clicked. */ ?>
+        var button = event.target.closest('[data-copy-doc-url]');
+<?php /*         Stops when the click was somewhere else. */ ?>
+        if (!button) return;
+<?php /*         Reads the shareable address stored on the button. */ ?>
+        var url = button.getAttribute('data-copy-doc-url');
+<?php /*         Stops when the button has no address. */ ?>
+        if (!url) return;
+<?php /*         Copies the link instead of opening it, so the click copies. */ ?>
+        event.preventDefault();
+<?php /*         Keeps the original button contents so they can be restored. */ ?>
+        var original = button.innerHTML;
+<?php /*         Copies the link to the clipboard. */ ?>
+        copyText(url).then(function () {
+<?php /*             Tells the coordinator the link was copied. */ ?>
+            button.innerHTML = '<i class="fas fa-check"></i> Copied!';
+<?php /*             Restores the button after a short confirmation. */ ?>
+            setTimeout(function () { button.innerHTML = original; }, 2000);
+<?php /*         Handles a blocked clipboard by showing the link for manual copying. */ ?>
+        }).catch(function () {
+<?php /*             Opens a small box that lets the coordinator copy the link by hand. */ ?>
+            showCopyFallback(url);
+<?php /*         Closes the copy result handler. */ ?>
+        });
+<?php /*     Closes the Copy Link click listener. */ ?>
+    });
+<?php /* Runs and closes the copy-link script wrapper. */ ?>
+})();
+<?php /* Closes the copy-link script block. */ ?>
 </script>
 
 <?php /* Loads the shared footer that closes the page layout. */ ?>

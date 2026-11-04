@@ -61,8 +61,8 @@ Every application follows a fixed set of stages based on the student's program a
 
 ### Student portal
 
-- **Account registration** using an ADZU email and ADZU ID number.
-- **Login** with email and password, or with Google Sign-In.
+- **Account registration** using an ADZU email and ADZU ID number. New accounts start as **waiting for validation** and cannot sign in until the coordinator approves them.
+- **Login** with email and password, or with Google Sign-In. Pending and rejected accounts are blocked with an explanation.
 - **Dashboard** showing current progress, pending requirements, and the next step.
 - **Online application** for the appropriate presentation stage of the student's program.
 - **Draft saving**, so a partly filled application can be resumed later.
@@ -85,6 +85,8 @@ Every application follows a fixed set of stages based on the student's program a
 - **Pools** for advisers, panel members, and documenters.
 - **Template library management**, including syncing the official forms from Google Drive.
 - **Archived applications** that can be restored to the active list or permanently deleted.
+- **Account validation** page, reached from the bell badge in the top bar, where new student accounts can be approved or rejected before the student can sign in.
+- **Shareable document links** in Applications → Edit → Documents and Requirements. The Copy Link action copies an unguessable link that opens the exact uploaded file in a browser, even for someone who is not signed in.
 
 ---
 
@@ -317,7 +319,7 @@ It is kept for demonstration only and is **outdated and incomplete**. Features a
 
 ## 8. Test Accounts
 
-All demo accounts below are part of `csite_grad_school.sql`, so a fresh import gives exactly these logins. Every account uses the password **`Password123`**.
+All demo accounts below are part of `csite_grad_school.sql`, so a fresh import gives exactly these logins. Every account uses the password **`Password123`**. The seeded accounts are already approved; only accounts created through the registration page need coordinator validation.
 
 ### Accounts by role
 
