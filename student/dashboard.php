@@ -404,12 +404,18 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
                         // the milestone the student is working on.
                         // Reads the document type required by this milestone.
                         $stepDocType = (string) ($step['docType'] ?? '');
+                        // Uses Apply for paper submissions, Upload for forms, and a receipt-specific label for payment.
+                        $stepActionKind = classifyUploadDocType($stepDocType);
+                        $stepActionLabel = $stepActionKind === 'paper'
+                            ? 'Apply'
+                            : ($stepActionKind === 'receipt' ? 'Upload Receipt' : 'Upload');
+                        $stepActionIcon = $stepActionKind === 'paper' ? 'fa-paper-plane' : 'fa-upload';
                         // Shows Upload only when that document type is currently open.
                         if ($stepDocType !== '' && in_array($stepDocType, $openTypes, true)):
                         // Closes the PHP block before the button markup.
                         ?>
 <?php /*                         Upload link that opens the Application page for this document. */ ?>
-                        <a class="btn btn-sm btn-primary" href="<?= url('student/application.php?stage=' . urlencode($stage['key']) . '&docType=' . urlencode($stepDocType)) ?>"><i class="fas fa-upload"></i> Upload</a>
+                        <a class="btn btn-sm btn-primary" href="<?= url('student/application.php?stage=' . urlencode($stage['key']) . '&docType=' . urlencode($stepDocType)) ?>"><i class="fas <?= htmlspecialchars($stepActionIcon, ENT_QUOTES, 'UTF-8') ?>"></i> <?= htmlspecialchars($stepActionLabel, ENT_QUOTES, 'UTF-8') ?></a>
 <?php /*                         Closes the if that shows the Upload button. */ ?>
                         <?php endif; ?>
 <?php /*                     Closes the step action column. */ ?>

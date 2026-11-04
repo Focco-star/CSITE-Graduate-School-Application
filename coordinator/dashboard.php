@@ -6,9 +6,6 @@ require_once __DIR__ . '/../includes/config/config.php';
 require_once __DIR__ . '/../includes/config/db.php';
 // Loads the helper that draws the program population chart.
 require_once __DIR__ . '/../includes/components/program_chart.php';
-// Loads the helper that renders the schedule calendar.
-require_once __DIR__ . '/../includes/components/calendar.php';
-
 // Checks whether a session is not running yet.
 if (session_status() === PHP_SESSION_NONE) {
     // Starts the session so the logged-in user can be read.
@@ -63,40 +60,73 @@ $academicYearStart = (int) date('n') >= 7 ? (int) date('Y') : (int) date('Y') - 
 // Builds the academic year label such as 2025-2026.
 $academicYearLabel = $academicYearStart . '-' . ($academicYearStart + 1);
 
+// Loads summary counts when the database connection is available.
+$dashboardStats = null;
+if ($pdo instanceof PDO) {
+    $statsStatement = $pdo->query(
+        "SELECT
+            (SELECT COUNT(*)
+             FROM applications
+             WHERE archived_at IS NULL) AS active_applications,
+            (SELECT COUNT(*)
+             FROM applications
+             WHERE archived_at IS NULL AND status IN ('submitted', 'under_review')) AS awaiting_review,
+            (SELECT COUNT(*)
+             FROM schedules
+             WHERE presentation_date >= CURDATE()
+               AND status IN ('pending', 'confirmed')) AS upcoming_presentations"
+    );
+    $dashboardStats = $statsStatement->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
 // Loads the shared header with sidebar.
 require_once __DIR__ . '/../includes/layout/header.php';
 // Closes PHP so the HTML below is printed.
 ?>
 
-<?php /* Opens the welcome hero section of the dashboard. */ ?>
-<section class="dash-hero" aria-labelledby="dashHeroTitle">
-<?php /*     Opens the main area of the hero section. */ ?>
-    <div class="dash-hero-main">
-<?php /*         Shows a university icon in the hero badge. */ ?>
-        <span class="dash-hero-mark" aria-hidden="true"><i class="fas fa-university"></i></span>
-<?php /*         Opens the text block inside the hero. */ ?>
-        <div class="dash-hero-copy">
-<?php /*             Small label naming the CSITE Graduate School. */ ?>
-            <span class="dash-hero-eyebrow"><i class="fas fa-graduation-cap" aria-hidden="true"></i> CSITE Graduate School</span>
-<?php /*             Big welcome heading with the coordinator's name. */ ?>
-            <h2 class="dash-hero-title" id="dashHeroTitle">Welcome Back, Coordinator Precious Opinion</h2>
-<?php /*             Subtitle showing the coordinator role and university. */ ?>
-            <p class="dash-hero-subtitle">Graduate Program Coordinator <span class="dash-hero-dot" aria-hidden="true">&middot;</span> Ateneo de Zamboanga University</p>
-<?php /*         Closes the hero text block. */ ?>
+<section class="quick-summary" aria-labelledby="dashboardSummaryTitle">
+    <header class="quick-summary-header">
+        <div class="quick-summary-heading">
+            <span class="quick-summary-mark" aria-hidden="true"><i class="fas fa-chart-pie"></i></span>
+            <div class="quick-summary-heading-text">
+                <h3 id="dashboardSummaryTitle">Quick Summary</h3>
+                <p>Current graduate school activity at a glance</p>
+            </div>
         </div>
-<?php /*     Closes the hero main area. */ ?>
+        <span class="quick-summary-year"><i class="fas fa-calendar-days" aria-hidden="true"></i> Academic Year <?= htmlspecialchars($academicYearLabel, ENT_QUOTES, 'UTF-8') ?></span>
+    </header>
+    <div class="quick-summary-body">
+        <div class="quick-summary-grid quick-summary-grid--three">
+            <a class="quick-summary-stat quick-summary-stat--navy" href="<?= url('coordinator/applications/manage.php') ?>">
+                <span class="quick-summary-stat-head">
+                    <span class="quick-summary-icon" aria-hidden="true"><i class="fas fa-folder-open"></i></span>
+                    <span class="quick-summary-arrow" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+                </span>
+                <strong class="quick-summary-value"><?= $dashboardStats === null ? '&mdash;' : number_format((int) $dashboardStats['active_applications']) ?></strong>
+                <span class="quick-summary-label">Active Applications</span>
+            </a>
+            <a class="quick-summary-stat quick-summary-stat--gold" href="<?= url('coordinator/applications/manage.php') ?>">
+                <span class="quick-summary-stat-head">
+                    <span class="quick-summary-icon" aria-hidden="true"><i class="fas fa-hourglass-half"></i></span>
+                    <span class="quick-summary-arrow" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+                </span>
+                <strong class="quick-summary-value"><?= $dashboardStats === null ? '&mdash;' : number_format((int) $dashboardStats['awaiting_review']) ?></strong>
+                <span class="quick-summary-label">Awaiting Review</span>
+            </a>
+            <a class="quick-summary-stat quick-summary-stat--blue" href="<?= url('coordinator/schedule/manage.php') ?>">
+                <span class="quick-summary-stat-head">
+                    <span class="quick-summary-icon" aria-hidden="true"><i class="fas fa-calendar-check"></i></span>
+                    <span class="quick-summary-arrow" aria-hidden="true"><i class="fas fa-arrow-right"></i></span>
+                </span>
+                <strong class="quick-summary-value"><?= $dashboardStats === null ? '&mdash;' : number_format((int) $dashboardStats['upcoming_presentations']) ?></strong>
+                <span class="quick-summary-label">Upcoming Presentations</span>
+            </a>
+        </div>
+        <?php if ($dashboardStats === null): ?>
+            <p class="quick-summary-unavailable" role="status">Summary counts are unavailable because the database connection could not be established.</p>
+        <?php endif; ?>
     </div>
-<?php /*     Opens the side area of the hero. */ ?>
-    <div class="dash-hero-aside">
-<?php /*         Shows the current academic year with a calendar icon. */ ?>
-        <span class="dash-hero-ay"><i class="fas fa-calendar-days" aria-hidden="true"></i> Academic Year <?= htmlspecialchars($academicYearLabel) ?></span>
-<?php /*     Closes the hero side area. */ ?>
-    </div>
-<?php /* Closes the hero section. */ ?>
 </section>
-
-<?php /* Draws the schedule calendar for the coordinator. */ ?>
-<?php renderScheduleCalendar(); ?>
 
 <?php /* Opens the box that holds the program chart. */ ?>
 <div class="dash-chart">

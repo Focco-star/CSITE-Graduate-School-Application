@@ -13,8 +13,8 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // If a coordinator is already signed in, skip the login form.
 if (!empty($_SESSION['user']) && ($_SESSION['user']['role'] ?? '') === 'coordinator') {
-    // Redirects the signed-in coordinator straight to the dashboard.
-    header('Location: ' . url('coordinator/dashboard.php'));
+    // Redirects the signed-in coordinator to the home page.
+    header('Location: ' . url('coordinator/homepage.php'));
     // Stops the script after the redirect.
     exit;
 // Closes the already-signed-in check.
@@ -85,10 +85,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'role'      => $user['role'],
                 // Closes the session user array.
                 ];
-                // Queues a welcome message shown on the dashboard.
+                // Queues a welcome message shown on the home page.
                 setFlash('success', 'Welcome Back, Coordinator Precious Opinion');
-                // Redirects the coordinator to the dashboard after login.
-                header('Location: ' . url('coordinator/dashboard.php'));
+                // Redirects the coordinator to the home page after login.
+                header('Location: ' . url('coordinator/homepage.php'));
                 // Stops the script after the redirect.
                 exit;
             // Runs when the email was not found or the password was wrong.

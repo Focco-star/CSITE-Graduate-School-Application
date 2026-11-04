@@ -1028,6 +1028,12 @@
             const selected = parseISO(active.input.value);
             // Builds today's date in YYYY-MM-DD form.
             const todayISO = toISO(new Date());
+            // Reads the active field's optional date bounds.
+            const minISO = active.input.min;
+            const maxISO = active.input.max;
+            // Disables the Today shortcut when today is outside the field's bounds.
+            const todayBtn = pop.querySelector('[data-dp-today]');
+            todayBtn.disabled = (minISO && todayISO < minISO) || (maxISO && todayISO > maxISO);
             // Builds the selected date in the same form.
             const selectedISO = selected ? toISO(selected) : '';
             // Finds the first day of the month being viewed.
@@ -1051,8 +1057,11 @@
                 if (iso === todayISO) cls.push('today');
                 // Marks the date already chosen in the field.
                 if (iso === selectedISO) cls.push('selected');
+                // Disables dates outside the field's allowed range.
+                const disabled = (minISO && iso < minISO) || (maxISO && iso > maxISO);
+                if (disabled) cls.push('disabled');
                 // Adds the day button with its classes and date value.
-                html += '<button type="button" class="' + cls.join(' ') + '" data-date="' + iso + '">' + d.getDate() + '</button>';
+                html += '<button type="button" class="' + cls.join(' ') + '" data-date="' + iso + '"' + (disabled ? ' disabled aria-label="' + iso + ', unavailable"' : '') + '>' + d.getDate() + '</button>';
             // Closes the six-week loop.
             }
             // Puts all the day buttons into the grid.
@@ -1121,6 +1130,8 @@
         function commit(value) {
             // Stops when no date field is active.
             if (!active) return;
+            // Prevents shortcut or script selections outside the field's allowed range.
+            if (value && ((active.input.min && value < active.input.min) || (active.input.max && value > active.input.max))) return;
             // Stores the active input for convenience.
             const input = active.input;
             // Writes the new date value into the field.
@@ -1166,7 +1177,7 @@
             // Finds the day button that was clicked.
             const btn = e.target.closest('[data-date]');
             // Writes that day's date into the field.
-            if (btn) commit(btn.dataset.date);
+            if (btn && !btn.disabled) commit(btn.dataset.date);
         // Closes the day grid click handler.
         });
 
@@ -1233,8 +1244,18 @@
             function check(final) {
                 // Reads the trimmed value of the field.
                 const v = input.value.trim();
-                // Clears the error when the field is empty or holds a real date.
-                if (v === '' || parseISO(v)) { setError(''); return; }
+                // Validates that a real date is within the field's allowed range.
+                const parsed = v === '' ? null : parseISO(v);
+                if (v === '' || parsed) {
+                    if (parsed && input.min && v < input.min) {
+                        setError('Choose a date on or after ' + input.min + '.');
+                    } else if (parsed && input.max && v > input.max) {
+                        setError('Choose a date on or before ' + input.max + '.');
+                    } else {
+                        setError('');
+                    }
+                    return;
+                }
                 // Notes why the date error waits until ten characters are typed.
                 // Only nag while typing once all 10 characters are in; always nag on blur
                 // Shows the error on blur or once ten characters are typed.

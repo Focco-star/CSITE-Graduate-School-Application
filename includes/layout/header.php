@@ -75,6 +75,7 @@ $csiteStyleSections = [
     'coordinator/90-charts-calendar.css',
     'student/95-portal-pages.css',
     'coordinator/96-dashboard.css',
+    'coordinator/homepagestyle.css',
     'applications/97-coordinator-table.css',
     'coordinator/98-edit-controls.css',
     'applications/99-records.css',

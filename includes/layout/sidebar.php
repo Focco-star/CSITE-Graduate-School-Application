@@ -72,8 +72,8 @@ $studentLinks = [
 
 // Starts the list of menu links shown to coordinators.
 $coordinatorLinks = [
-    // Adds the coordinator Dashboard link.
-    ['key' => 'dashboard',    'label' => 'Dashboard',              'icon' => 'fa-gauge-high',     'href' => url('coordinator/dashboard.php')],
+    // Adds the coordinator Home link with welcome and schedule information.
+    ['key' => 'home', 'label' => 'Home', 'icon' => 'fa-house', 'href' => url('coordinator/homepage.php')],
     // Starts the group definition for the Applications submenu.
     [
         // Sets the key used to detect this page.
@@ -116,6 +116,8 @@ $coordinatorLinks = [
     ],
     // Adds the Presentation Schedules link.
     ['key' => 'schedule',  'label' => 'Presentation Schedules', 'icon' => 'fa-calendar-days', 'href' => url('coordinator/schedule/manage.php')],
+    // Keeps the coordinator Dashboard at the bottom of the navigation.
+    ['key' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'fa-gauge-high', 'href' => url('coordinator/dashboard.php')],
 // Closes the coordinator links array.
 ];
 

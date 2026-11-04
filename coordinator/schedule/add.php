@@ -252,6 +252,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stage = $availableStages[$stage];
         // Reads the posted presentation date and trims spaces.
         $displayDate = trim($_POST['date'] ?? '');
+        // Normalises the chosen date before accepting it for a new schedule.
+        $scheduleDate = scheduleDateYMD($displayDate);
+        // Rejects malformed dates and dates that have already passed.
+        if ($scheduleDate === null || $scheduleDate < date('Y-m-d')) {
+            setFlash('error', 'Choose a valid presentation date that is today or later.');
+            redirectTo('coordinator/schedule/add.php');
+        }
         // Only reformat the date when the coordinator actually typed one.
         if ($displayDate !== '') {
             // Converts the typed date text into a Unix timestamp.
@@ -546,7 +553,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                     Wrapper that styles the date picker input. */ ?>
                     <div class="schedule-picker-wrap">
 <?php /*                         Date input named date, required, using the browser date picker. */ ?>
-                        <input class="schedule-picker" type="date" name="date" required>
+                        <input class="schedule-picker" type="date" name="date" min="<?= htmlspecialchars(date('Y-m-d'), ENT_QUOTES, 'UTF-8') ?>" required>
 <?php /*                     Closes the date picker wrapper. */ ?>
                     </div>
 <?php /*                 Closes the date field wrapper. */ ?>

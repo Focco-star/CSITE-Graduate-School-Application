@@ -3,7 +3,7 @@
 /**
  * Presentation Schedule Calendar
  * ---------------------------------------------------------------------------
- * Shared by coordinator/dashboard.php and coordinator/schedule/manage.php.
+ * Shared by coordinator/homepage.php and coordinator/schedule/manage.php.
  *
  *   scheduleCalendarFetch()   Reads schedules from the database (data layer).
  *   renderScheduleCalendar()  Prints the calendar markup. The behaviour lives
