@@ -221,16 +221,6 @@ $templateLibraryIcon = static function (array $template): string {
                             <i class="fas fa-download"></i> Download
 <?php /*                         <!-- Closes the download button. --> */ ?>
                         </a>
-<?php /*                         <?php /* Shows the edit link only in the coordinator view. * / ?> */ ?>
-                        <?php if ($templateLibraryIsCoordinator): ?>
-<?php /*                         <!-- Edit button linking to the template edit page with its id. --> */ ?>
-                        <a class="btn btn-sm btn-outline" href="<?= url('coordinator/templates/edit.php?id=' . urlencode((string) ($template['id'] ?? ''))) ?>" title="Edit template">
-<?php /*                             <!-- Pencil icon inside the edit button. --> */ ?>
-                            <i class="fas fa-edit"></i>
-<?php /*                         <!-- Closes the edit button. --> */ ?>
-                        </a>
-<?php /*                         <?php /* Ends the coordinator-only edit check. * / ?> */ ?>
-                        <?php endif; ?>
 <?php /*                     <!-- Closes the actions row. --> */ ?>
                     </div>
 <?php /*                 <!-- Closes the template tile. --> */ ?>
@@ -316,16 +306,6 @@ $templateLibraryIcon = static function (array $template): string {
                             <i class="fas fa-download"></i> Download
 <?php /*                         <!-- Closes the download button. --> */ ?>
                         </a>
-<?php /*                         <?php /* Shows the edit link only in the coordinator view. * / ?> */ ?>
-                        <?php if ($templateLibraryIsCoordinator): ?>
-<?php /*                         <!-- Edit button linking to the template edit page with its id. --> */ ?>
-                        <a class="btn btn-sm btn-outline" href="<?= url('coordinator/templates/edit.php?id=' . urlencode((string) ($template['id'] ?? ''))) ?>" title="Edit template">
-<?php /*                             <!-- Pencil icon inside the edit button. --> */ ?>
-                            <i class="fas fa-edit"></i>
-<?php /*                         <!-- Closes the edit button. --> */ ?>
-                        </a>
-<?php /*                         <?php /* Ends the coordinator-only edit check. * / ?> */ ?>
-                        <?php endif; ?>
 <?php /*                     <!-- Closes the actions row. --> */ ?>
                     </div>
 <?php /*                 <!-- Closes the reference tile. --> */ ?>

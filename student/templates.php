@@ -67,9 +67,11 @@ $templateLibraryCourse = [
 ];
 
 // The updates that are waiting to be read. They are collected before the
-// "seen" mark is written, so the list still shows which ones were new.
-// Loads the template update notices for students.
-$templateUpdates = templateNotificationsList('student', $track);
+// "seen" mark is written, so the new-notification card still shows them.
+// Loads the unseen template update notices for students.
+$newTemplateUpdates = templateNotificationsList('student', $track, 25, 'unseen');
+// Loads the updates the student has already seen for the Updates history.
+$templateUpdates = templateNotificationsList('student', $track, 40, 'seen');
 // Marks those update notices as read for this student.
 markTemplateNotificationsSeen('student', $track);
 
@@ -126,60 +128,91 @@ foreach ($templateLibrary as $libraryTrack) {
 <?php /* Closes the pending notice if. */ ?>
 <?php endif; ?>
 
-<?php /* Only shows the updates card when there are updates. */ ?>
-<?php if (!empty($templateUpdates)): ?>
-<?php /* Card that lists recently added or changed templates. */ ?>
-<div class="card tpl-updates-card">
-<?php /*     Header of the updates card. */ ?>
+<?php /* Shows the new notifications card only when unseen updates exist. */ ?>
+<?php if (!empty($newTemplateUpdates)): ?>
+<?php /* Card that lists newly arrived template changes. */ ?>
+<div class="card tpl-updates-card tpl-new-updates-card">
+<?php /*     Header of the new updates card. */ ?>
     <div class="card-header">
-<?php /*         Title of the updates card with a bell icon. */ ?>
-        <h3><i class="fas fa-bell"></i> Template Updates</h3>
-<?php /*         Shows how many updates there are, with correct wording. */ ?>
-        <span class="tpl-update-count"><?= count($templateUpdates) ?> update<?= count($templateUpdates) === 1 ? '' : 's' ?></span>
-<?php /*     Closes the updates card header. */ ?>
+<?php /*         Title of the new updates card with a bell icon. */ ?>
+        <h3><i class="fas fa-bell"></i> New Template Updates</h3>
+<?php /*         Shows how many new updates there are. */ ?>
+        <span class="tpl-update-count"><?= count($newTemplateUpdates) ?> new</span>
+<?php /*     Closes the new updates card header. */ ?>
     </div>
-<?php /*     Body of the updates card. */ ?>
+<?php /*     Body of the new updates card. */ ?>
     <div class="card-body">
-<?php /*         Hint telling the student to download the newest version. */ ?>
-        <p class="tpl-update-hint">These forms and templates were added or changed by the Graduate School. Download the newest version before you fill it in.</p>
-<?php /*         List that holds one entry per template update. */ ?>
-        <ul class="tpl-update-list">
-<?php /*             Loops over each template update. */ ?>
-            <?php foreach ($templateUpdates as $update): ?>
-<?php /*             One update row, highlighted when it is new to the student. */ ?>
-            <li class="tpl-update-item<?= !empty($update['isNew']) ? ' is-new' : '' ?>">
-<?php /*                 Plus or check icon depending on added or updated. */ ?>
-                <i class="fas <?= $update['change_type'] === 'added' ? 'fa-file-circle-plus' : 'fa-file-circle-check' ?>" aria-hidden="true"></i>
-<?php /*                 Body of the update row. */ ?>
-                <div class="tpl-update-body">
-<?php /*                     Shows the template file name. */ ?>
-                    <strong class="tpl-update-name"><?= htmlspecialchars($update['file_name']) ?></strong>
-<?php /*                     Small line of details under the file name. */ ?>
-                    <span class="tpl-update-meta">
-<?php /*                         Says New template added or Template updated. */ ?>
-                        <?= $update['change_type'] === 'added' ? 'New template added' : 'Template updated' ?>
-<?php /*                         Shows when the template was last changed. */ ?>
-                        &middot; Last updated <?= htmlspecialchars($update['changedLabel']) ?>
-<?php /*                         Shows how long ago the change happened. */ ?>
-                        (<?= htmlspecialchars($update['ago']) ?>)
-<?php /*                     Closes the details line. */ ?>
-                    </span>
-<?php /*                 Closes the update row body. */ ?>
-                </div>
-<?php /*                 Shows a New badge for updates the student has not seen. */ ?>
-                <?php if (!empty($update['isNew'])): ?><span class="tpl-update-new">New</span><?php endif; ?>
-<?php /*             Closes the update row. */ ?>
-            </li>
-<?php /*             Ends the loop over template updates. */ ?>
-            <?php endforeach; ?>
-<?php /*         Closes the update list. */ ?>
-        </ul>
-<?php /*     Closes the updates card body. */ ?>
+<?php /*         Explains that these are the newest changes. */ ?>
+        <p class="tpl-update-hint">New changes from Google Drive. They move to your Updates section after you view them.</p>
+<?php /*         Passes the unseen updates to the shared list. */ ?>
+        <?php $updateItems = $newTemplateUpdates; ?>
+<?php /*         Prints the new update list. */ ?>
+        <?php require __DIR__ . '/../includes/components/template_update_list.php'; ?>
+<?php /*     Closes the new updates card body. */ ?>
     </div>
-<?php /* Closes the updates card. */ ?>
+<?php /* Closes the new updates card. */ ?>
 </div>
-<?php /* Closes the updates card if. */ ?>
+<?php /* Closes the new updates card check. */ ?>
 <?php endif; ?>
+
+<?php /* Opens the collapsible Updates history section. */ ?>
+<div class="card tpl-updates-card" id="studentUpdatesCard">
+<?php /*     Header button that expands or collapses the previous updates. */ ?>
+    <button type="button" class="card-header tpl-updates-toggle" id="studentUpdatesToggle" aria-expanded="false" aria-controls="studentUpdatesBody">
+<?php /*         Title of the Updates section. */ ?>
+        <h3><i class="fas fa-clock-rotate-left"></i> Updates</h3>
+<?php /*         Shows how many previous updates are saved. */ ?>
+        <span class="tpl-update-count"><?= count($templateUpdates) ?> update<?= count($templateUpdates) === 1 ? '' : 's' ?></span>
+<?php /*         Chevron icon that hints the section can be expanded. */ ?>
+        <i class="fas fa-chevron-down tpl-updates-caret" aria-hidden="true"></i>
+<?php /*     Closes the Updates header button. */ ?>
+    </button>
+<?php /*     Hidden body that holds the previous updates. */ ?>
+    <div class="card-body" id="studentUpdatesBody" hidden>
+<?php /*         Shows the saved updates when there are any. */ ?>
+        <?php if ($templateUpdates): ?>
+<?php /*             Explains that these are previous changes. */ ?>
+        <p class="tpl-update-hint">Previous template changes from Google Drive. You can review them again here.</p>
+<?php /*             Passes the seen updates to the shared list. */ ?>
+        <?php $updateItems = $templateUpdates; ?>
+<?php /*             Prints the previous update list. */ ?>
+        <?php require __DIR__ . '/../includes/components/template_update_list.php'; ?>
+<?php /*         Shows an empty message when no updates were seen yet. */ ?>
+        <?php else: ?>
+        <p class="tpl-update-hint">No previous template updates yet.</p>
+<?php /*         Closes the previous-updates check. */ ?>
+        <?php endif; ?>
+<?php /*     Closes the Updates body. */ ?>
+    </div>
+<?php /* Closes the Updates section. */ ?>
+</div>
+
+<?php /* Starts the script that opens or closes the Updates history. */ ?>
+<script>
+<?php /* Wraps the Updates toggle so its names stay private. */ ?>
+(function () {
+<?php /*     Finds the Updates header button. */ ?>
+    var toggle = document.getElementById('studentUpdatesToggle');
+<?php /*     Finds the hidden body of the Updates section. */ ?>
+    var body = document.getElementById('studentUpdatesBody');
+<?php /*     Stops when the Updates section is not on the page. */ ?>
+    if (!toggle || !body) return;
+<?php /*     Listens for a click on the Updates header. */ ?>
+    toggle.addEventListener('click', function () {
+<?php /*         Reads whether the body is currently hidden. */ ?>
+        var open = body.hidden;
+<?php /*         Shows or hides the previous updates. */ ?>
+        body.hidden = !open;
+<?php /*         Updates the arrow state for screen readers. */ ?>
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+<?php /*         Rotates the arrow to match the section state. */ ?>
+        toggle.classList.toggle('is-open', open);
+<?php /*     Closes the Updates click listener. */ ?>
+    });
+<?php /* Runs and closes the Updates toggle wrapper. */ ?>
+})();
+<?php /* Closes the Updates script. */ ?>
+</script>
 
 <?php /* Filter bar that searches and filters the template grid. */ ?>
 <div class="filter-bar" data-filter-table="#studentTplGrid" style="margin-bottom:1rem;">

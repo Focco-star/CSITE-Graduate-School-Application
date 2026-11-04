@@ -946,4 +946,30 @@ a.stage-stepper-btn:hover .stage-stepper-label { color: var(--adzu-navy); }
 .substep-line.done { background: var(--success); }
 /* Styles the small gray coordinator chip beside a step. */
 .coord-chip { font-size: 0.65rem; background: var(--gray-100); color: var(--gray-500); padding: 1px 6px; border-radius: 99px; font-weight: 500; }
-
+
+/* Starts the card holding the official Google Drive folder links. */
+.tpl-drive-card { margin-bottom: 1rem; }
+/* Lays the three folder buttons out in a wrapping row. */
+.tpl-drive-links { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+/* Keeps the Drive folder buttons aligned with the rest of the toolbar. */
+.tpl-drive-links .btn { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+/* Colors the new-notification updates card blue instead of gold. */
+.tpl-new-updates-card { border-left-color: var(--info); }
+/* Colors the new-update count blue. */
+.tpl-new-updates-card .tpl-update-count { color: var(--info); }
+
+/* Starts the card that lists the files changed by the last sync. */
+.tpl-sync-results { margin-bottom: 1rem; border-left: 3px solid var(--info); }
+/* Spaces the added, updated, and deleted groups. */
+.tpl-sync-group { margin-bottom: 0.75rem; }
+/* Removes the bottom margin from the last sync group. */
+.tpl-sync-group:last-child { margin-bottom: 0; }
+/* Styles a sync result group heading. */
+.tpl-sync-group h4 { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.35rem; font-size: 0.85rem; color: var(--adzu-navy); }
+/* Colors the deleted-templates heading red. */
+.tpl-sync-group.is-removed h4 { color: #b91c1c; }
+/* Styles the list of file names in a sync group. */
+.tpl-sync-list { margin: 0; padding-left: 1.2rem; font-size: 0.8rem; color: var(--gray-700); }
+/* Spaces the file names in a sync group. */
+.tpl-sync-list li { margin-bottom: 0.15rem; }

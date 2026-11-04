@@ -19,11 +19,72 @@
  * whether a file changed - no download required for the check.
  */
 
-// Only sets the template folder id when it is not defined elsewhere.
+// Defines the official Google Drive folder id of each graduate school track.
+if (!defined('GDRIVE_TEMPLATE_FOLDERS')) {
+    // Maps each track code to the Google Drive folder the coordinator manages.
+    define('GDRIVE_TEMPLATE_FOLDERS', [
+        // Capstone forms and templates folder.
+        'capstone' => '1yKy8MWnNP5fYpBlJuujPyNZtVjTJO8ul',
+        // Seminar Paper forms and templates folder.
+        'seminar'  => '1ApUzCqlldk4OffQ_l8uOyH-lwq52F_wn',
+        // Thesis forms and templates folder.
+        'thesis'   => '1oIqNK3LNe5YqBDuOjVXGW19rNiphHjCD',
+    // Closes the track folder map.
+    ]);
+// Closes the check that defines the track folder map.
+}
+
+// Keeps the official folder links exactly as the coordinator supplied them.
+if (!defined('GDRIVE_TEMPLATE_FOLDER_LINKS')) {
+    // Maps each track to its official Google Drive folder link.
+    define('GDRIVE_TEMPLATE_FOLDER_LINKS', [
+        // Capstone folder link, including the coordinator's Google account slot.
+        'capstone' => 'https://drive.google.com/drive/u/2/folders/1yKy8MWnNP5fYpBlJuujPyNZtVjTJO8ul',
+        // Seminar Paper folder link.
+        'seminar'  => 'https://drive.google.com/drive/u/2/folders/1ApUzCqlldk4OffQ_l8uOyH-lwq52F_wn',
+        // Thesis folder link.
+        'thesis'   => 'https://drive.google.com/drive/u/2/folders/1oIqNK3LNe5YqBDuOjVXGW19rNiphHjCD',
+    // Closes the official folder link map.
+    ]);
+// Closes the official folder link definition.
+}
+
+// Keeps the old single-folder constant for any older code that still reads it.
 if (!defined('GDRIVE_TEMPLATE_FOLDER_ID')) {
-    // Defines GDRIVE_TEMPLATE_FOLDER_ID as the public template folder's id.
-    define('GDRIVE_TEMPLATE_FOLDER_ID', '1o4Mk29HL-PQwJFgByRgGtkmCdK9ZBJqg');
-// Closes the check that defines the template folder id.
+    // Falls back to the thesis folder, which is the default track.
+    define('GDRIVE_TEMPLATE_FOLDER_ID', GDRIVE_TEMPLATE_FOLDERS['thesis']);
+// Closes the check that defines the old template folder id.
+}
+
+// Returns the Drive folder id of one track.
+function gdriveTemplateFolderId(string $track): string {
+    // Reads the lowercase track code.
+    $track = strtolower(trim($track));
+    // Returns the folder id, or empty text for an unknown track.
+    return GDRIVE_TEMPLATE_FOLDERS[$track] ?? '';
+// Closes the gdriveTemplateFolderId function.
+}
+
+// Returns the public Drive folder URL of one track.
+function gdriveTemplateFolderUrl(string $track): string {
+    // Reads the folder id of the track.
+    $folderId = gdriveTemplateFolderId($track);
+    // Returns an empty URL when the track has no folder.
+    if ($folderId === '') {
+        // Returns empty text for an unknown track.
+        return '';
+    // Closes the empty folder check.
+    }
+    // Returns the public folder URL.
+    return gdriveFolderUrl($folderId);
+// Closes the gdriveTemplateFolderUrl function.
+}
+
+// Returns the official Drive folder links of every track.
+function gdriveTemplateFolderLinks(): array {
+    // Returns the exact links supplied by the coordinator.
+    return GDRIVE_TEMPLATE_FOLDER_LINKS;
+// Closes the gdriveTemplateFolderLinks function.
 }
 
 /** Browser user agent: Drive answers a plain script with an error page. */
@@ -52,6 +113,107 @@ function gdriveHeaderUrl(string $fileId): string {
     // Returns the usercontent download URL used for HEAD requests.
     return 'https://drive.usercontent.google.com/download?id=' . rawurlencode($fileId) . '&export=download';
 // Closes the gdriveHeaderUrl() function.
+}
+
+// Returns the export URL of a Google Docs, Sheets, or Slides file.
+function gdriveGoogleExportUrl(string $fileId, string $googleType): string {
+    // Reads the lowercase Google file type.
+    $type = strtolower(trim($googleType));
+    // Builds the export URL for a Google Doc.
+    if ($type === 'document') {
+        // Exports the document as a Word file.
+        return 'https://docs.google.com/document/d/' . rawurlencode($fileId) . '/export?format=docx';
+    // Closes the Google Doc branch.
+    }
+    // Builds the export URL for a Google Sheet.
+    if ($type === 'spreadsheet') {
+        // Exports the sheet as an Excel file.
+        return 'https://docs.google.com/spreadsheets/d/' . rawurlencode($fileId) . '/export?format=xlsx';
+    // Closes the Google Sheet branch.
+    }
+    // Builds the export URL for Google Slides.
+    if ($type === 'presentation') {
+        // Exports the slides as a PowerPoint file.
+        return 'https://docs.google.com/presentation/d/' . rawurlencode($fileId) . '/export?format=pptx';
+    // Closes the Google Slides branch.
+    }
+    // Returns empty text for an unknown Google file type.
+    return '';
+// Closes the gdriveGoogleExportUrl function.
+}
+
+// Returns the local extension used for an exported Google file.
+function gdriveGoogleExtension(string $googleType): string {
+    // Maps Google file types to their exported extensions.
+    $extensions = ['document' => 'docx', 'spreadsheet' => 'xlsx', 'presentation' => 'pptx'];
+    // Returns the extension, or empty text for a normal Drive file.
+    return $extensions[strtolower(trim($googleType))] ?? '';
+// Closes the gdriveGoogleExtension function.
+}
+
+// Reads the file extension hint from a folder row.
+function gdriveFileExtensionFromRow(string $body): string {
+    // Reads the tooltip text that names the Drive file type.
+    if (preg_match('/data-tooltip="([^"]+)"/', $body, $m)) {
+        // Decodes the tooltip into plain text and lowercases it.
+        $tooltip = strtolower(html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        // Maps the file type words to their normal extension.
+        $types = [
+            'google docs'        => 'docx',
+            'google sheets'      => 'xlsx',
+            'google slides'      => 'pptx',
+            'microsoft word'     => 'docx',
+            'microsoft excel'    => 'xlsx',
+            'microsoft powerpoint' => 'pptx',
+            'pdf document'       => 'pdf',
+            'pdf'                => 'pdf',
+        ];
+        // Loops over the known type words.
+        foreach ($types as $word => $extension) {
+            // Returns the extension when the tooltip mentions this type.
+            if (str_contains($tooltip, $word)) {
+                // Returns the extension for the detected file type.
+                return $extension;
+            // Closes the type-word check.
+            }
+        // Closes the loop over type words.
+        }
+    // Closes the tooltip check.
+    }
+    // Returns empty text when the row gives no type hint.
+    return '';
+// Closes the gdriveFileExtensionFromRow function.
+}
+
+// Reads the Google file type from a folder row.
+function gdriveGoogleTypeFromRow(string $body): string {
+    // Reads the tooltip text that names the Drive file type.
+    if (preg_match('/data-tooltip="([^"]+)"/', $body, $m)) {
+        // Decodes the tooltip into plain text and lowercases it.
+        $tooltip = strtolower(html_entity_decode($m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        // Detects Google Docs files.
+        if (str_contains($tooltip, 'google docs')) {
+            // Returns the Google Doc type.
+            return 'document';
+        // Closes the Google Docs check.
+        }
+        // Detects Google Sheets files.
+        if (str_contains($tooltip, 'google sheets')) {
+            // Returns the Google Sheet type.
+            return 'spreadsheet';
+        // Closes the Google Sheets check.
+        }
+        // Detects Google Slides files.
+        if (str_contains($tooltip, 'google slides')) {
+            // Returns the Google Slides type.
+            return 'presentation';
+        // Closes the Google Slides check.
+        }
+    // Closes the tooltip check.
+    }
+    // Returns empty text for a normal Drive file.
+    return '';
+// Closes the gdriveGoogleTypeFromRow function.
 }
 
 /** Public folder page for a Drive folder. */
@@ -307,6 +469,10 @@ function gdriveParseFolderHtml(string $html): array {
                 'isFolder' => $isFolder,
                 // Stores the size, using zero for folders.
                 'size'     => $isFolder ? 0 : gdriveRowSize($body),
+                // Stores the Google Docs, Sheets, or Slides type, if any.
+                'googleType' => $isFolder ? '' : gdriveGoogleTypeFromRow($body),
+                // Stores the extension hint for files named without one.
+                'fileExt' => $isFolder ? '' : gdriveFileExtensionFromRow($body),
             // Closes the entry array.
             ];
         // Closes the loop over matched rows.
@@ -661,7 +827,7 @@ function gdriveFilesMeta(array $fileIds): array {
  * failed or interrupted download never replaces a good copy.
  */
 // Declares the function that downloads a Drive file to a local path.
-function gdriveDownloadFile(string $fileId, string $destination): bool {
+function gdriveDownloadFile(string $fileId, string $destination, string $googleType = ''): bool {
     // Returns false when curl is not available.
     if (!function_exists('curl_init')) {
         // Gives up because the download needs curl.
@@ -681,12 +847,21 @@ function gdriveDownloadFile(string $fileId, string $destination): bool {
     // Builds a temporary .part file name for the download.
     $temp = $destination . '.part';
 
+    // Chooses the Google export URL for Docs, Sheets, or Slides files.
+    $downloadUrl = gdriveGoogleExportUrl($fileId, $googleType);
+    // Falls back to the normal direct download for ordinary Drive files.
+    if ($downloadUrl === '') {
+        // Uses the normal download endpoint.
+        $downloadUrl = gdriveDownloadUrl($fileId);
+    // Closes the export URL fallback.
+    }
+
     // Creates a curl handle for the download.
     $ch = curl_init();
     // Starts the curl options array.
     curl_setopt_array($ch, [
-        // Sets the direct download URL for the file.
-        CURLOPT_URL            => gdriveDownloadUrl($fileId),
+        // Sets the direct download or Google export URL for the file.
+        CURLOPT_URL            => $downloadUrl,
         // Returns the file body as a string.
         CURLOPT_RETURNTRANSFER => true,
         // Follows redirects to the download host.

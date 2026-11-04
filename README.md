@@ -71,7 +71,7 @@ Every application follows a fixed set of stages based on the student's program a
 - **Document status tracking**: submitted, verified, incomplete, or needs revision, with coordinator comments.
 - **Templates and forms** download, filtered by program and stage.
 - **Coordinator comment notifications** shown under the matching stage in the Milestone Tracker, with an X button to remove a notification after reading it. A message icon opens a **Coordinator Comments** box with a Show/Hide arrow, listing every active comment grouped by stage and milestone.
-- **Update notifications** when the official templates in Google Drive change.
+- **Update notifications** when the official templates in Google Drive change. New changes appear as notifications, then move into a collapsible **Updates** section after the student views them.
 - **Payment and receipt details** recorded by the coordinator.
 - **Profile editing** and viewing or downloading previously submitted files.
 
@@ -85,7 +85,7 @@ Every application follows a fixed set of stages based on the student's program a
 - **Presentation scheduling** with date, time, venue, panel members, and panel roles.
 - **Student search** on the schedule page by name, email, or program.
 - **Pools** for advisers, panel members, and documenters.
-- **Template library management**, including syncing the official forms from Google Drive.
+- **Template library management**, including syncing the official forms from Google Drive. Each sync shows the file names that were added, updated, or deleted.
 - **Archived applications** that can be restored to the active list or permanently deleted.
 - **Comment history and student progress** in the stage editor: sent comments can be expanded or hidden, active comments can be removed, and removed comments stay in history with **Removed by coordinator** or **This comment was removed by the student.** The milestone tracker also shows the student's current progress and latest upload.
 - **Abstract viewer** in the stage document list: clicking the final paper name opens the student's **Brief Description / Abstract** exactly as submitted.
@@ -467,12 +467,16 @@ Lets students log in with their Google account instead of a password.
 
 ### Google Drive template sync
 
-Mirrors the official forms folder into the portal and shows a notification badge when templates change.
+Mirrors the three official track folders into the portal and shows a notification badge when templates change.
 
-- The folder ID is set in `includes/integrations/gdrive.php`.
-- The folder must be shared as **Anyone with the link**.
+- The Capstone, Seminar Paper, and Thesis folder IDs are set in `GDRIVE_TEMPLATE_FOLDERS` inside `includes/integrations/gdrive.php`.
+- Every folder must be shared as **Anyone with the link – Viewer** so the anonymous sync can read it.
+- Google Docs, Sheets, and Slides are exported to `.docx`, `.xlsx`, and `.pptx` during the sync.
 - Templates are re-checked at most every 15 minutes.
-- The endpoint `template_sync.php` performs a sync when the Templates page is opened.
+- The coordinator can open each official folder from **Manage Templates** and manage the files directly in Google Drive. The Edit action was removed from the template cards.
+- The endpoint `template_sync.php` performs a sync when the Templates page is opened; **Sync from Google Drive** forces one from the coordinator page.
+- New files are added, changed files are replaced, and files deleted from Drive are hidden from both the coordinator and student libraries on the next sync.
+- A restored file is shown again automatically, and the sync message reports added, updated, and removed counts.
 
 ---
 

@@ -37,11 +37,23 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 $syncMessage = '';
 // Prepares the CSS class that colours the message as success or error.
 $syncNotice  = '';
+// Starts the sync result as null until the button is pressed.
+$syncResult  = null;
+// Starts the three name lists empty.
+$syncAddedNames = [];
+$syncUpdatedNames = [];
+$syncRemovedNames = [];
 
 // Runs the sync only when the sync form was posted.
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['form'] ?? '') === 'sync-templates') {
     // Asks Google Drive for changes and applies them to the library.
     $syncResult  = syncTemplatesFromDrive(true);
+    // Reads the names of files added during this sync.
+    $syncAddedNames = (array) ($syncResult['added_names'] ?? []);
+    // Reads the names of files updated during this sync.
+    $syncUpdatedNames = (array) ($syncResult['updated_names'] ?? []);
+    // Reads the names of templates removed during this sync.
+    $syncRemovedNames = (array) ($syncResult['removed_names'] ?? []);
     // Reads the message text returned by the sync helper.
     $syncMessage = (string) ($syncResult['message'] ?? '');
     // Sets the message style to error when the sync failed.
@@ -143,6 +155,8 @@ markTemplateNotificationsSeen('coordinator');
 
 // Gets the timestamp of the last Google Drive check.
 $lastSyncAt = templateLastSyncAt();
+// Loads the official Google Drive folder link of each track.
+$driveFolderLinks = gdriveTemplateFolderLinks();
 
 /*
  * A course is matched through the tracks assigned to it (program_tracks), so
@@ -171,6 +185,49 @@ foreach (PROGRAMS as $programCode => $programName) {
 <?php /* Closes the notice box. */ ?>
 </div>
 <?php /* Closes the 'has message' condition. */ ?>
+<?php endif; ?>
+
+<?php /* Shows the files changed by the sync that was just run. */ ?>
+<?php if ($syncResult !== null && ($syncAddedNames || $syncUpdatedNames || $syncRemovedNames)): ?>
+<?php /* Card that lists the added, updated, and deleted files by name. */ ?>
+<div class="card tpl-sync-results">
+<?php /*     Header of the sync result card. */ ?>
+    <div class="card-header"><h3><i class="fas fa-list-check"></i> Sync Results</h3></div>
+<?php /*     Body of the sync result card. */ ?>
+    <div class="card-body">
+<?php /*         Loops over the three change groups. */ ?>
+        <?php foreach ([
+            ['label' => 'Added files', 'icon' => 'fa-file-circle-plus', 'class' => 'is-added', 'names' => $syncAddedNames],
+            ['label' => 'Updated files', 'icon' => 'fa-file-circle-check', 'class' => 'is-updated', 'names' => $syncUpdatedNames],
+            ['label' => 'Deleted templates', 'icon' => 'fa-file-circle-minus', 'class' => 'is-removed', 'names' => $syncRemovedNames],
+        ] as $syncGroup): ?>
+<?php /*         Shows a group only when it has files. */ ?>
+        <?php if (!empty($syncGroup['names'])): ?>
+<?php /*             Opens one sync result group. */ ?>
+        <div class="tpl-sync-group <?= htmlspecialchars($syncGroup['class']) ?>">
+<?php /*             Shows the group heading and count. */ ?>
+            <h4><i class="fas <?= htmlspecialchars($syncGroup['icon']) ?>" aria-hidden="true"></i> <?= htmlspecialchars($syncGroup['label']) ?> (<?= count($syncGroup['names']) ?>)</h4>
+<?php /*             Opens the file name list. */ ?>
+            <ul class="tpl-sync-list">
+<?php /*                 Loops over every file name in this group. */ ?>
+                <?php foreach ($syncGroup['names'] as $syncName): ?>
+<?php /*                 Shows one changed file name. */ ?>
+                <li><?= htmlspecialchars((string) $syncName) ?></li>
+<?php /*                 Ends the file name loop. */ ?>
+                <?php endforeach; ?>
+<?php /*             Closes the file name list. */ ?>
+            </ul>
+<?php /*         Closes the sync result group. */ ?>
+        </div>
+<?php /*         Closes the non-empty group check. */ ?>
+        <?php endif; ?>
+<?php /*         Ends the sync result group loop. */ ?>
+        <?php endforeach; ?>
+<?php /*     Closes the sync result card body. */ ?>
+    </div>
+<?php /* Closes the sync result card. */ ?>
+</div>
+<?php /* Closes the sync result card check. */ ?>
 <?php endif; ?>
 
 <?php /* Shows the latest synced files card only when there are new files. */ ?>
@@ -334,6 +391,37 @@ foreach (PROGRAMS as $programCode => $programName) {
 })();
 <?php /* Ends the script block. */ ?>
 </script>
+
+<?php /* Opens the card with the official Drive folders. */ ?>
+<div class="card tpl-drive-card">
+<?php /*     Header naming the official folder source. */ ?>
+    <div class="card-header"><h3><i class="fab fa-google-drive"></i> Official Google Drive Folders</h3></div>
+<?php /*     Opens the body of the Drive folder card. */ ?>
+    <div class="card-body">
+<?php /*         Explains that files are managed directly in Drive. */ ?>
+        <p class="tpl-update-hint">Add, replace, or update the template files directly in Google Drive, then click <strong>Sync from Google Drive</strong> to update the student side.</p>
+<?php /*         Opens the row of track folder links. */ ?>
+        <div class="tpl-drive-links">
+<?php /*             Loops over the three tracks in a fixed display order. */ ?>
+            <?php foreach (['capstone' => 'Capstone', 'seminar' => 'Seminar Paper', 'thesis' => 'Thesis'] as $driveTrack => $driveLabel): ?>
+<?php /*             Reads the folder link of this track. */ ?>
+            <?php $driveUrl = (string) ($driveFolderLinks[$driveTrack] ?? ''); ?>
+<?php /*             Shows the button only when the track has a folder link. */ ?>
+            <?php if ($driveUrl !== ''): ?>
+<?php /*             Opens the official folder in a new browser tab. */ ?>
+            <a class="btn btn-outline" href="<?= htmlspecialchars($driveUrl) ?>" target="_blank" rel="noopener"><i class="fas fa-folder-open"></i> <?= htmlspecialchars($driveLabel) ?> Folder</a>
+<?php /*             Closes the folder-link check. */ ?>
+            <?php endif; ?>
+<?php /*             Ends the track folder loop. */ ?>
+            <?php endforeach; ?>
+<?php /*         Closes the folder link row. */ ?>
+        </div>
+<?php /*         Gives the sharing requirement for the sync to read a folder. */ ?>
+        <p class="field-hint" style="margin-top:0.6rem;">For Sync to work, each folder must be shared as <strong>Anyone with the link &ndash; Viewer</strong>.</p>
+<?php /*     Closes the Drive folder card body. */ ?>
+    </div>
+<?php /* Closes the Drive folder card. */ ?>
+</div>
 
 <?php /* Toolbar row holding the add button and the sync form. */ ?>
 <div class="form-actions" style="border:none;padding:0;margin-bottom:1rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">

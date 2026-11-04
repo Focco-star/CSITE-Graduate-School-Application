@@ -620,87 +620,116 @@ function templateSyncLockPath(): string {
  * ------------------------------------------------------------------ */
 
 /**
- * Read the teacher's Drive folder.
+ * Read the official Drive folders.
  *
- * The root holds one folder per track; every file inside those folders is a
- * template. The subfolder pages are read in parallel, so the whole folder
- * is known in about a second.
+ * Each graduate school track has its own public Drive folder. The three
+ * folders are read in parallel, and every file in them becomes a template
+ * for that track.
  *
- * @return array<int, array{id:string,name:string,track:string,size:int}>
+ * @return array<int, array{id:string,name:string,track:string,size:int,googleType:string}>
  */
-// Reads the teacher's Drive folder and returns every template file.
+// Reads the official Drive folders and returns every template file.
 function templateDriveEntries(): array {
-    // Lists the root Drive folder that holds the track subfolders.
-    $root = gdriveListFolder(GDRIVE_TEMPLATE_FOLDER_ID);
-    // Checks whether the root folder could not be read.
-    if (!$root) {
-        // Returns an empty list when Drive gave no answer.
-        return [];
-    // Closes the if block for an unreadable root folder.
-    }
-
     // Starts the list of template files with their track.
-    $entries       = [];
-    // Starts the list of subfolder ids with their track codes.
-    $subfolderIds  = [];
+    $entries = [];
+    // Starts the map of Drive folder id to track code.
+    $trackFolders = [];
 
-    // Loops over each item in the root Drive folder.
-    foreach ($root as $item) {
-        // Checks whether the item is a file and not a folder.
-        if (!$item['isFolder']) {
-            // Adds a root level file to the list of entries.
-            $entries[] = [
-                // Stores the Drive file id.
-                'id'    => $item['id'],
-                // Stores the file name.
-                'name'  => $item['name'],
-                // Guesses the track from the file name.
-                'track' => templateTrackForFolderName($item['name']),
-                // Stores the file size, or zero when it is unknown.
-                'size'  => (int) ($item['size'] ?? 0),
-            // Closes the entry array.
-            ];
-            // Skips the rest of the loop for this file.
+    // Loops over the official folder map.
+    foreach (GDRIVE_TEMPLATE_FOLDERS as $track => $folderId) {
+        // Skips an empty folder id.
+        if (trim((string) $folderId) === '') {
+            // Moves to the next track folder.
             continue;
-        // Closes the if block for files.
+        // Closes the empty folder check.
         }
-        // Remembers the subfolder id and the track it belongs to.
-        $subfolderIds[$item['id']] = templateTrackForFolderName($item['name']);
-    // Closes the foreach loop over the root folder.
+        // Remembers which track owns this folder.
+        $trackFolders[(string) $folderId] = (string) $track;
+    // Closes the loop over the official folders.
     }
 
-    // Lists the files of all track subfolders in one batch.
-    foreach (gdriveListFolders(array_keys($subfolderIds)) as $folderId => $files) {
-        // Gets the track code remembered for this subfolder.
-        $track = $subfolderIds[$folderId] ?? '';
-        // Loops over the files of the subfolder.
+    // Lists the files of all track folders in one batch.
+    foreach (gdriveListFolders(array_keys($trackFolders)) as $folderId => $files) {
+        // Gets the track code remembered for this folder.
+        $track = $trackFolders[$folderId] ?? '';
+        // Loops over the files of the track folder.
         foreach ($files as $file) {
-            // Checks whether the item is another folder.
+            // Skips nested folders because only files become templates.
             if ($file['isFolder']) {
-                // Skips folders because only files become templates.
+                // Moves to the next Drive entry.
                 continue;
-            // Closes the if block for folders.
+            // Closes the nested-folder check.
             }
-            // Adds the subfolder file to the list of entries.
+            // Reads the Google Docs, Sheets, or Slides type of the file.
+            $googleType = (string) ($file['googleType'] ?? '');
+            // Builds the file name used inside the portal.
+            $fileName = (string) $file['name'];
+            // Gets the extension used for an exported Google file.
+            $googleExtension = gdriveGoogleExtension($googleType);
+            // Uses the Google export extension, or the file type hint.
+            $extensionHint = $googleExtension !== '' ? $googleExtension : (string) ($file['fileExt'] ?? '');
+            // Adds an extension only when the Drive name has none.
+            if ($extensionHint !== '' && pathinfo($fileName, PATHINFO_EXTENSION) === '') {
+                // Appends the detected file extension.
+                $fileName .= '.' . $extensionHint;
+            // Closes the missing-extension check.
+            }
+            // Adds the Drive file to the list of entries.
             $entries[] = [
                 // Stores the Drive file id.
                 'id'    => $file['id'],
-                // Stores the file name.
-                'name'  => $file['name'],
-                // Stores the track of the subfolder.
+                // Stores the file name with its exported extension.
+                'name'  => $fileName,
+                // Stores the track that owns the folder.
                 'track' => $track,
                 // Stores the file size, or zero when it is unknown.
                 'size'  => (int) ($file['size'] ?? 0),
+                // Stores the Google file type, or empty for a normal file.
+                'googleType' => $googleType,
             // Closes the entry array.
             ];
-        // Closes the foreach loop over the subfolder files.
+        // Closes the loop over the folder files.
         }
-    // Closes the foreach loop over the subfolders.
+    // Closes the loop over the track folders.
     }
 
     // Returns the complete list of Drive template files.
     return $entries;
 // Closes the templateDriveEntries function.
+}
+
+/** Names of the official track folders that returned no readable files. */
+// Lists the tracks whose Drive folder could not be read or is empty.
+function templateDriveEmptyTracks(array $entries): array {
+    // Starts a count of zero for every official track.
+    $counts = array_fill_keys(array_keys(GDRIVE_TEMPLATE_FOLDERS), 0);
+    // Counts the files found under each track.
+    foreach ($entries as $entry) {
+        // Reads the track code of the Drive entry.
+        $track = (string) ($entry['track'] ?? '');
+        // Adds one file when the track is known.
+        if (isset($counts[$track])) {
+            // Increments the file count for this track.
+            $counts[$track]++;
+        // Closes the known-track check.
+        }
+    // Closes the loop over Drive entries.
+    }
+    // Starts the list of tracks with no files.
+    $empty = [];
+    // Loops over the track counts.
+    foreach ($counts as $track => $count) {
+        // Checks whether the track folder returned nothing.
+        if ($count === 0) {
+            // Adds the readable track label.
+            $empty[] = getTrackLabel($track);
+        // Closes the empty-folder check.
+        }
+    // Closes the loop over track counts.
+    }
+    // Returns the tracks that returned no files.
+    return $empty;
+// Closes the templateDriveEmptyTracks function.
 }
 
 /** Every template row, newest first. */
@@ -891,10 +920,12 @@ function templateDetectDriveChanges(bool $force = false): array {
     try {
         // Reads the list of template files from the Drive folder.
         $entries = templateDriveEntries();
+        // Finds the track folders that returned no files.
+        $emptyTracks = templateDriveEmptyTracks($entries);
         // Checks whether the Drive folder returned no files.
         if (!$entries) {
             // Sets a message that the Drive folder could not be read.
-            $out['message'] = 'The Google Drive folder could not be read. It may no longer be shared.';
+            $out['message'] = 'The Google Drive folders could not be read. Check that each folder is shared with anyone who has the link.';
             // Saves the failed check state with its message.
             templateSaveDetectState(null, $out['message']);
             // Returns the failed result.
@@ -1025,6 +1056,12 @@ function templateDetectDriveChanges(bool $force = false): array {
             ? 'Google Drive holds no changes.'
             // Message listing how many new and changed files are waiting.
             : $out['added'] . ' new and ' . $out['updated'] . ' changed file(s) are waiting to be synchronized.';
+        // Warns when one of the official folders could not be read.
+        if ($emptyTracks) {
+            // Adds the folders that returned no files to the message.
+            $out['message'] .= ' No files were found for ' . implode(', ', $emptyTracks) . '. Check that those Google Drive folders are shared with anyone who has the link.';
+        // Closes the empty-folder warning.
+        }
 
         // Returns the successful result to the caller.
         return $out;
@@ -1419,14 +1456,16 @@ function templateRecordNotification(array $row, array $entry, int $changedAt, st
  * Mirror the Drive folder into the portal.
  *
  * @param  bool $force ignore the refresh interval
- * @return array{ok:bool,message:string,added:int,updated:int,checked:int,skipped:bool,downloaded:int}
+ * @return array{ok:bool,message:string,added:int,updated:int,removed:int,added_names:array,updated_names:array,removed_names:array,checked:int,skipped:bool,downloaded:int}
  */
 // Downloads the Drive folder into the portal and records changes.
 function syncTemplatesFromDrive(bool $force = false): array {
     // Prepares the result array with counters and a message.
     $out = [
-        // Starts the counters for added and updated files.
-        'ok' => false, 'message' => '', 'added' => 0, 'updated' => 0,
+        // Starts the counters for added, updated, and removed files.
+        'ok' => false, 'message' => '', 'added' => 0, 'updated' => 0, 'removed' => 0,
+        // Starts the name lists shown after a coordinator sync.
+        'added_names' => [], 'updated_names' => [], 'removed_names' => [],
         // Adds counters for checked, skipped, and downloaded files.
         'checked' => 0, 'skipped' => false, 'downloaded' => 0,
     // Closes the result array.
@@ -1481,10 +1520,12 @@ function syncTemplatesFromDrive(bool $force = false): array {
 
         // Reads the list of template files from the Drive folder.
         $entries = templateDriveEntries();
+        // Finds the track folders that returned no files.
+        $emptyTracks = templateDriveEmptyTracks($entries);
         // Checks whether the Drive folder returned no files.
         if (!$entries) {
             // Sets a message that the Drive folder could not be read.
-            $out['message'] = 'The Google Drive folder could not be read. It may no longer be shared.';
+            $out['message'] = 'The Google Drive folders could not be read. Check that each folder is shared with anyone who has the link.';
             // Saves the failed sync state.
             templateSaveSyncState(null, $out['message']);
             // Returns the failed result.
@@ -1608,9 +1649,17 @@ function syncTemplatesFromDrive(bool $force = false): array {
                 $needsDownload = !is_file($localAbsolute);
             // Closes the if block for the missing local file.
             }
+            // Reads the Google Docs, Sheets, or Slides type of this file.
+            $isGoogleFile = ((string) ($entry['googleType'] ?? '') !== '');
+            // Always refreshes a Google file so the local export stays current.
+            if ($isGoogleFile) {
+                // Forces the download without forcing a false update notice.
+                $needsDownload = true;
+            // Closes the Google-file refresh.
+            }
 
             // Downloads the file from Drive when it is needed.
-            if ($needsDownload && gdriveDownloadFile($entry['id'], $localAbsolute)) {
+            if ($needsDownload && gdriveDownloadFile($entry['id'], $localAbsolute, (string) ($entry['googleType'] ?? ''))) {
                 // Counts one downloaded file.
                 $out['downloaded']++;
                 // Comment: removes the old copy when no other template uses it.
@@ -1680,8 +1729,8 @@ function syncTemplatesFromDrive(bool $force = false): array {
             // A template that was put aside because its file was missing
             // Comment: it is reactivated once the file exists again.
             // comes back as soon as the file is there.
-            // Checks whether an inactive flagged template now has its file.
-            if ((int) ($row['is_active'] ?? 1) === 0 && !empty($row['needsReview']) && is_file($localAbsolute)) {
+            // Checks whether an inactive template now has its file again.
+            if ((int) ($row['is_active'] ?? 1) === 0 && is_file($localAbsolute)) {
                 // Marks the template active again.
                 $update['is_active']    = 1;
                 // Clears the needs_review flag.
@@ -1691,6 +1740,16 @@ function syncTemplatesFromDrive(bool $force = false): array {
 
             // Saves the changed columns on the template row.
             DB::update('templates', $update, ['template_id' => (int) ($row['template_id'] ?? 0)]);
+            // Remembers the file name for the coordinator sync result list.
+            if ($changeType === 'added') {
+                // Adds the new file name to the added list.
+                $out['added_names'][] = (string) $entry['name'];
+            // Checks whether the file changed.
+            } elseif ($changeType === 'updated') {
+                // Adds the changed file name to the updated list.
+                $out['updated_names'][] = (string) $entry['name'];
+            // Closes the change-type check.
+            }
             // Only records a notification when something changed.
             if ($changeType !== '') {
                 // Reloads the template row so the notification has fresh values.
@@ -1719,6 +1778,69 @@ function syncTemplatesFromDrive(bool $force = false): array {
         // Closes the foreach loop over the Drive files.
         }
 
+        // Builds the set of Drive file ids still present in the official folders.
+        $currentDriveIds = array_fill_keys(array_column($entries, 'id'), true);
+        // Reads the tracks that returned at least one file.
+        $tracksWithEntries = array_fill_keys(array_column($entries, 'track'), true);
+        // Maps track ids to their codes for the stored template rows.
+        $trackIdToCode = [];
+        // Starts a guarded block for the track lookup.
+        try {
+            // Loops over every track row.
+            foreach (DB::query('SELECT `track_id`, `track_code` FROM `tracks`')->fetchAll() as $trackRow) {
+                // Stores the lowercase track code under its id.
+                $trackIdToCode[(int) ($trackRow['track_id'] ?? 0)] = strtolower((string) ($trackRow['track_code'] ?? ''));
+            // Closes the loop over track rows.
+            }
+        // Catches a track lookup error and skips deletion detection.
+        } catch (Throwable $e) {
+            // Leaves the map empty when tracks cannot be read.
+        // Closes the track lookup catch block.
+        }
+        // Loops over every stored template row to hide files deleted from Drive.
+        foreach ($rows as $row) {
+            // Reads the Drive file id and the row's track code.
+            $driveId   = trim((string) ($row['drive_file_id'] ?? ''));
+            $trackCode = $trackIdToCode[(int) ($row['track_id'] ?? 0)] ?? '';
+            // Skips rows without a Drive link, rows already seen in this sync,
+            // rows in an unreadable folder, and rows that are already inactive.
+            if ($driveId === ''
+                || isset($currentDriveIds[$driveId])
+                || isset($usedTemplateIds[(int) ($row['template_id'] ?? 0)])
+                || !isset($tracksWithEntries[$trackCode])
+                || (int) ($row['is_active'] ?? 1) === 0) {
+                // Moves to the next template row.
+                continue;
+            // Closes the deletion checks.
+            }
+            // Starts a guarded block for the deactivation update.
+            try {
+                // Hides the template because its Drive file is no longer in the folder.
+                DB::update('templates', ['is_active' => 0, 'needs_review' => 0], ['template_id' => (int) ($row['template_id'] ?? 0)]);
+                // Reads the template name, or the file name as a fallback.
+                $removedName = trim((string) ($row['template_name'] ?? ''));
+                // Falls back to the stored file name when the label is empty.
+                if ($removedName === '') {
+                    // Uses the file name for the removed list.
+                    $removedName = trim((string) ($row['file_name'] ?? ''));
+                // Closes the empty-label fallback.
+                }
+                // Adds the removed template name when one exists.
+                if ($removedName !== '') {
+                    // Records the name for the coordinator sync result list.
+                    $out['removed_names'][] = $removedName;
+                // Closes the removed-name check.
+                }
+                // Counts one removed template.
+                $out['removed']++;
+            // Catches an update error and continues with the other rows.
+            } catch (Throwable $e) {
+                // Leaves this row unchanged when the update failed.
+            // Closes the deactivation catch block.
+            }
+        // Closes the loop over stored template rows.
+        }
+
         // Comment: files handled in this run are removed from the waiting list.
         // The files that were taken care of are taken off the waiting list.
         // Comment: files that failed stay on it so the coordinator still sees them.
@@ -1728,16 +1850,27 @@ function syncTemplatesFromDrive(bool $force = false): array {
         // Clears the synchronized files from the waiting list.
         templateClearPendingChanges($synchronisedIds);
 
+        // Removes repeated names from the three sync result lists.
+        $out['added_names']   = array_values(array_unique($out['added_names']));
+        $out['updated_names'] = array_values(array_unique($out['updated_names']));
+        $out['removed_names'] = array_values(array_unique($out['removed_names']));
+
         // Marks the sync as successful.
         $out['ok'] = true;
         // Builds the result message with the number of checked files.
         $out['message'] = 'Checked ' . $out['checked'] . ' file' . ($out['checked'] === 1 ? '' : 's') . ' in Google Drive. '
             // Continues the message with the change counts.
-            . ($out['added'] + $out['updated'] === 0
+            . (($out['added'] + $out['updated'] + $out['removed']) === 0
                 // Message used when everything is already up to date.
                 ? 'Everything is up to date.'
-                // Message listing how many files were added and updated.
-                : $out['added'] . ' new and ' . $out['updated'] . ' updated file' . (($out['added'] + $out['updated']) === 1 ? '' : 's') . '.');
+                // Message listing the added, updated, and removed counts.
+                : $out['added'] . ' added, ' . $out['updated'] . ' updated, ' . $out['removed'] . ' removed.');
+        // Warns when one of the official folders could not be read.
+        if ($emptyTracks) {
+            // Adds the folders that returned no files to the message.
+            $out['message'] .= ' No files were found for ' . implode(', ', $emptyTracks) . '. Check that those Google Drive folders are shared with anyone who has the link.';
+        // Closes the empty-folder warning.
+        }
         // Saves the sync time and the result message.
         templateSaveSyncState($changedAt, $out['message']);
 
@@ -1911,7 +2044,8 @@ function templateNotificationsList(string $role, string $trackCode = '', int $li
         $sql = 'SELECT n.*, t.template_name, t.file_path, t.stage_id, t.track_id
                   FROM `template_notifications` n
                   LEFT JOIN `templates` t ON t.template_id = n.template_id
-                 WHERE 1 = 1';
+                 WHERE 1 = 1
+                   AND (t.`template_id` IS NULL OR t.`is_active` = 1)';
         // Prepares an empty list of query parameters.
         $params = [];
         // Filters to updates that were not seen yet.
