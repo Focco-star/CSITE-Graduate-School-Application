@@ -131,7 +131,8 @@
                 // Adds the venue row.
                 ['Venue', event.venue],
                 // Adds the status row, using the friendly label when present.
-                ['Status', event.statusLabel || event.status]
+                ['Status', event.statusLabel || event.status],
+                ['Presentation Result', event.resultLabel]
             // Loops over each label and value pair.
             ].forEach(([label, value]) => {
                 // Skips pairs whose value is empty.
@@ -181,14 +182,17 @@
                 || (statusKey ? statusKey.charAt(0).toUpperCase() + statusKey.slice(1) : '');
             // Adds a status class so each status can have its own colour.
             if (statusKey) button.classList.add(`psc-event--${statusKey}`);
+            // Adds an outcome class so completed presentations use result colours.
+            const resultKey = String(event.resultKey || '').replace(/[^a-z0-9_-]/g, '');
+            if (resultKey) button.classList.add(`psc-event--result-${resultKey}`);
             // Builds the hover tooltip from the event details.
-            button.title = [event.student, event.title, event.startLabel, statusLabel].filter(Boolean).join(' · ');
+            button.title = [event.student, event.title, event.startLabel, event.resultLabel || statusLabel].filter(Boolean).join(' · ');
             // Adds the start time when the event has one.
             if (event.startLabel) button.appendChild(makeElement('span', 'psc-event-time', event.startLabel));
             // Adds the student name, falling back to the title.
             button.appendChild(makeElement('span', 'psc-event-name', event.student || event.title || 'Presentation'));
             // Adds the status label when there is one.
-            if (statusLabel) button.appendChild(makeElement('span', 'psc-event-status', statusLabel));
+            if (event.resultLabel || statusLabel) button.appendChild(makeElement('span', 'psc-event-status', event.resultLabel || statusLabel));
             // Opens the details dialog when the button is clicked.
             button.addEventListener('click', () => showEvent(event, date, button));
             // Returns the finished button.

@@ -220,6 +220,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         $postedResult    = $resultWasPosted ? trim((string) $stagePosted['result']) : '';
         // Uses the posted result, or keeps the saved one when the field was absent.
         $effectiveResult = $resultWasPosted ? $postedResult : (string) ($app['result'] ?? '');
+        // Maps results saved by the earlier workflow to the closest new outcome.
+        $legacyResultMap = [
+            'requires_revision' => 're_presentation_required',
+            'Approved with Minor Revisions' => 'approved_with_revision',
+            'Approved with revision' => 'approved_with_revision',
+            'Requires Major Revisions' => 're_presentation_required',
+            'Approved' => 'approved',
+        ];
+        $effectiveResult = $legacyResultMap[$effectiveResult] ?? $effectiveResult;
+        // Allows only the outcomes shown in the presentation result selector.
+        $validPresentationResults = ['', 'approved', 'approved_with_revision', 're_presentation_required'];
+        if ($resultWasPosted && !in_array($effectiveResult, $validPresentationResults, true)) {
+            $processError = 'Select a valid presentation result.';
+        }
 
         // Reads whether the readiness checkbox is set in this save.
         $readyPosted = array_key_exists('readyForPresentation', $stagePosted)
@@ -254,10 +268,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         // Closes the prerequisite loop.
         }
 
-        // An approved result completes the stage automatically.
+        // An approved result, with or without revisions, completes the stage automatically.
         $effectiveStatus = $status;
-        // Checks whether the coordinator just recorded an approved result.
-        if ($resultWasPosted && $effectiveResult === 'approved') {
+        // Checks whether the coordinator just recorded an approved outcome.
+        if ($resultWasPosted && in_array($effectiveResult, ['approved', 'approved_with_revision'], true)) {
             // Moves the application to Presentation Complete.
             $effectiveStatus = 'completed';
         // Otherwise, checking readiness moves the stage to Ready for Presentation.
@@ -278,7 +292,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         $statusChanged = ($effectiveStatus !== (string) ($app['status'] ?? ''));
 
         // Asks the helper whether the new status is blocked by missing requirements.
-        $blockedReason = applicationStatusBlockedReason($effectiveStatus, $statusMilestones, $effectiveResult, $statusChanged, (string) ($app['status'] ?? ''));
+        $blockedReason = $processError !== ''
+            ? $processError
+            : applicationStatusBlockedReason($effectiveStatus, $statusMilestones, $effectiveResult, $statusChanged, (string) ($app['status'] ?? ''));
 
         // Blocks marking ready while a prerequisite is still open.
         if ($blockedReason === null && $readyPosted && !$preReadyDone && $effectiveStatus === 'ready_for_presentation') {
@@ -474,8 +490,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             // Refreshes the in-memory application so the page shows the saved values.
             $app = array_merge($app, $updatedFields);
             // Marks the linked schedule completed when the application is complete.
-            if ($updatedFields['status'] === 'completed' && $updatedFields['result'] === 'approved') {
-                // Synchronizes the schedule card and calendar with the application.
+            if ($resultWasPosted && $updatedFields['result'] !== '') {
+                // Marks the presentation itself complete for every recorded outcome.
                 setScheduleStatusForApplication((int) $app['id'], 'completed');
             // Closes the completed-application sync.
             }
@@ -547,14 +563,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
                 } elseif ($actionResult === '') {
                     // Asks the coordinator to record the result before approving.
                     $processError = 'Record the presentation result before approving the next stage.';
-                // A result of requires_revision must not unlock the next stage.
-                } elseif ($actionResult === 'requires_revision') {
+                // A required re-presentation must not unlock the next stage.
+                } elseif (in_array($actionResult, ['re_presentation_required', 'requires_revision'], true)) {
                     // Comment: a revision keeps the student on the same stage.
                     // A revision keeps the student right where they are; the
                     // Comment: the next stage opens only once the result is approved.
                     // next stage opens only once the result is approved.
                     // Explains that the next stage stays locked until the revision is approved.
-                    $processError = 'The presentation result requires revision. The next stage stays locked until the revised result is approved.';
+                    $processError = 'A re-presentation is required. The next stage stays locked until a later presentation is approved.';
                 // Starts the branch that actually completes the stage.
                 } else {
                     // Marks the stage completed and stores the approved result.
@@ -1268,7 +1284,15 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                                 For the result milestone, shows the recorded presentation result. */ ?>
                                 <?php elseif ($stepKey === 'result'): ?>
 <?php /*                                     Prints Approved, Requires revision or Not recorded for the result. */ ?>
-                                    <span class="ms-step-detail" style="margin:0;"><?= htmlspecialchars($panel['result'] === 'approved' ? 'Approved' : ($panel['result'] === 'requires_revision' ? 'Requires revision' : 'Not recorded')) ?></span>
+                                    <span class="ms-step-detail" style="margin:0;"><?= htmlspecialchars([
+                                        'approved' => 'Approved',
+                                        'Approved' => 'Approved',
+                                        'approved_with_revision' => 'Approved with revision',
+                                        'Approved with Minor Revisions' => 'Approved with revision',
+                                        'requires_revision' => 'Re-Presentation Required',
+                                        'Requires Major Revisions' => 'Re-Presentation Required',
+                                        're_presentation_required' => 'Re-Presentation Required',
+                                    ][$panel['result']] ?? 'Not recorded') ?></span>
 <?php /*                                 Ends the milestone action checks. */ ?>
                                 <?php endif; ?>
 <?php /*                             Closes the milestone action column. */ ?>
@@ -1307,7 +1331,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                         // Notes that the buttons show what can currently be done here.
                         // coordinator can see what can be done here.
                         // Sets $approveReady when requirements, result and application all allow approval.
-                        $approveReady = $panel['requirementsComplete'] && ($panel['result'] ?? '') === 'approved' && (bool) $stageApp;
+                        $approveReady = $panel['requirementsComplete'] && in_array(($panel['result'] ?? ''), ['approved', 'approved_with_revision', 'Approved', 'Approved with Minor Revisions'], true) && (bool) $stageApp;
                         // Reads the label of the next stage for the button text and hints.
                         $nextLabel = $panels[$nextStageKey]['stage']['label'];
                         // Closes the PHP block that prepared the approval values.
@@ -1329,9 +1353,9 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                                     // Tooltip shown when the stage can be approved and the next stage unlocked.
                                     ? 'Approve ' . htmlspecialchars($stageName) . ' and unlock ' . htmlspecialchars($nextLabel) . ' for the student'
                                     // Checks whether the recorded result needs revision.
-                                    : (($panel['result'] ?? '') === 'requires_revision'
-                                        // Tooltip telling the coordinator to approve after fixing the result.
-                                        ? 'The result requires revision - approve the next stage once the result is set to Approved'
+                                    : (in_array(($panel['result'] ?? ''), ['requires_revision', 're_presentation_required'], true)
+                                        // Tooltip explaining that another presentation is required first.
+                                        ? 'A re-presentation is required before approving the next stage'
                                         // Fallback tooltip asking for the required items to be completed first.
                                         : 'This stage cannot be approved yet. Please complete the required items first.') ?>">
 <?php /*                             Button text for approving the stage and unlocking the next one. */ ?>
@@ -1827,9 +1851,9 @@ $scheduleAlerts = [
 <?php /*                         Not yet presented option is selected when no result is saved. */ ?>
                         <option value="" <?= empty($panel['result']) ? 'selected' : '' ?>>Not yet presented</option>
 <?php /*                         Approved option is selected when the saved result is approved. */ ?>
-                        <option value="approved" <?= $panel['result'] === 'approved' ? 'selected' : '' ?>>Approved</option>
-<?php /*                         Requires Revision option is selected for a revision result. */ ?>
-                        <option value="requires_revision" <?= $panel['result'] === 'requires_revision' ? 'selected' : '' ?>>Requires Revision</option>
+                        <option value="approved" <?= in_array($panel['result'], ['approved', 'Approved'], true) ? 'selected' : '' ?>>Approved</option>
+                        <option value="approved_with_revision" <?= in_array($panel['result'], ['approved_with_revision', 'Approved with Minor Revisions', 'Approved with revision'], true) ? 'selected' : '' ?>>Approved with revision</option>
+                        <option value="re_presentation_required" <?= in_array($panel['result'], ['re_presentation_required', 'requires_revision', 'Requires Major Revisions'], true) ? 'selected' : '' ?>>Re-Presentation Required</option>
 <?php /*                     Closes the result dropdown. */ ?>
                     </select>
 <?php /*                 Closes the result box. */ ?>

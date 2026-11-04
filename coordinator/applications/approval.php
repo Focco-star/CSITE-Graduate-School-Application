@@ -23,15 +23,11 @@ $approvalError = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
     // Reads the chosen final result from the posted form.
     $result = $_POST['result'] ?? '';
-    // Maps each readable result name to the status stored in data.
+    // Maps each presentation outcome to the application status stored in data.
     $statusMap = [
-        // Approved marks the application as completed.
-        'Approved' => 'completed',
-        // Approved with minor revisions keeps an approved status.
-        'Approved with Minor Revisions' => 'approved',
-        // Requires major revisions flags the student for more work.
-        'Requires Major Revisions' => 'requires_revision',
-    // Closes the result-to-status lookup array.
+        'approved' => 'completed',
+        'approved_with_revision' => 'approved',
+        're_presentation_required' => 'requires_revision',
     ];
     // Checks that the submitted result is one of the allowed choices.
     if (!isset($statusMap[$result])) {
@@ -45,12 +41,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             'status' => $statusMap[$result],
             // Stores the trimmed final comment from the textarea.
             'coordinatorComment' => trim($_POST['comment'] ?? ''),
-            // Stores the readable result text as typed.
+            // Stores the canonical result key.
             'result' => $result,
             // Stores the completion date, defaulting to today.
             'completionDate' => $_POST['completionDate'] ?? date('Y-m-d'),
         // Closes the array of fields to update.
         ]);
+        if (function_exists('setScheduleStatusForApplication')) {
+            setScheduleStatusForApplication((int) $app['id'], 'completed');
+        }
         // Tells the coordinator the result was recorded.
         $approvalSuccess = 'Final result recorded. The student status page now reflects this outcome.';
     // Closes the else branch that saved the record.
@@ -190,11 +189,9 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                         Placeholder option asking the coordinator to choose. */ ?>
                         <option value="">Select result</option>
 <?php /*                         Option for a straight approval. */ ?>
-                        <option>Approved</option>
-<?php /*                         Option for approval needing only small fixes. */ ?>
-                        <option>Approved with Minor Revisions</option>
-<?php /*                         Option for work that needs major revisions. */ ?>
-                        <option>Requires Major Revisions</option>
+                        <option value="approved">Approved</option>
+                        <option value="approved_with_revision">Approved with revision</option>
+                        <option value="re_presentation_required">Re-Presentation Required</option>
 <?php /*                     Closes the result dropdown. */ ?>
                     </select>
 <?php /*                 Closes the result field group. */ ?>

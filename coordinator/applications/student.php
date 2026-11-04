@@ -294,7 +294,16 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*             Shows the submission date with the full month name. */ ?>
             <div class="detail-item"><label>Submission Date</label><span><?= $selected['date'] ? date('F d, Y', strtotime($selected['date'])) : '—' ?></span></div>
 <?php /*             Shows Approved, Requires Revision, or an em dash when no result. */ ?>
-            <div class="detail-item"><label>Presentation Result</label><span><?= $selected['result'] ? htmlspecialchars($selected['result'] === 'approved' ? 'Approved' : 'Requires Revision') : '—' ?></span></div>
+            <div class="detail-item"><label>Presentation Result</label><span><?= $selected['result'] ? htmlspecialchars([
+                'approved' => 'Approved',
+                'Approved' => 'Approved',
+                'approved_with_revision' => 'Approved with revision',
+                'Approved with Minor Revisions' => 'Approved with revision',
+                'Approved with revision' => 'Approved with revision',
+                'requires_revision' => 'Re-Presentation Required',
+                'Requires Major Revisions' => 'Re-Presentation Required',
+                're_presentation_required' => 'Re-Presentation Required',
+            ][$selected['result']] ?? $selected['result']) : '—' ?></span></div>
 <?php /*             Picks the best graduate school endorsement upload for this application. */ ?>
             <?php $gradSchoolUpload = bestUploadOfKind($uploads, 'grad_school_endorsement'); ?>
 <?php /*             Shows the endorsement status, or 'Not submitted' when missing. */ ?>
