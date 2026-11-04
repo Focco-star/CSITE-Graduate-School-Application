@@ -720,8 +720,8 @@ function setApplicationStatusRecord(int $applicationId, string $status, ?bool $r
 /**
  * Sets the status of the schedule that belongs to an application.
  *
- * Used when an application is completed (schedule becomes completed) and when
- * an approval is revoked (schedule returns to confirmed).
+ * Used when a presentation outcome is recorded and when an approval is
+ * revoked (schedule returns to confirmed).
  */
 // Sets the schedule status for one application.
 function setScheduleStatusForApplication(int $applicationId, string $status): void {
@@ -798,11 +798,18 @@ function syncApplicationStatusFromSchedule(int $applicationId, string $scheduleS
     // Reads the current status and result.
     $currentStatus = (string) ($app['status'] ?? '');
     $result = (string) ($app['result'] ?? '');
+    $result = [
+        'Approved' => 'approved',
+        'Approved with Minor Revisions' => 'approved_with_revision',
+        'Approved with revision' => 'approved_with_revision',
+        'Requires Major Revisions' => 're_presentation_required',
+        'requires_revision' => 're_presentation_required',
+    ][$result] ?? $result;
 
     // A finished application always keeps a completed schedule.
     if (in_array($currentStatus, ['completed', 'approved'], true)) {
         // Marks the schedule completed when the result was approved.
-        if ($result === 'approved' && $scheduleStatus !== 'completed') {
+        if (in_array($result, ['approved', 'approved_with_revision'], true) && $scheduleStatus !== 'completed') {
             // Writes the completed schedule status.
             setScheduleStatusForApplication($applicationId, 'completed');
         // Closes the approved-result check.
@@ -819,8 +826,8 @@ function syncApplicationStatusFromSchedule(int $applicationId, string $scheduleS
 
     // Confirmed and completed schedules are verified presentations.
     if (in_array($scheduleStatus, ['confirmed', 'completed'], true)) {
-        // An approved result completes the stage.
-        if ($result === 'approved') {
+        // An approved outcome, with or without revisions, completes the stage.
+        if (in_array($result, ['approved', 'approved_with_revision'], true)) {
             // Targets the completed status.
             $targetStatus = 'completed';
             // Keeps readiness on record.

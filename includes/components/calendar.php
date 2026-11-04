@@ -362,11 +362,39 @@ if (!function_exists('scheduleCalendarStatus')) {
 // Closes the guard around the status helper.
 }
 
+/** Normalises stored presentation outcomes for calendar labels and colours. */
+if (!function_exists('scheduleCalendarPresentationResult')) {
+    function scheduleCalendarPresentationResult($result): array
+    {
+        $raw = strtolower(trim((string) $result));
+        $aliases = [
+            'approved with minor revisions' => 'approved_with_revision',
+            'approved with revision' => 'approved_with_revision',
+            'approved with revisions' => 'approved_with_revision',
+            'requires_revision' => 're_presentation_required',
+            'requires revision' => 're_presentation_required',
+            'requires major revisions' => 're_presentation_required',
+            're-presentation required' => 're_presentation_required',
+        ];
+        $key = $aliases[$raw] ?? str_replace([' ', '-'], '_', $raw);
+        $labels = [
+            'approved' => 'Approved',
+            'approved_with_revision' => 'Approved with revision',
+            're_presentation_required' => 'Re-Presentation Required',
+        ];
+
+        return [
+            'key' => isset($labels[$key]) ? $key : '',
+            'label' => $labels[$key] ?? '',
+        ];
+    }
+}
+
 /** Builds one calendar event in the shape the front end expects. */
 // Guards the event builder so it is declared only once.
 if (!function_exists('scheduleCalendarEvent')) {
     // Declares the helper that builds one calendar event array.
-    function scheduleCalendarEvent(string $id, int $applicationId, $student, $title, $stage, $venue, string $status, ?string $start, ?string $end): array
+    function scheduleCalendarEvent(string $id, int $applicationId, $student, $title, $stage, $venue, string $status, ?string $start, ?string $end, $result = ''): array
     // Opens the body of scheduleCalendarEvent().
     {
         // Checks for an end time at or before the start time.
@@ -377,6 +405,8 @@ if (!function_exists('scheduleCalendarEvent')) {
         }
         // Normalises the status into its key and label.
         $statusMeta = scheduleCalendarStatus($status);
+        // Normalises the presentation result separately from schedule status.
+        $resultMeta = scheduleCalendarPresentationResult($result);
         // Starts the event array handed to the front end.
         return [
             // Stores the unique event id.
@@ -397,6 +427,10 @@ if (!function_exists('scheduleCalendarEvent')) {
             'statusKey'     => $statusMeta['key'],
             // Stores the readable status label.
             'statusLabel'   => $statusMeta['label'],
+            // Stores the normalized presentation outcome for the event indicator.
+            'resultKey'     => $resultMeta['key'],
+            // Stores the readable presentation outcome.
+            'resultLabel'   => $resultMeta['label'],
             // Stores the start time in H:i form.
             'start'         => $start,
             // Stores the end time in H:i form.
@@ -469,7 +503,7 @@ if (!function_exists('scheduleCalendarFetch')) {
             // Starts the SQL that joins schedules, applications, users and students.
             "SELECT sc.schedule_id, sc.application_id, sc.presentation_date, sc.start_time, sc.end_time,
                     sc.venue, sc.status AS schedule_status,
-                    a.paper_title, a.presentation_stage,
+                    a.paper_title, a.presentation_stage, a.result AS presentation_result,
                     {$nameSql} AS student_name
              FROM schedules sc
              JOIN applications a ON a.application_id = sc.application_id
@@ -514,7 +548,8 @@ if (!function_exists('scheduleCalendarFetch')) {
                 // Converts the stored start time to H:i.
                 scheduleCalendarParseTime($row['start_time']),
                 // Converts the stored end time to H:i.
-                scheduleCalendarParseTime($row['end_time'])
+                scheduleCalendarParseTime($row['end_time']),
+                $row['presentation_result']
             // Closes the event builder and the add call.
             ));
         // Closes the loop over schedule rows.
@@ -529,7 +564,7 @@ if (!function_exists('scheduleCalendarFetch')) {
             // Passes the database connection into the query helper.
             $pdo,
             // Starts the SQL that reads scheduling data from applications.
-            "SELECT a.application_id, a.workflow_state, a.paper_title, a.presentation_stage,
+            "SELECT a.application_id, a.workflow_state, a.paper_title, a.presentation_stage, a.result AS presentation_result,
                     {$nameSql} AS student_name
              FROM applications a
              JOIN users u ON u.user_id = a.user_id
@@ -586,7 +621,8 @@ if (!function_exists('scheduleCalendarFetch')) {
                 // Converts the workflow presentation time to H:i.
                 scheduleCalendarParseTime($workflow['presentation_time'] ?? ''),
                 // Passes null because the workflow has no end time.
-                null
+                null,
+                $row['presentation_result']
             // Closes the event builder and the add call.
             ));
         // Closes the loop over workflow-only rows.
@@ -690,6 +726,9 @@ if (!function_exists('renderScheduleCalendar')) {
             <li><span class="psc-swatch psc-swatch-pending" aria-hidden="true"></span>Pending</li>
 <?php /*             Shows the completed colour swatch in the legend. */ ?>
             <li><span class="psc-swatch psc-swatch-completed" aria-hidden="true"></span>Completed</li>
+            <li><span class="psc-swatch psc-swatch-result-approved" aria-hidden="true"></span>Approved</li>
+            <li><span class="psc-swatch psc-swatch-result-approved_with_revision" aria-hidden="true"></span>Approved with revision</li>
+            <li><span class="psc-swatch psc-swatch-result-re_presentation_required" aria-hidden="true"></span>Re-Presentation Required</li>
 <?php /*         Closes the legend list. */ ?>
         </ul>
 <?php /*     Closes the calendar header. */ ?>

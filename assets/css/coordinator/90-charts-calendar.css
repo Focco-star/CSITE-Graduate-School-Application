@@ -585,6 +585,9 @@
 .psc-swatch-pending { background: #b6bcc5; box-shadow: 0 0 0 3px rgba(182, 188, 197, 0.2); }
 /* Colours the completed swatch green, matching the completed event background. */
 .psc-swatch-completed { background: #8fd9b8; box-shadow: 0 0 0 3px rgba(143, 217, 184, 0.2); }
+.psc-swatch-result-approved { background: #8fd9b8; box-shadow: 0 0 0 3px rgba(143, 217, 184, 0.2); }
+.psc-swatch-result-approved_with_revision { background: #f5cf54; box-shadow: 0 0 0 3px rgba(245, 207, 84, 0.2); }
+.psc-swatch-result-re_presentation_required { background: #a78bfa; box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2); }
 /* Toolbar row holding the month controls and the today button. */
 .psc-toolbar { justify-content: space-between; margin: 0; padding: 1rem 1.5rem 0.75rem; }
 /* Adds a gap between the previous and next controls. */
@@ -711,6 +714,15 @@
 .psc-event--completed { color: #123f30; background: linear-gradient(135deg, #cdf1df 0%, #8fd9b8 100%); }
 /* Darkens the time text inside a completed chip. */
 .psc-event--completed .psc-event-time { color: #14624a; }
+.psc-event--result-approved { color: #123f30; background: linear-gradient(135deg, #cdf1df 0%, #8fd9b8 100%); }
+.psc-event--result-approved .psc-event-time,
+.psc-event--result-approved .psc-event-status { color: #14624a; }
+.psc-event--result-approved_with_revision { color: #594300; background: linear-gradient(135deg, #fff2a8 0%, #f5cf54 100%); }
+.psc-event--result-approved_with_revision .psc-event-time,
+.psc-event--result-approved_with_revision .psc-event-status { color: #594300; }
+.psc-event--result-re_presentation_required { color: #3b246d; background: linear-gradient(135deg, #e8ddff 0%, #a78bfa 100%); }
+.psc-event--result-re_presentation_required .psc-event-time,
+.psc-event--result-re_presentation_required .psc-event-status { color: #3b246d; }
 /* Colours cancelled event chips red. */
 .psc-event--cancelled { color: #5b2730; background: linear-gradient(135deg, #f6d9dd 0%, #e9b8c1 100%); }
 /* Darkens the time text inside a cancelled chip. */
@@ -851,4 +863,3 @@ body.psc-dialog-open { overflow: hidden; }
     .psc-event { transition: none; }
 /* Closes the reduced-motion block. */
 }
-

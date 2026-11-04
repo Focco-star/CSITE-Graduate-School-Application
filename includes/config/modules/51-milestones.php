@@ -497,14 +497,12 @@ function milestoneStepsForStage(array $p, string $track, string $stageKey): arra
             'coord'  => true,
             // Uses the result state, defaulting to pending.
             'detail' => (($p['result']['value'] ?? '') === 'approved'
-                // Marks result recording as the coordinator's task.
                 ? 'Approved — proceed to the next stage'
-                // Checks whether the result is approved.
-                : (($p['result']['value'] ?? '') === 'revision'
-                    // Tells the student to proceed to the next stage.
-                    ? 'Revision required — resubmit the updated paper'
-                    // Checks whether the result asks for a revision.
-                    : 'Awaiting presentation')),
+                : ((($p['result']['value'] ?? '') === 'approved_with_revision')
+                    ? 'Approved with revision — proceed to the next stage'
+                    : (in_array(($p['result']['value'] ?? ''), ['revision', 're_presentation_required'], true)
+                        ? 'Re-Presentation Required — schedule another presentation'
+                        : 'Awaiting presentation'))),
         // Tells the student to resubmit the updated paper.
         ],
     // Otherwise says the presentation is still awaited.

@@ -702,6 +702,13 @@ function getStudentProgress(string $email, string $track): array {
 
         // Reads the application's result value.
         $resultVal = $app['result'] ?? '';
+        $resultVal = [
+            'Approved' => 'approved',
+            'Approved with Minor Revisions' => 'approved_with_revision',
+            'Approved with revision' => 'approved_with_revision',
+            'Requires Major Revisions' => 're_presentation_required',
+            'requires_revision' => 're_presentation_required',
+        ][$resultVal] ?? $resultVal;
         // Adds the finished progress row to the list.
         $rows[] = [
             // Stores the stage key.
@@ -736,10 +743,12 @@ function getStudentProgress(string $email, string $track): array {
             ],
             // Starts the result details array.
             'result' => [
-                // Maps approved or requires_revision to a result state.
-                'status' => $resultVal === 'approved' ? 'done' : ($resultVal === 'requires_revision' ? 'flagged' : 'pending'),
-                // Maps the result value used for display.
-                'value' => $resultVal === 'approved' ? 'approved' : ($resultVal === 'requires_revision' ? 'revision' : ''),
+                // Marks approved outcomes done and a required re-presentation flagged.
+                'status' => in_array($resultVal, ['approved', 'approved_with_revision'], true)
+                    ? 'done'
+                    : (in_array($resultVal, ['requires_revision', 're_presentation_required'], true) ? 'flagged' : 'pending'),
+                // Preserves the specific outcome for milestone details.
+                'value' => $resultVal === 'requires_revision' ? 're_presentation_required' : $resultVal,
             // Closes the result details array.
             ],
             // Stores the coordinator's overall comment.

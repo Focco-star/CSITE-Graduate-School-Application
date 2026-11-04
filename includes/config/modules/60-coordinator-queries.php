@@ -174,7 +174,8 @@ function applicationStatusBlockedReason(string $status, array $milestoneSteps, s
     }
 
     // Keeps the approved result on a completed stage intact.
-    if (!$statusChanged && $currentStatus === 'completed' && $status === 'completed' && $result !== 'approved') {
+    if (!$statusChanged && $currentStatus === 'completed' && $status === 'completed'
+        && !in_array($result, ['approved', 'approved_with_revision'], true)) {
         // Explains that a completed stage keeps its approved result.
         return 'The approved result of a completed stage cannot be cleared or changed.';
     }
@@ -248,10 +249,10 @@ function applicationStatusBlockedReason(string $status, array $milestoneSteps, s
             return 'The student cannot be marked as Presentation Complete before the presentation is scheduled and confirmed.';
         // Closes the presentation check.
         }
-        // A revision result never completes the stage.
-        if ($result === 'requires_revision') {
-            // Returns the reason when the result still needs revision.
-            return 'The student cannot be marked as Presentation Complete while the presentation result requires revision.';
+        // A required re-presentation never completes the stage.
+        if (in_array($result, ['requires_revision', 're_presentation_required'], true)) {
+            // Returns the reason when another presentation is required.
+            return 'The student cannot be marked as Presentation Complete while a re-presentation is required.';
         // Closes the revision check.
         }
         // Requires an approved result.
@@ -260,9 +261,9 @@ function applicationStatusBlockedReason(string $status, array $milestoneSteps, s
             return 'The student cannot be marked as Presentation Complete before the presentation result is recorded.';
         // Closes the empty-result check.
         }
-        // Only an approved result completes the stage.
-        if ($result !== 'approved') {
-            // Returns the reason when the result is not approved.
+        // Only an approved outcome completes the stage.
+        if (!in_array($result, ['approved', 'approved_with_revision'], true)) {
+            // Returns the reason when the outcome is not approved.
             return 'The student cannot be marked as Presentation Complete until the presentation result is approved.';
         // Closes the approved-result check.
         }
