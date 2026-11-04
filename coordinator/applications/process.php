@@ -1552,8 +1552,8 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                                         <a class="btn btn-sm btn-outline" href="<?= htmlspecialchars($shareUrl) ?>" data-copy-doc-url="<?= htmlspecialchars($shareUrl) ?>" title="Copy a shareable link to this document"><i class="fas fa-link"></i> Copy Link</a>
 <?php /*                                         Closes the copy-link availability check. */ ?>
                                         <?php endif; ?>
-<?php /*                                         Download button opens the coordinator download script for the file. */ ?>
-                                        <a class="btn btn-sm btn-outline" href="<?= url('coordinator/download.php?id=' . urlencode($document['id'])) ?>"><i class="fas fa-download"></i> Download</a>
+<?php /*                                         Download link saves the original uploaded file. */ ?>
+                                        <a class="btn btn-sm btn-outline" href="<?= url('coordinator/download.php?id=' . urlencode($document['id'])) ?>" title="Download the original uploaded document"><i class="fas fa-download"></i> Download</a>
 <?php /*                                         Starts the branch used when the file is missing from storage. */ ?>
                                         <?php else: ?>
 <?php /*                                         Tells the coordinator the file is unavailable. */ ?>

@@ -139,8 +139,9 @@ function documentShareToken(array $upload): string {
 /**
  * The full, shareable URL of one uploaded document.
  *
- * The URL is absolute so it can be pasted into an email or chat. It works
- * without a coordinator login because the random token identifies the file.
+ * The URL is absolute so it can be pasted into an email or chat. The random
+ * token identifies the exact file, and the viewer still requires a signed-in
+ * coordinator or admin before it sends the document.
  */
 // Builds the shareable URL for a document.
 function documentShareUrl(array $upload): string {

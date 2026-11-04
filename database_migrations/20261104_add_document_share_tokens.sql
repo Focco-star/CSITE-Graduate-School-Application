@@ -2,9 +2,9 @@
 -- Shareable document links
 --
 -- Each uploaded document can carry one random share token. The coordinator
--- copies a link that includes the token, and anyone with that link can open
--- only that one document without signing in. The token is created the first
--- time the Copy Link button is used.
+-- copies a link that includes the token. The link opens only while the visitor
+-- is signed in as a coordinator or admin, and it points to exactly one document.
+-- The token is created the first time the document link is built.
 -- --------------------------------------------------------
 
 ALTER TABLE `application_documents`

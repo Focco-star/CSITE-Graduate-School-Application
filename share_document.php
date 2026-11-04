@@ -1,9 +1,40 @@
-<?php /* Opens the public viewer for a shared student document. */ ?>
+<?php /* Opens the protected viewer for a shared student document. */ ?>
 <?php
 // Loads the shared configuration and helper functions.
 require_once __DIR__ . '/includes/config/config.php';
 // Loads the database class used to find the shared document.
 require_once __DIR__ . '/includes/config/db.php';
+
+// Checks whether a session is already running before starting one.
+if (session_status() === PHP_SESSION_NONE) {
+    // Starts the session so the signed-in user can be checked.
+    session_start();
+// Closes the session-start check.
+}
+
+// Checks whether anyone is signed in before deciding how to handle the request.
+if (empty($_SESSION['user'])) {
+    // Reads the page the user tried to open so it can be restored after login.
+    $returnPath = (string) ($_SERVER['REQUEST_URI'] ?? '');
+    // Builds the coordinator login address with the return path when one exists.
+    $loginTarget = url('coordinator/login.php') . ($returnPath !== '' ? '?next=' . rawurlencode($returnPath) : '');
+    // Sends the visitor to the coordinator login page.
+    header('Location: ' . $loginTarget);
+    // Stops the script after the redirect.
+    exit;
+// Closes the signed-out check.
+}
+
+// Blocks signed-in users whose role is not coordinator or admin.
+if (!in_array($_SESSION['user']['role'] ?? '', ['coordinator', 'admin'], true)) {
+    // Sends an HTTP 403 status meaning access is forbidden.
+    http_response_code(403);
+    // Tells the browser the error page is HTML in UTF-8.
+    header('Content-Type: text/html; charset=utf-8');
+    // Shows a short page explaining that only authorized users may open the file.
+    exit('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Access denied</title></head><body style="font-family:system-ui,sans-serif;background:#f1f5f9;color:#1e293b;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:1.5rem;"><div style="background:#fff;border-radius:10px;padding:2rem;max-width:460px;box-shadow:0 12px 30px rgba(15,23,42,.15);text-align:center;"><h1 style="margin:0 0 .75rem;font-size:1.25rem;">Access denied</h1><p style="margin:0;font-size:.95rem;line-height:1.6;">This document link is only available to the coordinator or another authorized user.</p></div></body></html>');
+// Closes the role check.
+}
 
 // Reads the share token from the URL.
 $token = (string) ($_GET['token'] ?? '');
@@ -31,119 +62,102 @@ if (!$path || !file_exists($path)) {
 }
 
 // Reads the original file name, falling back to a simple label.
-$fileName = (string) ($upload['fileName'] ?? 'Document');
-// Reads the stored MIME type in lowercase for comparisons.
-$mimeType = strtolower((string) ($upload['mimeType'] ?? ''));
-// Reads the file extension in lowercase for comparisons.
+$fileName = basename((string) ($upload['fileName'] ?? 'Document'));
+// Reads the stored MIME type, or detects it from the file itself.
+$mimeType = (string) ($upload['mimeType'] ?? '');
+// Detects the type from the file when the database has no MIME type.
+if ($mimeType === '') {
+    // Uses the detected type, or a generic binary type as the last fallback.
+    $mimeType = (string) (mime_content_type($path) ?: 'application/octet-stream');
+// Closes the MIME fallback check.
+}
+// Reads the lowercase extension for the viewer decision.
 $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+// Treats the file as a Word .docx when its extension or MIME type says so.
+$isDocx = ($extension === 'docx') || str_contains(strtolower($mimeType), 'wordprocessingml');
+// Serves the original bytes when the viewer asks for the raw file.
+$isRaw = ($_GET['raw'] ?? '') === '1';
+// Serves the original bytes as a download when requested.
+$isDownload = ($_GET['download'] ?? '') === '1';
 
-// Serves the raw file when the viewer or a download button asks for it.
-if (($_GET['raw'] ?? '') === '1' || ($_GET['download'] ?? '') === '1') {
-    // Uses the original name only, never a folder from the database.
-    $downloadName = basename($fileName);
-    // Uses the stored MIME type, or detects it from the file itself.
-    $sendType = $mimeType !== '' ? $mimeType : (string) (mime_content_type($path) ?: 'application/octet-stream');
-    // Chooses attachment for downloads and inline for the in-page viewer.
-    $disposition = ($_GET['download'] ?? '') === '1' ? 'attachment' : 'inline';
+// Streams the original file for non-Word documents and for raw/download requests.
+if ($isRaw || $isDownload || !$isDocx) {
+    // Uses attachment only when a download was explicitly requested.
+    $disposition = $isDownload ? 'attachment' : 'inline';
     // Clears any output buffering so the file bytes are not corrupted.
     if (ob_get_level()) {
         // Ends every active output buffer.
         ob_end_clean();
     // Closes the output buffer cleanup check.
     }
-    // Tells the browser what type of file is being sent.
-    header('Content-Type: ' . $sendType);
-    // Tells the browser the exact size of the file in bytes.
+    // Sends the original file type and size to the browser.
+    header('Content-Type: ' . $mimeType);
+    // Tells the browser the exact size of the original file.
     header('Content-Length: ' . filesize($path));
-    // Sets the file name and whether to show it or download it.
-    header('Content-Disposition: ' . $disposition . '; filename="' . addcslashes($downloadName, "\\\"") . '"');
+    // Sends the original file name and lets the browser show or download the file.
+    header('Content-Disposition: ' . $disposition . '; filename="' . addcslashes($fileName, "\\\"") . '"');
+    // Stops the browser from guessing a different content type.
+    header('X-Content-Type-Options: nosniff');
     // Prevents browsers and proxies from caching the private file.
     header('Cache-Control: private, max-age=0, must-revalidate');
-    // Sends the actual file contents to the browser.
+    // Sends the original file bytes without changing the content or formatting.
     readfile($path);
     // Ends the script so nothing else is appended to the file.
     exit;
-// Closes the raw-file branch.
+// Closes the original-file branch.
 }
 
-// Treats the file as a PDF when its MIME type or extension says so.
-$isPdf = ($mimeType === 'application/pdf') || ($extension === 'pdf');
-// Treats the file as a Word .docx when its MIME type or extension says so.
-$isDocx = ($extension === 'docx') || str_contains($mimeType, 'wordprocessingml');
-// Treats the file as an image when its MIME type or extension says so.
-$isImage = str_starts_with($mimeType, 'image/') || in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'], true);
-// Treats the file as plain text when its MIME type or extension says so.
-$isText = str_starts_with($mimeType, 'text/') || in_array($extension, ['txt', 'csv', 'log'], true);
-
-// Builds the link that shows the original file inside the viewer.
-$fileUrl = url('share_document.php?token=' . rawurlencode($token) . '&raw=1');
-// Builds the link that downloads the original file as an attachment.
+// Builds the internal address used to fetch the original Word bytes.
+$rawUrl = url('share_document.php?token=' . rawurlencode($token) . '&raw=1');
+// Builds the address that downloads the original Word file.
 $downloadUrl = url('share_document.php?token=' . rawurlencode($token) . '&download=1');
-// Closes PHP so the HTML viewer page can be printed.
+// Closes PHP so the Word viewer page can be printed.
 ?>
-<?php /* Declares the document as an HTML5 page. */ ?>
+<?php /* Declares the viewer as an HTML5 page. */ ?>
 <!DOCTYPE html>
 <?php /* Sets the page language to English. */ ?>
 <html lang="en">
-<?php /* Starts the head section with the page title and styles. */ ?>
+<?php /* Starts the head section with the page title and viewer styles. */ ?>
 <head>
-<?php /*     Tells the browser to use UTF-8 so names show correctly. */ ?>
+<?php /*     Tells the browser to use UTF-8 so document text shows correctly. */ ?>
     <meta charset="UTF-8">
 <?php /*     Makes the viewer fit mobile and desktop screen widths. */ ?>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <?php /*     Keeps the shared page out of search engines. */ ?>
     <meta name="robots" content="noindex, nofollow">
-<?php /*     Sets the browser tab title to View Document plus the file name. */ ?>
+<?php /*     Sets the browser tab title to the document name. */ ?>
     <title>View Document - <?= htmlspecialchars($fileName) ?></title>
-<?php /*     Loads the Font Awesome icons used in the header buttons. */ ?>
+<?php /*     Loads the Font Awesome icons used in the header. */ ?>
     <link rel="stylesheet" href="<?= asset('vendor/fontawesome/all.min.css') ?>">
-<?php /*     Starts the CSS rules for the dark document viewer. */ ?>
+<?php /*     Starts the viewer styles. */ ?>
     <style>
-<?php /*         Resets spacing and sets a clean system font for every element. */ ?>
+<?php /*         Resets spacing and uses a clean system font. */ ?>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-<?php /*         Makes the page a full-height column with a dark background. */ ?>
-        body { display: flex; flex-direction: column; height: 100vh; background-color: #1e1e1e; color: #fff; }
-<?php /*         Styles the top bar holding the file name and the buttons. */ ?>
-        .viewer-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 1.5rem; background-color: #2d2d2d; border-bottom: 1px solid #3f3f3f; min-height: 57px; flex-wrap: wrap; }
+<?php /*         Gives the viewer a light grey desk background. */ ?>
+        body { background: #e5e7eb; color: #1e293b; min-height: 100vh; }
+<?php /*         Makes the top bar stay visible while scrolling the document. */ ?>
+        .viewer-header { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 1.5rem; background: #2d2d2d; color: #fff; border-bottom: 1px solid #3f3f3f; min-height: 57px; flex-wrap: wrap; }
 <?php /*         Lays out the file icon and file name in a flexible row. */ ?>
         .file-info { display: flex; align-items: center; gap: 0.75rem; overflow: hidden; min-width: 0; }
 <?php /*         Styles the file name, cutting it off with an ellipsis when long. */ ?>
         .file-name { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-<?php /*         Lays out the header buttons in a row. */ ?>
+<?php /*         Lays out the header actions. */ ?>
         .viewer-actions { display: flex; align-items: center; gap: 0.5rem; }
-<?php /*         Styles the blue Download File button. */ ?>
-        .btn-download { display: inline-flex; align-items: center; gap: 0.5rem; background-color: #2563eb; color: #fff; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: background 0.2s; }
-<?php /*         Darkens the download button when the mouse hovers over it. */ ?>
-        .btn-download:hover { background-color: #1d4ed8; }
-<?php /*         Makes the PDF iframe fill the rest of the window. */ ?>
-        .viewer-container { flex: 1; width: 100%; height: calc(100vh - 57px); border: none; }
-<?php /*         Centres images inside the remaining window space. */ ?>
-        .image-stage { flex: 1; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 1.5rem; background-color: #141414; }
-<?php /*         Keeps images inside the visible window. */ ?>
-        .image-stage img { max-width: 100%; max-height: 100%; object-fit: contain; box-shadow: 0 4px 24px rgba(0,0,0,0.45); }
-<?php /*         Centres the fallback message for files that cannot be shown. */ ?>
-        .fallback-message { display: flex; flex-direction: column; align-items: center; justify-content: center; height: calc(100vh - 57px); gap: 1rem; color: #aaa; text-align: center; padding: 2rem; }
-<?php /*         Adds a scrolling area for rendered Word documents. */ ?>
-        .docx-scroll { flex: 1; overflow-y: auto; padding: 1.5rem; }
-<?php /*         Styles the small status line above a rendered document. */ ?>
-        .docx-status { max-width: 850px; margin: 0 auto 1rem; color: #aaa; font-size: 0.9rem; text-align: center; }
-<?php /*         Styles the white paper sheet that holds the rendered document. */ ?>
-        .docx-paper { background: #fff; color: #1e293b; border-radius: 8px; padding: 2.5rem 3rem; max-width: 850px; margin: 0 auto; box-shadow: 0 4px 24px rgba(0,0,0,0.45); font-size: 0.95rem; line-height: 1.65; }
-<?php /*         Styles document headings inside the rendered page. */ ?>
-        .docx-paper h1, .docx-paper h2, .docx-paper h3, .docx-paper h4 { color: #0f172a; margin: 1.25em 0 0.5em; line-height: 1.3; }
-<?php /*         Sets heading sizes for h1 and h2 inside the rendered page. */ ?>
-        .docx-paper h1 { font-size: 1.5rem; } .docx-paper h2 { font-size: 1.25rem; }
-<?php /*         Adds space below paragraphs in the rendered document. */ ?>
-        .docx-paper p { margin: 0 0 0.75em; }
-<?php /*         Indents lists inside the rendered document. */ ?>
-        .docx-paper ul, .docx-paper ol { margin: 0 0 0.75em 1.5rem; }
-<?php /*         Makes tables in the rendered document collapse their borders. */ ?>
-        .docx-paper table { border-collapse: collapse; margin: 0 0 1em; max-width: 100%; }
-<?php /*         Adds thin borders and padding to table cells. */ ?>
-        .docx-paper th, .docx-paper td { border: 1px solid #cbd5e1; padding: 0.4rem 0.6rem; font-size: 0.85rem; }
-<?php /*         Keeps images inside the rendered document at the paper width. */ ?>
-        .docx-paper img { max-width: 100%; height: auto; }
-<?php /*     Closes the CSS block for the viewer. */ ?>
+<?php /*         Styles the blue download button. */ ?>
+        .btn-download { display: inline-flex; align-items: center; gap: 0.5rem; background: #2563eb; color: #fff; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: background 0.2s; }
+<?php /*         Darkens the download button on hover. */ ?>
+        .btn-download:hover { background: #1d4ed8; }
+<?php /*         Holds the rendered Word pages and scrolls sideways when a page is wide. */ ?>
+        #docxContainer { padding: 0; overflow-x: auto; }
+<?php /*         Shows a centred status line while the document renders. */ ?>
+        .docx-status { display: flex; align-items: center; justify-content: center; gap: 0.6rem; min-height: 60vh; padding: 2rem; color: #475569; font-size: 0.95rem; text-align: center; }
+<?php /*         Keeps the rendered pages on the grey desk with their original page size. */ ?>
+        #docxContainer .docx-wrapper { background: #e5e7eb !important; padding: 24px 16px 40px !important; overflow-x: auto; }
+<?php /*         Adds a soft shadow around each rendered page. */ ?>
+        #docxContainer .docx-wrapper > section.docx { box-shadow: 0 4px 24px rgba(15, 23, 42, 0.18); margin-bottom: 24px; }
+<?php /*         Matches the viewer colours when the browser prints the page. */ ?>
+        @media print { .viewer-header { display: none; } body { background: #fff; } #docxContainer .docx-wrapper { background: #fff !important; padding: 0 !important; } #docxContainer .docx-wrapper > section.docx { box-shadow: none; margin: 0; } }
+<?php /*     Closes the viewer styles. */ ?>
     </style>
 <?php /* Closes the head section. */ ?>
 </head>
@@ -154,105 +168,100 @@ $downloadUrl = url('share_document.php?token=' . rawurlencode($token) . '&downlo
     <header class="viewer-header">
 <?php /*         Groups the file icon and file name together. */ ?>
         <div class="file-info">
-<?php /*             Shows a document icon. */ ?>
-            <i class="fas fa-file-alt" style="color: #60a5fa;"></i>
-<?php /*             Shows the document file name in the top bar. */ ?>
+<?php /*             Shows a Word document icon. */ ?>
+            <i class="fas fa-file-word" style="color: #60a5fa;"></i>
+<?php /*             Shows the original document name. */ ?>
             <span class="file-name"><?= htmlspecialchars($fileName) ?></span>
 <?php /*         Closes the file info group. */ ?>
         </div>
-<?php /*         Starts the download link for the file. */ ?>
+<?php /*         Holds the download fallback for the original file. */ ?>
         <div class="viewer-actions">
-<?php /*             Downloads the shared file as an attachment. */ ?>
-            <a href="<?= $downloadUrl ?>" class="btn-download"><i class="fas fa-download"></i> Download File</a>
-<?php /*         Closes the header buttons group. */ ?>
+<?php /*             Downloads the untouched original Word file. */ ?>
+            <a href="<?= $downloadUrl ?>" class="btn-download"><i class="fas fa-download"></i> Download Original</a>
+<?php /*         Closes the header actions. */ ?>
         </div>
 <?php /*     Closes the viewer top bar. */ ?>
     </header>
 
-<?php /*     Shows PDF files inside a frame. */ ?>
-    <?php if ($isPdf): ?>
-<?php /*         Shows the PDF inside a frame that fills the window. */ ?>
-        <iframe src="<?= $fileUrl ?>" class="viewer-container" title="<?= htmlspecialchars($fileName) ?>"></iframe>
-<?php /*     Shows image files directly on the page. */ ?>
-    <?php elseif ($isImage): ?>
-<?php /*         Opens the stage that centres the image. */ ?>
-        <div class="image-stage">
-<?php /*             Shows the uploaded image at its natural aspect ratio. */ ?>
-            <img src="<?= $fileUrl ?>" alt="<?= htmlspecialchars($fileName) ?>">
-<?php /*         Closes the image stage. */ ?>
-        </div>
-<?php /*     Shows plain text files inside a frame. */ ?>
-    <?php elseif ($isText): ?>
-<?php /*         Shows the text file inside a frame that fills the window. */ ?>
-        <iframe src="<?= $fileUrl ?>" class="viewer-container" title="<?= htmlspecialchars($fileName) ?>"></iframe>
-<?php /*     Renders Word .docx files as HTML. */ ?>
-    <?php elseif ($isDocx): ?>
-<?php /*         Starts the scrolling area for the rendered Word document. */ ?>
-        <div class="docx-scroll">
-<?php /*             Shows a rendering spinner while mammoth.js works. */ ?>
-            <div id="docxStatus" class="docx-status"><i class="fas fa-spinner fa-spin"></i> Rendering document…</div>
-<?php /*             Holds the rendered document; hidden until rendering finishes. */ ?>
-            <article id="docxBody" class="docx-paper" style="display:none;"></article>
-<?php /*         Closes the scrolling area. */ ?>
-        </div>
-<?php /*         Loads the mammoth.js library that converts .docx to HTML. */ ?>
-        <script src="<?= asset('vendor/mammoth.browser.min.js') ?>"></script>
-<?php /*         Starts the script that renders the Word document in the browser. */ ?>
-        <script>
-<?php /*         Starts a self-running function so its variables stay private. */ ?>
-        (function () {
-<?php /*             Gets the status line element by its id. */ ?>
-            var statusEl = document.getElementById('docxStatus');
-<?php /*             Gets the paper element where the document will be inserted. */ ?>
-            var bodyEl = document.getElementById('docxBody');
-<?php /*             Fetches the document file from the server as binary data. */ ?>
-            fetch(<?= json_encode($fileUrl) ?>, { credentials: 'same-origin' })
-<?php /*                 Handles the response once it arrives. */ ?>
-                .then(function (res) {
-<?php /*                     Throws an error when the server did not return the file. */ ?>
-                    if (!res.ok) throw new Error('HTTP ' + res.status);
-<?php /*                     Reads the response body as an ArrayBuffer for mammoth. */ ?>
-                    return res.arrayBuffer();
-<?php /*                 Closes the response handler. */ ?>
-                })
-<?php /*                 Converts the Word bytes to HTML with mammoth.js. */ ?>
-                .then(function (buf) { return mammoth.convertToHtml({ arrayBuffer: buf }); })
-<?php /*                 Handles the converted result. */ ?>
-                .then(function (result) {
-<?php /*                     Reads the generated HTML and trims surrounding spaces. */ ?>
-                    var html = (result.value || '').trim();
-<?php /*                     Shows the HTML, or a friendly note when the document is empty. */ ?>
-                    bodyEl.innerHTML = html !== '' ? html : '<p><em>This document appears to be empty.</em></p>';
-<?php /*                     Makes the rendered paper visible. */ ?>
-                    bodyEl.style.display = '';
-<?php /*                     Hides the loading spinner. */ ?>
-                    statusEl.style.display = 'none';
-<?php /*                 Closes the result handler. */ ?>
-                })
-<?php /*                 Catches any rendering error. */ ?>
-                .catch(function () {
-<?php /*                     Shows a message with a link to download the file instead. */ ?>
-                    statusEl.innerHTML = 'Could not render this document in the browser. <a href="<?= $downloadUrl ?>" style="color:#60a5fa;">Download it instead.</a>';
-<?php /*                 Closes the error handler chain. */ ?>
-                });
-<?php /*         Closes the self-running function. */ ?>
-        })();
-<?php /*         Ends the document rendering script. */ ?>
-        </script>
-<?php /*     Shows a download fallback for file types the browser cannot preview. */ ?>
-    <?php else: ?>
-<?php /*         Starts the fallback message box. */ ?>
-        <div class="fallback-message">
-<?php /*             Shows a large file icon. */ ?>
-            <i class="fas fa-file fa-3x" style="color: #60a5fa;"></i>
-<?php /*             Explains that this file type cannot be shown directly. */ ?>
-            <p>This file type cannot be previewed directly in the browser.</p>
-<?php /*             Starts a button that downloads the document. */ ?>
-            <a href="<?= $downloadUrl ?>" class="btn-download"><i class="fas fa-download"></i> Download to View Document</a>
-<?php /*         Closes the fallback message box. */ ?>
-        </div>
-<?php /*     Closes the viewer selection block. */ ?>
-    <?php endif; ?>
+<?php /*     Shows the loading status until the document finishes rendering. */ ?>
+    <div id="docxStatus" class="docx-status"><i class="fas fa-spinner fa-spin"></i> Rendering the original document…</div>
+<?php /*     Holds the rendered Word pages. */ ?>
+    <div id="docxContainer"></div>
+
+<?php /*     Loads the zip reader that opens the original .docx package. */ ?>
+    <script src="<?= asset('vendor/jszip.min.js?v=' . filemtime(__DIR__ . '/assets/vendor/jszip.min.js')) ?>"></script>
+<?php /*     Loads the renderer that keeps the Word page layout and styling. */ ?>
+    <script src="<?= asset('vendor/docx-preview.min.js?v=' . filemtime(__DIR__ . '/assets/vendor/docx-preview.min.js')) ?>"></script>
+<?php /*     Starts the script that renders the original Word document. */ ?>
+    <script>
+<?php /*     Runs the renderer inside a self-starting function. */ ?>
+    (async function () {
+<?php /*         Gets the status line and the page container. */ ?>
+        var status = document.getElementById('docxStatus');
+<?php /*         Gets the container where the pages are inserted. */ ?>
+        var container = document.getElementById('docxContainer');
+<?php /*         Fetches the untouched original .docx bytes from the protected endpoint. */ ?>
+        try {
+<?php /*             Requests the original file with the current coordinator session. */ ?>
+            var response = await fetch(<?= json_encode($rawUrl) ?>, { credentials: 'same-origin' });
+<?php /*             Treats a login redirect or server error as a failed load. */ ?>
+            if (!response.ok || response.redirected) throw new Error('HTTP ' + response.status);
+<?php /*             Reads the original file as binary data. */ ?>
+            var buffer = await response.arrayBuffer();
+<?php /*             Renders the original Word pages with their layout and formatting. */ ?>
+            await docx.renderAsync(buffer, container, null, {
+<?php /*                 Uses the docx class prefix for the generated styles. */ ?>
+                className: 'docx',
+<?php /*                 Keeps the page wrapper and original page size. */ ?>
+                inWrapper: true,
+<?php /*                 Keeps manual and Word page breaks. */ ?>
+                breakPages: true,
+<?php /*                 Uses the page breaks Word already recorded. */ ?>
+                ignoreLastRenderedPageBreak: false,
+<?php /*                 Embeds images and fonts directly so nothing is missing. */ ?>
+                useBase64URL: true,
+<?php /*                 Keeps headers, footers, footnotes and endnotes. */ ?>
+                renderHeaders: true,
+<?php /*                 Keeps footers in the rendered pages. */ ?>
+                renderFooters: true,
+<?php /*                 Keeps footnotes in the rendered pages. */ ?>
+                renderFootnotes: true,
+<?php /*                 Keeps endnotes in the rendered pages. */ ?>
+                renderEndnotes: true,
+<?php /*                 Does not render embedded HTML parts from the file. */ ?>
+                renderAltChunks: false,
+<?php /*                 Enables the closest tab-stop calculation. */ ?>
+                experimental: true
+<?php /*             Closes the renderer options. */ ?>
+            });
+<?php /*             Makes document links safe after the pages are rendered. */ ?>
+            container.querySelectorAll('a[href]').forEach(function (link) {
+<?php /*                 Reads the link target from the rendered document. */ ?>
+                var href = link.getAttribute('href') || '';
+<?php /*                 Keeps only ordinary web, mail and in-page links. */ ?>
+                if (!/^(https?:|mailto:|#)/i.test(href)) {
+<?php /*                     Removes any script or data link from the document. */ ?>
+                    link.removeAttribute('href');
+<?php /*                 Closes the unsafe-link check. */ ?>
+                }
+<?php /*                 Opens safe links in a separate tab without control of this page. */ ?>
+                link.setAttribute('target', '_blank');
+<?php /*                 Blocks the new tab from reaching back into this page. */ ?>
+                link.setAttribute('rel', 'noopener noreferrer');
+<?php /*             Closes the rendered-link cleanup. */ ?>
+            });
+<?php /*             Hides the loading status after a successful render. */ ?>
+            status.style.display = 'none';
+<?php /*         Shows a clear fallback when the document cannot be rendered. */ ?>
+        } catch (error) {
+<?php /*             Replaces the status with an explanation and download link. */ ?>
+            status.innerHTML = 'This document could not be displayed in the browser. <a href="<?= $downloadUrl ?>" style="color:#2563eb;font-weight:600;">Download the original file</a> to view it in Word.';
+<?php /*         Closes the render error handler. */ ?>
+        }
+<?php /*     Closes the renderer function. */ ?>
+    })();
+<?php /*     Closes the renderer script. */ ?>
+    </script>
 
 <?php /* Closes the page body. */ ?>
 </body>

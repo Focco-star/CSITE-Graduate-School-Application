@@ -86,7 +86,7 @@ Every application follows a fixed set of stages based on the student's program a
 - **Template library management**, including syncing the official forms from Google Drive.
 - **Archived applications** that can be restored to the active list or permanently deleted.
 - **Account validation** page, reached from the bell badge in the top bar, where new student accounts can be approved or rejected before the student can sign in.
-- **Shareable document links** in Applications → Edit → Documents and Requirements. The Copy Link action copies an unguessable link that opens the exact uploaded file in a browser, even for someone who is not signed in.
+- **Shareable document links** in Applications → Edit → Documents and Requirements. The Copy Link action copies an unguessable link for signed-in coordinators or admins. PDFs open in the browser's PDF viewer, and Word files render with their original page layout and formatting.
 
 ---
 

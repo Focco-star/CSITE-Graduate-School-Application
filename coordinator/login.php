@@ -11,10 +11,27 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 
+// Reads an optional local page that should open after a successful sign-in.
+$nextCandidate = trim((string) ($_GET['next'] ?? $_POST['next'] ?? ''));
+// Starts with no return page until the requested path is proven safe.
+$nextUrl = '';
+// Accepts only a path on this same site, never another domain.
+if ($nextCandidate !== ''
+    && $nextCandidate[0] === '/'
+    && !str_starts_with($nextCandidate, '//')
+    && !str_contains($nextCandidate, '\\')
+    && !str_contains($nextCandidate, "\r")
+    && !str_contains($nextCandidate, "\n")
+    && (BASE_URL === '' || str_starts_with($nextCandidate, BASE_URL . '/'))) {
+    // Remembers the safe return path.
+    $nextUrl = $nextCandidate;
+// Closes the safe-return-path check.
+}
+
 // If a coordinator is already signed in, skip the login form.
 if (!empty($_SESSION['user']) && ($_SESSION['user']['role'] ?? '') === 'coordinator') {
-    // Redirects the signed-in coordinator to the home page.
-    header('Location: ' . url('coordinator/homepage.php'));
+    // Redirects to the requested page, or the home page when none was given.
+    header('Location: ' . ($nextUrl !== '' ? $nextUrl : url('coordinator/homepage.php')));
     // Stops the script after the redirect.
     exit;
 // Closes the already-signed-in check.
@@ -85,10 +102,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'role'      => $user['role'],
                 // Closes the session user array.
                 ];
-                // Queues a welcome message shown on the home page.
+                // Queues a welcome message shown after the login.
                 setFlash('success', 'Welcome Back, Coordinator Precious Opinion');
-                // Redirects the coordinator to the home page after login.
-                header('Location: ' . url('coordinator/homepage.php'));
+                // Redirects to the requested page, or the home page when none was given.
+                header('Location: ' . ($nextUrl !== '' ? $nextUrl : url('coordinator/homepage.php')));
                 // Stops the script after the redirect.
                 exit;
             // Runs when the email was not found or the password was wrong.
@@ -149,6 +166,8 @@ require_once __DIR__ . '/../includes/layout/slideshow.php';
 
 <?php /*         Starts the login form that posts to this same page. */ ?>
         <form class="login-form" action="<?= url('coordinator/login.php') ?>" method="post" data-validate>
+<?php /*             Keeps the requested return page across the sign-in post. */ ?>
+            <input type="hidden" name="next" value="<?= htmlspecialchars($nextUrl, ENT_QUOTES, 'UTF-8') ?>">
 <?php /*             Opens the field group for the email input. */ ?>
             <div class="form-group">
 <?php /*                 Labels the username field as Username / Email. */ ?>
