@@ -150,6 +150,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
     // Closes the guard for malformed stage data.
     }
 
+    $postedPanelIds = $stagePosted['panel_member_ids'] ?? [];
+    if (!is_array($postedPanelIds)) {
+        $postedPanelIds = [];
+    }
+
     // Reads the application status the coordinator chose.
     $status = (string) ($stagePosted['status'] ?? '');
     // Reads the stage key being saved, defaulting to the application stage or proposal.
@@ -190,6 +195,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         $stageLabels = getStagesForTrack($track);
         // Loads the stored document workflow states that will be updated below.
         $workflowState = $app['workflowState'] ?? [];
+
+        if ($isDatabaseApplication && (int) ($app['id'] ?? 0) > 0) {
+            try {
+                saveApplicationPanelMembers((int) $app['id'], $postedPanelIds);
+            } catch (Throwable $e) {
+                error_log('[application panel save] ' . $e->getMessage());
+                $processError = 'The panel assignment could not be saved. Apply the database migration and try again.';
+            }
+        }
 
         // Opens a comment block: the status must agree with the student milestones.
         /*
@@ -879,6 +893,8 @@ foreach ($stages as $key => $stage) {
         'latestUpload' => $latestStageUploadAt,
         // Panel commentHistory: every coordinator comment sent for this stage.
         'commentHistory' => $stageApp ? applicationCommentHistory((int) $stageApp['id']) : [],
+        // Panel members assigned while processing this application.
+        'assignedPanel' => $stageApp ? databaseApplicationPanelMembers((int) $stageApp['id']) : [],
     // Closes the panel data array.
     ];
 // Closes the loop that builds the stage panels.
@@ -1153,6 +1169,26 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                     Shows the submission date as Mmm dd, yyyy, or a dash. */ ?>
                     <div class="detail-item"><label>Submitted</label><span><?= $panel['date'] ? htmlspecialchars(date('M d, Y', strtotime($panel['date']))) : '—' ?></span></div>
 <?php /*                 Closes the details grid. */ ?>
+                </div>
+                <div class="form-field" style="margin-top:1rem;">
+                    <label>Academic Assessment Panel</label>
+                    <div class="form-row">
+                        <?php $assignedPanelIds = array_map('strval', array_column($panel['assignedPanel'], 'id')); ?>
+                        <?php for ($panelSlot = 0; $panelSlot < 3; $panelSlot++): ?>
+                        <div class="form-field">
+                            <label>Panel Member <?= $panelSlot + 1 ?></label>
+                            <select name="stage_data[<?= htmlspecialchars($key) ?>][panel_member_ids][]" class="panel-member-select">
+                                <option value="">Select panel member</option>
+                                <?php foreach (databasePanelMembers() as $panelMember): ?>
+                                    <option value="<?= (int) $panelMember['id'] ?>" <?= ($assignedPanelIds[$panelSlot] ?? '') === (string) $panelMember['id'] ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($panelMember['name'] . ($panelMember['qualification'] ? ' (' . $panelMember['qualification'] . ')' : '')) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <?php endfor; ?>
+                    </div>
+                    <p class="field-hint">Assign the academic assessment team using the same panel-member selectors as presentation scheduling. A presentation date can be scheduled later.</p>
                 </div>
 <?php /*                 Ends the check for a missing stage application. */ ?>
                 <?php endif; ?>

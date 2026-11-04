@@ -127,6 +127,7 @@ function databaseSchedulePanelMembers(int $applicationId): array {
                 $member['panel_role'] = (string) $row['panel_role'];
             // Closes the panel role check.
             }
+
             // Returns the normalized member for this row.
             return $member;
         // Closes the mapping callback and the array_map call.
@@ -138,6 +139,65 @@ function databaseSchedulePanelMembers(int $applicationId): array {
     // Closes the catch block.
     }
 // Closes databaseSchedulePanelMembers().
+}
+
+function databaseApplicationPanelMembers(int $applicationId): array {
+    if (!class_exists('DB') || $applicationId <= 0) {
+        return [];
+    }
+
+    try {
+        $rows = DB::query(
+            'SELECT pm.*, apa.panel_role
+             FROM application_panel_assignments apa
+             INNER JOIN panel_members pm ON pm.panel_member_id = apa.panel_member_id
+             WHERE apa.application_id = :application_id
+             ORDER BY apa.assignment_id',
+            ['application_id' => $applicationId]
+        )->fetchAll();
+
+        return array_map(static function (array $row): array {
+            $member = normalizePanelMemberRow($row);
+            $member['panel_role'] = (string) ($row['panel_role'] ?? 'member');
+            return $member;
+        }, $rows);
+    } catch (Throwable $e) {
+        error_log('[application panel assignments] ' . $e->getMessage());
+        return [];
+    }
+}
+
+function saveApplicationPanelMembers(int $applicationId, array $panelMemberIds): void {
+    if (!class_exists('DB') || $applicationId <= 0) {
+        return;
+    }
+
+    $ids = array_values(array_unique(array_filter(array_map('intval', $panelMemberIds), static fn (int $id): bool => $id > 0)));
+    $pdo = DB::getConnection();
+    $pdo->beginTransaction();
+
+    try {
+        $delete = $pdo->prepare('DELETE FROM application_panel_assignments WHERE application_id = :application_id');
+        $delete->execute(['application_id' => $applicationId]);
+
+        $insert = $pdo->prepare(
+            'INSERT INTO application_panel_assignments (application_id, panel_member_id, panel_role)
+             SELECT :application_id, panel_member_id, :panel_role
+             FROM panel_members
+             WHERE panel_member_id = :panel_member_id'
+        );
+        foreach ($ids as $id) {
+            $insert->execute([
+                'application_id' => $applicationId,
+                'panel_member_id' => $id,
+                'panel_role' => 'member',
+            ]);
+        }
+        $pdo->commit();
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        throw $e;
+    }
 }
 
 /**

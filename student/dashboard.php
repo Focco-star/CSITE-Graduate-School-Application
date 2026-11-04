@@ -439,6 +439,37 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
             </button>
 <?php /*             Body of the stage block that holds the milestone steps. */ ?>
             <div class="ms-stage-body">
+<?php
+                /* Shows the coordinator comments that belong to this stage. */
+$stageApplicationId = 0;
+foreach (applicationsForStudent((string) ($user['email'] ?? '')) as $studentApplication) {
+    if (($studentApplication['stageKey'] ?? '') === ($stage['key'] ?? '')) {
+        $stageApplicationId = (int) ($studentApplication['id'] ?? 0);
+        break;
+    }
+}
+$assignedPanel = $stageApplicationId > 0 ? databaseApplicationPanelMembers($stageApplicationId) : [];
+?>
+<?php if ($assignedPanel): ?>
+<div class="card" style="margin-bottom:1rem;">
+    <div class="card-header">
+        <h3><i class="fas fa-users"></i> Academic Assessment Team <span class="status-badge status-locked"><i class="fas fa-lock" aria-hidden="true"></i> Read-only</span></h3>
+    </div>
+    <div class="card-body">
+        <div class="form-field">
+            <select class="locked-select" aria-label="Assigned academic assessment team" style="width:100%;">
+                <option value="" selected>Check Assigned Panel</option>
+                <?php foreach ($assignedPanel as $panelIndex => $panelMember): ?>
+                    <option value="<?= (int) $panelMember['id'] ?>" disabled>
+                        <?= htmlspecialchars('Panel Member ' . ($panelIndex + 1) . ': ' . $panelMember['name'] . ($panelMember['qualification'] ? ' (' . $panelMember['qualification'] . ')' : '')) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <p class="field-hint">Your coordinator assigned this panel for the <?= htmlspecialchars($stage['label']) ?> assessment.</p>
+    </div>
+</div>
+<?php endif; ?>
 <?php /*                 Shows the coordinator comments that belong to this stage. */ ?>
                 <?php
                 // Passes this stage's notifications to the shared partial.
