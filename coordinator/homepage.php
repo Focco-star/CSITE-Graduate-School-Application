@@ -24,7 +24,7 @@ require_once __DIR__ . '/../includes/layout/header.php';
             <span class="dash-hero-mark" aria-hidden="true"><i class="fas fa-university"></i></span>
             <div class="dash-hero-copy">
                 <span class="dash-hero-eyebrow"><i class="fas fa-graduation-cap" aria-hidden="true"></i> CSITE Graduate School</span>
-                <h2 class="dash-hero-title" id="homeWelcomeTitle">Welcome   , <?= htmlspecialchars($userName, ENT_QUOTES, 'UTF-8') ?></h2>
+                <h2 class="dash-hero-title" id="homeWelcomeTitle">Welcome, <?= htmlspecialchars($userName, ENT_QUOTES, 'UTF-8') ?></h2>
                 <p class="dash-hero-subtitle">Graduate Program Coordinator <span class="dash-hero-dot" aria-hidden="true">&middot;</span> Ateneo de Zamboanga University</p>
             </div>
         </div>
