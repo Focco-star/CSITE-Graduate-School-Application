@@ -25,6 +25,25 @@ if (!$student) {
 // Closes the if that stops the page when no profile exists.
 }
 
+// Handles the X button that removes a coordinator comment notification.
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['remove_comment_id'])) {
+    // Reads the comment id sent by the remove button.
+    $removeId = (int) $_POST['remove_comment_id'];
+    // Removes the comment only when the student owns its application.
+    if ($removeId > 0 && removeStudentComment($removeId, (int) ($user['user_id'] ?? 0))) {
+        // Tells the student the comment was removed.
+        setFlash('success', 'Coordinator comment removed.');
+    // Explains when the comment could not be removed.
+    } else {
+        // Shows a safe error for a comment that was already removed.
+        setFlash('error', 'That comment could not be removed.');
+    // Closes the update result check.
+    }
+    // Reloads the dashboard so the list shows the change.
+    redirectTo('student/dashboard.php#milestone-tracker');
+// Closes the remove handler.
+}
+
 // Sets the page title shown in the browser and header.
 $pageTitle   = 'Dashboard';
 // Tells the shared layout that the current role is student.
@@ -49,6 +68,28 @@ $currentIdx = workflowCurrentIndex($progress, $stages);
 // The stages the student is not allowed to work on yet.
 // Builds a map of which stages are locked and the reason why.
 $lockStates = stageLockStates($stages, $currentIdx);
+
+// Loads the newest coordinator comment from each of the student's applications.
+$commentNotifications = studentCoordinatorComments((string) ($user['email'] ?? ''));
+// Groups the notifications by stage so each milestone block shows its own.
+$notificationsByStage = [];
+// Loops over every visible coordinator comment.
+foreach ($commentNotifications as $commentNotification) {
+    // Adds the comment under the stage it belongs to.
+    $notificationsByStage[$commentNotification['stageKey']][] = $commentNotification;
+// Closes the notification grouping loop.
+}
+
+// Loads every active comment for the "Coordinator Comments" box.
+$allCommentNotifications = studentAllCoordinatorComments((string) ($user['email'] ?? ''));
+// Groups the full comment list by stage for the expandable box.
+$allCommentsByStage = [];
+// Loops over every active coordinator comment.
+foreach ($allCommentNotifications as $allComment) {
+    // Adds the comment under the stage it belongs to.
+    $allCommentsByStage[$allComment['stageKey']][] = $allComment;
+// Closes the full-comment grouping loop.
+}
 
 // Picks the progress row of the current stage, or the first one.
 $activeStage = $progress[$currentIdx] ?? ($progress[0] ?? null);
@@ -166,18 +207,6 @@ require_once __DIR__ . '/../includes/layout/header.php';
                 Current Stage: <?= htmlspecialchars($stages[$currentIdx]['label'] ?? '') ?>
 <?php /*             Closes the current-stage heading. */ ?>
             </h4>
-<?php /*             If the coordinator left a note on this stage, show it. */ ?>
-            <?php if (!empty($activeStage['coordinatorComments'])): ?>
-<?php /*             Warning alert box that holds the coordinator note. */ ?>
-            <div class="alert alert-warning" style="margin-top:0;margin-bottom:0.75rem;">
-<?php /*                 Chat icon shown inside the coordinator note box. */ ?>
-                <i class="fas fa-comment-alt"></i>
-<?php /*                 Shows the coordinator note text, safely escaped. */ ?>
-                <div><strong>Coordinator note:</strong> <?= htmlspecialchars($activeStage['coordinatorComments']) ?></div>
-<?php /*             Closes the warning alert box. */ ?>
-            </div>
-<?php /*             Closes the if that checks for a coordinator note. */ ?>
-            <?php endif; ?>
 <?php /*         Closes the current-stage grey panel. */ ?>
         </div>
 <?php /*         Closes the if that shows the current stage. */ ?>
@@ -230,6 +259,8 @@ foreach ($stages as $idx => $stage) {
         'isDone'    => workflowStageState($row, $idx, $currentIdx) === 'done',
         // Marks the stage locked so the view can hide upload buttons.
         'isLocked'  => $lockStates[$stage['key']]['locked'] ?? false,
+        // Keeps the coordinator comments that belong to this stage.
+        'notifications' => $notificationsByStage[$stage['key']] ?? [],
     // Closes the array entry for this stage.
     ];
 // Closes the loop that builds the milestone blocks.
@@ -244,8 +275,19 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
     <div class="card-header">
 <?php /*         Title of the card with a tasks icon. */ ?>
         <h3><i class="fas fa-tasks"></i> Milestone Tracker</h3>
-<?php /*         Right-side overview with the counts and progress bar. */ ?>
+<?php /*         Right-side overview with the comment button and progress bar. */ ?>
         <div class="ms-overview">
+<?php /*             Opens the full list of coordinator comments for this student. */ ?>
+            <button type="button" class="ms-message-btn" id="studentCommentsButton" data-coord-comments-open aria-expanded="false" aria-controls="studentCoordinatorCommentsBox" title="Show all coordinator comments">
+<?php /*                 Shows the message icon. */ ?>
+                <i class="fas fa-comment-dots" aria-hidden="true"></i>
+<?php /*                 Shows a count badge when comments exist. */ ?>
+                <?php if (count($allCommentNotifications) > 0): ?>
+                <span class="ms-message-count"><?= count($allCommentNotifications) ?></span>
+<?php /*                 Closes the comment count check. */ ?>
+                <?php endif; ?>
+<?php /*             Closes the message button. */ ?>
+            </button>
 <?php /*             Text such as 3 of 12 milestones complete. */ ?>
             <span class="ms-overview-text"><?= (int) $milestoneDone ?> of <?= (int) $milestoneTotal ?> milestones complete</span>
 <?php /*             Progress bar filled to the completion percentage. */ ?>
@@ -256,6 +298,65 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
     </div>
 <?php /*     Body of the milestone tracker card. */ ?>
     <div class="card-body">
+<?php /*         Opens the full coordinator comments box. */ ?>
+        <div class="coord-comments-box" id="studentCoordinatorCommentsBox" hidden>
+<?php /*             Opens the box header with the show/hide arrow. */ ?>
+            <div class="coord-comments-box-head">
+<?php /*                 Names the comments box. */ ?>
+                <h4><i class="fas fa-comments" aria-hidden="true"></i> Coordinator Comments</h4>
+<?php /*                 Shows the arrow only when there are comments. */ ?>
+                <?php if (!empty($allCommentNotifications)): ?>
+<?php /*                 Arrow button that expands or collapses all comments. */ ?>
+                <button type="button" class="coord-comments-toggle" data-coord-comments-toggle aria-expanded="false">Show Comments <i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+<?php /*                 Closes the comments-arrow check. */ ?>
+                <?php endif; ?>
+<?php /*             Closes the box header. */ ?>
+            </div>
+<?php /*             Shows an empty note when the coordinator has not commented yet. */ ?>
+            <?php if (empty($allCommentNotifications)): ?>
+            <p class="coord-comments-empty">No coordinator comments yet.</p>
+<?php /*             Otherwise prints the comments grouped by stage. */ ?>
+            <?php else: ?>
+<?php /*                 Opens the hidden list toggled by the arrow. */ ?>
+            <div class="coord-comments-list" hidden>
+<?php /*                 Loops over the student's workflow stages in order. */ ?>
+                <?php foreach ($stages as $commentStage): ?>
+<?php /*                     Reads the comments of this stage. */ ?>
+                    <?php $stageComments = $allCommentsByStage[$commentStage['key']] ?? []; ?>
+<?php /*                     Skips stages with no comments. */ ?>
+                    <?php if (!$stageComments) continue; ?>
+<?php /*                     Opens one stage group. */ ?>
+                    <div class="coord-comments-stage">
+<?php /*                         Shows the stage the comments belong to. */ ?>
+                        <h5><i class="fas fa-flag" aria-hidden="true"></i> <?= htmlspecialchars($commentStage['label']) ?></h5>
+<?php /*                         Loops over every active comment of this stage. */ ?>
+                        <?php foreach ($stageComments as $stageComment): ?>
+<?php /*                         Opens one coordinator comment card. */ ?>
+                        <div class="coord-comment-card">
+<?php /*                             Shows the coordinator name and comment date. */ ?>
+                            <div class="coord-comment-meta">
+<?php /*                                 Shows who wrote the comment. */ ?>
+                                <span class="coord-comment-author"><?= htmlspecialchars((string) $stageComment['coordinatorName']) ?></span>
+<?php /*                                 Shows when the comment was written. */ ?>
+                                <span class="coord-comment-date"><?= htmlspecialchars(!empty($stageComment['createdAt']) ? date('M j, Y g:i A', strtotime((string) $stageComment['createdAt'])) : '') ?></span>
+<?php /*                             Closes the comment metadata row. */ ?>
+                            </div>
+<?php /*                             Prints the comment text with its line breaks. */ ?>
+                            <p class="coord-comment-text"><?= nl2br(htmlspecialchars((string) $stageComment['text'])) ?></p>
+<?php /*                         Closes this comment card. */ ?>
+                        </div>
+<?php /*                         Ends the loop over this stage's comments. */ ?>
+                        <?php endforeach; ?>
+<?php /*                     Closes this stage group. */ ?>
+                    </div>
+<?php /*                 Ends the loop over workflow stages. */ ?>
+                <?php endforeach; ?>
+<?php /*             Closes the hidden comment list. */ ?>
+            </div>
+<?php /*             Closes the non-empty comments branch. */ ?>
+            <?php endif; ?>
+<?php /*         Closes the coordinator comments box. */ ?>
+        </div>
 <?php /*         Starts PHP to work out the student's next step. */ ?>
         <?php
         // Explains the next-step banner: the first step the student must do.
@@ -303,7 +404,8 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
             // Badge CSS class that matches the label above.
             $stageStatusClass = $block['isLocked'] ? 'status-locked' : (stageRequiresRepresentation($progress[$block['index']] ?? []) ? STATUSES['requires_revision']['class'] : ($stageIsSubmitted ? (STATUSES[$stageStatus]['class'] ?? 'status-submitted') : 'status-pending'));
             // Keeps current or finished stages expanded by default.
-            $openByDefault = $block['isCurrent'] || $block['isDone'];
+            // A stage with a new coordinator comment also opens so it is seen.
+            $openByDefault = $block['isCurrent'] || $block['isDone'] || !empty($block['notifications']);
             // Explains how the open document types are chosen for this stage.
             // The document types the student may upload now. The same rule
             // Continues: the same rule picks the Application page document list.
@@ -322,6 +424,11 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
                 <span class="ms-stage-num"><?= $block['isLocked'] ? '<i class="fas fa-lock" aria-hidden="true"></i>' : (int) $block['index'] + 1 ?></span>
 <?php /*                 Shows the full stage label. */ ?>
                 <span class="ms-stage-title"><?= htmlspecialchars($stage['label']) ?></span>
+<?php /*                 Shows a comment badge when this stage has notifications. */ ?>
+                <?php if (!empty($block['notifications'])): ?>
+                <span class="ms-notif-badge"><i class="fas fa-comment-dots" aria-hidden="true"></i> <?= count($block['notifications']) ?></span>
+<?php /*                 Closes the notification badge check. */ ?>
+                <?php endif; ?>
 <?php /*                 Shows how many milestones are done out of the total. */ ?>
                 <span class="ms-stage-count"><?= (int) $stats['done'] ?> / <?= (int) $stats['total'] ?> milestones</span>
 <?php /*                 Shows the status badge for this stage. */ ?>
@@ -332,6 +439,15 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
             </button>
 <?php /*             Body of the stage block that holds the milestone steps. */ ?>
             <div class="ms-stage-body">
+<?php /*                 Shows the coordinator comments that belong to this stage. */ ?>
+                <?php
+                // Passes this stage's notifications to the shared partial.
+                $notifications = $block['notifications'];
+                // The dashboard reload returns to the milestone tracker itself.
+                $notificationReturnStage = '';
+                // Prints the notification cards with their X buttons.
+                require __DIR__ . '/../includes/layout/student-comment-notifications.php';
+                ?>
 <?php /*                 If the stage is locked, show the reason instead of steps. */ ?>
                 <?php if ($block['isLocked']): ?>
 <?php /*                 Note explaining why this stage is locked. */ ?>
@@ -460,6 +576,80 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
 <?php /* Closes and immediately runs the wrapper function. */ ?>
 })();
 <?php /* Closes the JavaScript block. */ ?>
+</script>
+
+<?php /* Starts the script for the coordinator comments box. */ ?>
+<script>
+<?php /* Wraps the comment handlers so their names stay private. */ ?>
+(function () {
+<?php /*     Gets the comments box and the message icon that opens it. */ ?>
+    var box = document.getElementById('studentCoordinatorCommentsBox');
+<?php /*     Gets the message icon in the milestone tracker header. */ ?>
+    var openButton = document.getElementById('studentCommentsButton');
+<?php /*     Stops when the comments box is not on the page. */ ?>
+    if (!box || !openButton) return;
+<?php /*     Gets the list of comments inside the box. */ ?>
+    var list = box.querySelector('.coord-comments-list');
+<?php /*     Gets the arrow button that expands or collapses the list. */ ?>
+    var toggle = box.querySelector('[data-coord-comments-toggle]');
+
+<?php /*     Shows or hides the comment list and updates the arrow text. */ ?>
+    function setList(open) {
+<?php /*         Stops when the page has no comments to toggle. */ ?>
+        if (!list || !toggle) return;
+<?php /*         Shows or hides the list. */ ?>
+        list.hidden = !open;
+<?php /*         Updates the arrow state for screen readers. */ ?>
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+<?php /*         Switches the button label between Show and Hide. */ ?>
+        toggle.innerHTML = (open ? 'Hide Comments' : 'Show Comments') + ' <i class="fas fa-chevron-down" aria-hidden="true"></i>';
+<?php /*         Rotates the arrow to match the list state. */ ?>
+        toggle.classList.toggle('is-open', open);
+<?php /*     Closes the setList function. */ ?>
+    }
+
+<?php /*     Opens or closes the whole comments box from the message icon. */ ?>
+    openButton.addEventListener('click', function () {
+<?php /*         Reads whether the box is currently open. */ ?>
+        var isOpen = openButton.getAttribute('aria-expanded') === 'true';
+<?php /*         Closes the box when it is already open. */ ?>
+        if (isOpen) {
+<?php /*             Hides the box. */ ?>
+            box.hidden = true;
+<?php /*             Updates the icon state. */ ?>
+            openButton.setAttribute('aria-expanded', 'false');
+<?php /*             Restores the tooltip. */ ?>
+            openButton.title = 'Show all coordinator comments';
+<?php /*         Otherwise opens the box and shows all comments at once. */ ?>
+        } else {
+<?php /*             Shows the box. */ ?>
+            box.hidden = false;
+<?php /*             Updates the icon state. */ ?>
+            openButton.setAttribute('aria-expanded', 'true');
+<?php /*             Updates the tooltip. */ ?>
+            openButton.title = 'Hide coordinator comments';
+<?php /*             Expands the comment list immediately. */ ?>
+            setList(true);
+<?php /*         Closes the open/close branch. */ ?>
+        }
+<?php /*     Closes the message icon click handler. */ ?>
+    });
+
+<?php /*     Adds the arrow handler when the page has comments. */ ?>
+    if (toggle) {
+<?php /*         Expands or collapses the comment list. */ ?>
+        toggle.addEventListener('click', function () {
+<?php /*             Reads whether the list is currently open. */ ?>
+            var isOpen = toggle.getAttribute('aria-expanded') === 'true';
+<?php /*             Switches the list to the opposite state. */ ?>
+            setList(!isOpen);
+<?php /*         Closes the arrow click handler. */ ?>
+        });
+<?php /*     Closes the arrow availability check. */ ?>
+    }
+<?php /* Runs and closes the comment box wrapper. */ ?>
+})();
+<?php /* Closes the comment box script. */ ?>
 </script>
 
 <?php /* Starts the CSS block for the scheduled presentation cards. */ ?>

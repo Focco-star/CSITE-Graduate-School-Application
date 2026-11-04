@@ -62,6 +62,7 @@ CREATE TABLE `applications` (
   `user_id` int(11) NOT NULL,
   `presentation_stage` varchar(100) NOT NULL,
   `paper_title` text NOT NULL,
+  `abstract` text DEFAULT NULL,
   `status` enum('submitted','under_review','for_payment','payment_recorded','ready_for_presentation','scheduled','approved','requires_revision','completed') DEFAULT 'submitted',
   `coordinator_comment` text DEFAULT NULL,
   `grad_school_endorsed` tinyint(1) NOT NULL DEFAULT 0,
@@ -152,7 +153,10 @@ CREATE TABLE `application_comments` (
   `application_id` int(11) NOT NULL,
   `coordinator_user_id` int(11) NOT NULL,
   `comment_text` text NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `student_dismissed_at` datetime DEFAULT NULL,
+  `coordinator_removed_at` datetime DEFAULT NULL,
+  `coordinator_removed_by` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --

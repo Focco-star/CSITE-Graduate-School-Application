@@ -65,10 +65,12 @@ Every application follows a fixed set of stages based on the student's program a
 - **Login** with email and password, or with Google Sign-In. Pending and rejected accounts are blocked with an explanation.
 - **Dashboard** showing current progress, pending requirements, and the next step.
 - **Online application** for the appropriate presentation stage of the student's program.
+- **Brief Description / Abstract** entered on the final stage and saved with the final-stage application.
 - **Draft saving**, so a partly filled application can be resumed later.
 - **Document upload** for concept papers, proposals, final papers, adviser endorsements, graduate school endorsements, and payment receipts (up to 20 MB per file).
 - **Document status tracking**: submitted, verified, incomplete, or needs revision, with coordinator comments.
 - **Templates and forms** download, filtered by program and stage.
+- **Coordinator comment notifications** shown under the matching stage in the Milestone Tracker, with an X button to remove a notification after reading it. A message icon opens a **Coordinator Comments** box with a Show/Hide arrow, listing every active comment grouped by stage and milestone.
 - **Update notifications** when the official templates in Google Drive change.
 - **Payment and receipt details** recorded by the coordinator.
 - **Profile editing** and viewing or downloading previously submitted files.
@@ -85,6 +87,8 @@ Every application follows a fixed set of stages based on the student's program a
 - **Pools** for advisers, panel members, and documenters.
 - **Template library management**, including syncing the official forms from Google Drive.
 - **Archived applications** that can be restored to the active list or permanently deleted.
+- **Comment history and student progress** in the stage editor: sent comments can be expanded or hidden, active comments can be removed, and removed comments stay in history with **Removed by coordinator** or **This comment was removed by the student.** The milestone tracker also shows the student's current progress and latest upload.
+- **Abstract viewer** in the stage document list: clicking the final paper name opens the student's **Brief Description / Abstract** exactly as submitted.
 - **Account validation** page, reached from the bell badge in the top bar, where new student accounts can be approved or rejected before the student can sign in.
 - **Shareable document links** in Applications → Edit → Documents and Requirements. The Copy Link action copies an unguessable link for signed-in coordinators or admins. PDFs open in the browser's PDF viewer, and Word files render with their original page layout and formatting.
 

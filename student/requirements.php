@@ -32,6 +32,45 @@ $currentIndex = workflowCurrentIndex($progress, $stages);
 // Maps which stages are locked and the reason for each.
 $lockStates = stageLockStates($stages, $currentIndex);
 
+// Handles the X button that removes a coordinator comment notification.
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['remove_comment_id'])) {
+    // Reads the comment and the stage that should reopen afterwards.
+    $removeId    = (int) ($_POST['remove_comment_id'] ?? 0);
+    $returnStage = (string) ($_POST['return_stage'] ?? '');
+    // Removes the comment only when the student owns its application.
+    if ($removeId > 0 && removeStudentComment($removeId, (int) ($_SESSION['user']['user_id'] ?? 0))) {
+        // Tells the student the comment was removed.
+        setFlash('success', 'Coordinator comment removed.');
+    // Explains when the comment could not be removed.
+    } else {
+        // Shows a safe error for a comment that was already removed.
+        setFlash('error', 'That comment could not be removed.');
+    // Closes the update result check.
+    }
+    // Builds the address of the page that should reopen.
+    $returnPath = 'student/requirements.php';
+    // Reopens the same stage when the posted stage is valid.
+    if ($returnStage !== '' && in_array($returnStage, array_column($stages, 'key'), true)) {
+        // Adds the selected stage to the return address.
+        $returnPath .= '?stage=' . urlencode($returnStage);
+    // Closes the valid-stage check.
+    }
+    // Reloads the Process Tracker so the notification disappears.
+    redirectTo($returnPath);
+// Closes the remove handler.
+}
+
+// Loads the newest coordinator comment from each of the student's applications.
+$commentNotifications = studentCoordinatorComments((string) ($mockStudent['email'] ?? ''));
+// Groups the notifications by stage so the open stage shows its own.
+$notificationsByStage = [];
+// Loops over every visible coordinator comment.
+foreach ($commentNotifications as $commentNotification) {
+    // Adds the comment under the stage it belongs to.
+    $notificationsByStage[$commentNotification['stageKey']][] = $commentNotification;
+// Closes the notification grouping loop.
+}
+
 // A student may only open the stage they are working on. A future stage is
 // locked until the coordinator approves the progression.
 // Checks which stage the student may open from the URL.
@@ -217,18 +256,15 @@ require_once __DIR__ . '/../includes/layout/header.php';
     </div>
 <?php /*     Body of the stage card. */ ?>
     <div class="card-body">
-<?php /*         If the coordinator left a note, show it first. */ ?>
-        <?php if (!empty($p['coordinatorComments'])): ?>
-<?php /*         Warning alert box for the coordinator note. */ ?>
-        <div class="alert alert-warning" style="margin-bottom:1.25rem;">
-<?php /*             Comment icon inside the note box. */ ?>
-            <i class="fas fa-comment-dots"></i>
-<?php /*             Shows the coordinator note text. */ ?>
-            <div><strong>Coordinator:</strong> <?= htmlspecialchars($p['coordinatorComments']) ?></div>
-<?php /*         Closes the note text div. */ ?>
-        </div>
-<?php /*         Closes the coordinator note if. */ ?>
-        <?php endif; ?>
+<?php /*         Shows the coordinator comments that belong to this stage. */ ?>
+        <?php
+        // Passes this stage's notifications to the shared partial.
+        $notifications = $notificationsByStage[$stage['key']] ?? [];
+        // The Process Tracker reload returns to this same stage.
+        $notificationReturnStage = $stage['key'];
+        // Prints the notification cards with their X buttons.
+        require __DIR__ . '/../includes/layout/student-comment-notifications.php';
+        ?>
 
 <?php /*         Wrapper that lists the milestone steps of the stage. */ ?>
         <div class="substep-list">

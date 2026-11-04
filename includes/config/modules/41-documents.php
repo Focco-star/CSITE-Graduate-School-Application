@@ -191,12 +191,48 @@ function databaseCoordinatorUserId(): int {
 function saveApplicationComment(int $applicationId, string $comment): void {
     // Finds the coordinator user id to record as the author.
     $coordinatorId = databaseCoordinatorUserId();
+    // Trims the comment before it is compared and saved.
+    $comment = trim($comment);
     // Stops when the application, coordinator, or comment is missing.
-    if ($applicationId <= 0 || $coordinatorId <= 0 || trim($comment) === '') return;
+    if ($applicationId <= 0 || $coordinatorId <= 0 || $comment === '') return;
+    // Makes sure the comment removal columns exist before they are read.
+    if (function_exists('ensureStudentCommentNotificationSchema')) {
+        // Adds the removal columns when this is a fresh database.
+        ensureStudentCommentNotificationSchema();
+    // Closes the schema check.
+    }
+    // Starts a guarded block so a lookup problem never blocks the save.
+    try {
+        // Reads the newest comment already saved for this application.
+        $latest = DB::query(
+            // Selects the newest comment text and its removal timestamps.
+            'SELECT `comment_text`, `coordinator_removed_at`, `student_dismissed_at`
+               FROM `application_comments`
+              WHERE `application_id` = :application_id
+              ORDER BY `comment_id` DESC
+              LIMIT 1',
+            // Binds the application id.
+            ['application_id' => $applicationId]
+        // Closes the query call.
+        )->fetch();
+        // Skips the insert only when the same text is still active.
+        if ($latest
+            && trim((string) ($latest['comment_text'] ?? '')) === $comment
+            && empty($latest['coordinator_removed_at'])
+            && empty($latest['student_dismissed_at'])) {
+            // Returns because the same active comment is already stored.
+            return;
+        // Closes the unchanged-comment check.
+        }
+    // Catches lookup problems and continues with the normal insert.
+    } catch (Throwable $e) {
+        // Leaves the save path unchanged when the lookup failed.
+    // Closes the catch block.
+    }
     // Prepares the INSERT into the application comments table.
     $stmt = DB::getConnection()->prepare('INSERT INTO application_comments (application_id, coordinator_user_id, comment_text) VALUES (:application_id, :coordinator_user_id, :comment_text)');
     // Runs the insert with the application, coordinator, and comment.
-    $stmt->execute(['application_id' => $applicationId, 'coordinator_user_id' => $coordinatorId, 'comment_text' => trim($comment)]);
+    $stmt->execute(['application_id' => $applicationId, 'coordinator_user_id' => $coordinatorId, 'comment_text' => $comment]);
 // Closes the saveApplicationComment function.
 }
 

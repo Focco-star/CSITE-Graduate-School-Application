@@ -312,6 +312,133 @@
 /* Closes the pending button hover rule. */
 }
 
+/* Starts the sent-comments history under the coordinator comment box. */
+.comment-history {
+    /* Separates the history from the comment textarea. */
+    margin-top: 0.85rem; padding-top: 0.75rem;
+    /* Draws a light divider above the history. */
+    border-top: 1px solid var(--gray-100);
+/* Closes the comment history rule. */
+}
+/* Lays out the history title and total count. */
+.comment-history-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--gray-600); }
+/* Styles the history title in navy. */
+.comment-history-head strong { color: var(--adzu-navy); }
+/* Pushes the total count and arrow to the right side of the heading. */
+.comment-history-count { margin-left: auto; font-size: 0.72rem; color: var(--gray-500); white-space: nowrap; }
+/* Starts the round arrow that shows or hides the sent comments. */
+.comment-history-toggle {
+    /* Sizes the button and centers the arrow. */
+    width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+    /* Gives the button a white face and light border. */
+    background: #fff; border: 1px solid var(--gray-300); color: var(--gray-600);
+    /* Makes the button round and clickable. */
+    border-radius: 50%; cursor: pointer; font-size: 0.7rem;
+    /* Animates the arrow rotation. */
+    transition: background .18s ease, transform .18s ease;
+/* Closes the history toggle rule. */
+}
+/* Gives the arrow a light hover background. */
+.comment-history-toggle:hover { background: var(--gray-50); }
+/* Shows a focus ring for keyboard users. */
+.comment-history-toggle:focus-visible { outline: 2px solid var(--adzu-gold); outline-offset: 2px; }
+/* Rotates the arrow when the history is open. */
+.comment-history-toggle.is-open i { transform: rotate(180deg); }
+/* Keeps the history list hidden until the arrow is used. */
+.comment-history-list[hidden] { display: none; }
+/* Styles an empty-history note. */
+.comment-history-empty { margin: 0.35rem 0 0; font-size: 0.78rem; color: var(--gray-400); }
+/* Starts one sent-comment record. */
+.comment-history-item {
+    /* Adds a light background and border around each comment. */
+    background: var(--gray-50); border: 1px solid var(--gray-200);
+    /* Rounds the record and spaces it from the next one. */
+    border-radius: 8px; padding: 0.6rem 0.7rem; margin-bottom: 0.45rem;
+/* Closes the sent-comment record rule. */
+}
+/* Removes the bottom margin from the last record. */
+.comment-history-item:last-child { margin-bottom: 0; }
+/* Lays out the record date and seen state. */
+.comment-history-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; font-size: 0.7rem; color: var(--gray-500); margin-bottom: 0.25rem; }
+/* Styles the sent-comment text. */
+.comment-history-text { margin: 0; font-size: 0.8rem; color: var(--gray-700); line-height: 1.45; }
+/* Starts the small active or removed pill. */
+.comment-history-state { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 99px; line-height: 1.35; }
+/* Colors the pill green while the comment is active. */
+.comment-history-state.is-active { background: rgba(22, 163, 74, 0.10); color: #15803d; }
+/* Colors the pill gray when the coordinator removed the comment. */
+.comment-history-state.is-removed { background: rgba(100, 116, 139, 0.12); color: #475569; }
+/* Colors the pill amber when the student removed the comment. */
+.comment-history-state.is-student-removed { background: rgba(217, 119, 6, 0.12); color: #b45309; text-transform: none; letter-spacing: 0; }
+/* Fades and strikes the text of a removed comment. */
+.comment-history-item.is-removed .comment-history-text { color: var(--gray-400); text-decoration: line-through; }
+/* Aligns the remove control under a comment. */
+.comment-history-actions { display: flex; justify-content: flex-end; margin-top: 0.45rem; }
+/* Starts the small danger button that removes a comment. */
+.comment-history-remove {
+    /* Lays the icon and label out in a row. */
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    /* Gives the button a light red face and border. */
+    background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
+    /* Rounds the button and sets its text size. */
+    border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.72rem; font-weight: 600;
+    /* Makes the button clickable. */
+    cursor: pointer;
+/* Closes the remove button rule. */
+}
+/* Darkens the remove button on hover. */
+.comment-history-remove:hover { background: #fee2e2; }
+/* Starts the latest-notification status row in the milestone tracker. */
+.coord-comment-status { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.78rem; color: var(--gray-600); background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; padding: 0.5rem 0.65rem; margin-bottom: 0.75rem; }
+/* Colors the bell icon amber. */
+.coord-comment-status > i { color: #b45309; }
+/* Styles the latest student upload line in the milestone tracker. */
+.coord-student-update { margin: 0 0 0.75rem; font-size: 0.78rem; color: var(--gray-600); }
+/* Colors the upload icon navy. */
+.coord-student-update > i { color: var(--adzu-navy); margin-right: 0.25rem; }
+/* Shows the student update value in navy. */
+.coord-student-update strong { color: var(--adzu-navy); }
+
+/* Starts the button that opens a final paper's abstract. */
+.doc-abstract-toggle {
+    /* Lays the document name and arrow out in a row. */
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    /* Clears the button styling so it reads like the document name. */
+    background: none; border: none; padding: 0; font: inherit; color: inherit;
+    /* Aligns the name to the left and makes the button clickable. */
+    text-align: left; cursor: pointer;
+/* Closes the abstract toggle rule. */
+}
+/* Keeps the document name navy in the abstract toggle. */
+.doc-abstract-toggle strong { color: var(--adzu-navy); }
+/* Underlines the name on hover to show it opens something. */
+.doc-abstract-toggle:hover strong { text-decoration: underline; }
+/* Sets the size and colour of the abstract arrow. */
+.doc-abstract-toggle i { font-size: 0.7rem; color: var(--gray-400); transition: transform .18s ease; }
+/* Rotates the arrow when the abstract is open. */
+.doc-abstract-toggle.is-open i { transform: rotate(180deg); }
+/* Shows a focus ring for keyboard users. */
+.doc-abstract-toggle:focus-visible { outline: 2px solid var(--adzu-gold); outline-offset: 2px; }
+/* Starts the box that holds the student's abstract. */
+.doc-abstract-box {
+    /* Gives the box a light panel look with a gold left accent. */
+    margin-top: 0.55rem; padding: 0.6rem 0.7rem;
+    background: var(--gray-50); border: 1px solid var(--gray-200); border-left: 3px solid var(--adzu-gold);
+    /* Rounds the box. */
+    border-radius: 6px;
+/* Closes the abstract box rule. */
+}
+/* Keeps the abstract box hidden until its document name is clicked. */
+.doc-abstract-box[hidden] { display: none; }
+/* Styles the small abstract label. */
+.doc-abstract-label { margin-bottom: 0.25rem; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--gray-500); }
+/* Colors the label icon gold. */
+.doc-abstract-label i { color: var(--adzu-gold); }
+/* Styles the abstract text. */
+.doc-abstract-text { margin: 0; font-size: 0.8rem; color: var(--gray-700); line-height: 1.5; }
+/* Styles the note shown when no abstract was saved. */
+.doc-abstract-empty { margin: 0; font-size: 0.8rem; color: var(--gray-400); font-style: italic; }
+
 /* Applies smaller stage slider sizes on narrow screens. */
 @media (max-width: 768px) {
     /* Shrinks the stage cards on phones. */

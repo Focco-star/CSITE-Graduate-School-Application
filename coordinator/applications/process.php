@@ -72,6 +72,35 @@ $presentationTeam = $email !== '' ? studentPresentationDetails($email) : [];
  * statuses, the workflow records, the presentation result and the stage
  * approvals.
  * ------------------------------------------------------------------ */
+// Handles the Remove button in the sent-comments history.
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['remove_comment_id'])) {
+    // Reads the comment the coordinator wants to remove.
+    $removeCommentId = (int) $_POST['remove_comment_id'];
+    // Reads the stage that should reopen after the removal.
+    $returnStage = trim((string) ($_POST['selected_stage'] ?? ($app['stageKey'] ?? '')));
+    // Falls back when the posted stage is not part of this track.
+    if (!isset($stages[$returnStage])) {
+        // Uses the application stage, or the first stage of the track.
+        $returnStage = (string) ($app['stageKey'] ?? ($stageKeys[0] ?? ''));
+    // Closes the stage fallback.
+    }
+    // Reads the coordinator id from either session key style.
+    $removeCoordinatorId = (int) ($_SESSION['user']['user_id'] ?? $_SESSION['user']['id'] ?? 0);
+    // Removes the comment only when it exists and the update succeeds.
+    if ($removeCommentId > 0 && removeCoordinatorComment($removeCommentId, $removeCoordinatorId)) {
+        // Tells the coordinator the comment is hidden from the student side.
+        setFlash('success', 'Comment removed. It no longer appears on the student side.');
+    // Explains when the removal could not be saved.
+    } else {
+        // Shows a safe error when the comment was already removed.
+        setFlash('error', 'That comment could not be removed.');
+    // Closes the removal result check.
+    }
+    // Reloads the same stage so the history shows the removal.
+    redirectTo('coordinator/applications/process.php?id=' . (int) ($app['id'] ?? 0) . '&stage=' . urlencode($returnStage) . '#milestone-tracker-' . $returnStage);
+// Closes the coordinator removal handler.
+}
+
 // Only runs the save logic when the form was submitted and an application exists.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
     // Reads which stage tab was submitted, defaulting to the application stageKey.
@@ -671,6 +700,20 @@ foreach ($stages as $key => $stage) {
 
     // Loads the documents uploaded for this stage application.
     $stageUploads   = $stageApp ? uploadsForApplication((int) $stageApp['id']) : [];
+    // Starts with no student upload date until the newest one is found.
+    $latestStageUploadAt = '';
+    // Loops over the stage uploads to find the newest student update.
+    foreach ($stageUploads as $stageUpload) {
+        // Reads the upload date from the document row.
+        $stageUploadDate = (string) ($stageUpload['date'] ?? '');
+        // Keeps the newest date that has a real timestamp.
+        if ($stageUploadDate !== '' && ($latestStageUploadAt === '' || strtotime($stageUploadDate) > strtotime($latestStageUploadAt))) {
+            // Replaces the saved date with this newer one.
+            $latestStageUploadAt = $stageUploadDate;
+        // Closes the newer-upload check.
+        }
+    // Closes the loop over stage uploads.
+    }
     // Gets the required documents defined for this stage of the track.
     $required       = requiredDocumentsForStage($track, $key);
     // Combines requirements and uploads into rows for the document checklist.
@@ -832,6 +875,10 @@ foreach ($stages as $key => $stage) {
         'resultReached' => $resultReached,
         // Panel unlocked: true when nothing is missing.
         'unlocked'   => $missing === [],
+        // Panel latestUpload: the newest student upload time for this stage.
+        'latestUpload' => $latestStageUploadAt,
+        // Panel commentHistory: every coordinator comment sent for this stage.
+        'commentHistory' => $stageApp ? applicationCommentHistory((int) $stageApp['id']) : [],
     // Closes the panel data array.
     ];
 // Closes the loop that builds the stage panels.
@@ -1179,6 +1226,75 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                     <label>Recommendations / Comments</label>
 <?php /*                     Text box for recommendations, pre-filled with the saved comment. */ ?>
                     <textarea name="stage_data[<?= htmlspecialchars($key) ?>][comment]" placeholder="Enter recommendations or revision notes for the student..."><?= htmlspecialchars($stageApp['coordinatorComment'] ?? '') ?></textarea>
+<?php /*                     Starts the list of comments already sent to the student. */ ?>
+                    <?php $commentHistory = $panel['commentHistory'] ?? []; ?>
+                    <div class="comment-history">
+<?php /*                         Opens the history heading with the total count. */ ?>
+                        <div class="comment-history-head">
+<?php /*                             Names the sent-comments list. */ ?>
+                            <strong><i class="fas fa-clock-rotate-left" aria-hidden="true"></i> Sent comments</strong>
+<?php /*                             Shows how many comments this stage has. */ ?>
+                            <span class="comment-history-count"><?= count($commentHistory) ?> total</span>
+<?php /*                             Adds the arrow that shows or hides the history. */ ?>
+                            <?php if ($commentHistory): ?>
+                            <button type="button" class="comment-history-toggle" data-comment-history-toggle aria-expanded="false" title="Show sent comments"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+<?php /*                             Closes the history arrow check. */ ?>
+                            <?php endif; ?>
+<?php /*                         Closes the history heading. */ ?>
+                        </div>
+<?php /*                         Shows an empty note when nothing was sent yet. */ ?>
+                        <?php if (!$commentHistory): ?>
+                        <p class="comment-history-empty">No comments have been sent for this stage yet.</p>
+<?php /*                         Otherwise shows the most recent comments. */ ?>
+                        <?php else: ?>
+<?php /*                             Opens the hidden list toggled by the arrow. */ ?>
+                        <div class="comment-history-list" hidden>
+<?php /*                             Loops over the ten newest comments. */ ?>
+                        <?php foreach (array_slice($commentHistory, 0, 10) as $historyItem): ?>
+<?php /*                             Opens one sent-comment record, marked when removed. */ ?>
+                        <div class="comment-history-item<?= $historyItem['active'] ? '' : ' is-removed' ?>">
+<?php /*                                 Shows the date and the removal state. */ ?>
+                            <div class="comment-history-meta">
+<?php /*                                 Prints when the comment was saved. */ ?>
+                                <span><?= htmlspecialchars(!empty($historyItem['createdAt']) ? date('M j, Y g:i A', strtotime((string) $historyItem['createdAt'])) : '') ?></span>
+<?php /*                                 Shows the coordinator removal state first. */ ?>
+                                <?php if ($historyItem['coordinatorRemoved']): ?>
+                                <span class="comment-history-state is-removed">Removed by coordinator</span>
+<?php /*                                 Shows the student removal message next. */ ?>
+                                <?php elseif ($historyItem['studentRemoved']): ?>
+                                <span class="comment-history-state is-student-removed">This comment was removed by the student.</span>
+<?php /*                                 Otherwise marks the comment as active. */ ?>
+                                <?php else: ?>
+                                <span class="comment-history-state is-active">Active</span>
+<?php /*                                 Closes the removal state check. */ ?>
+                                <?php endif; ?>
+<?php /*                             Closes the comment metadata row. */ ?>
+                            </div>
+<?php /*                             Prints the comment text, keeping its line breaks. */ ?>
+                            <p class="comment-history-text"><?= nl2br(htmlspecialchars((string) $historyItem['text'])) ?></p>
+<?php /*                             Offers a remove button only while the comment is active. */ ?>
+                            <?php if ($historyItem['active']): ?>
+                            <div class="comment-history-actions">
+<?php /*                                 Removes the comment from the student side. */ ?>
+                                <button type="submit" name="remove_comment_id" value="<?= (int) $historyItem['commentId'] ?>" formnovalidate class="comment-history-remove" title="Remove this comment" onclick="return confirm('Remove this comment? It will disappear from the student side.');"><i class="fas fa-trash" aria-hidden="true"></i> Remove</button>
+<?php /*                             Closes the remove button row. */ ?>
+                            </div>
+<?php /*                             Closes the active-comment check. */ ?>
+                            <?php endif; ?>
+<?php /*                         Closes this sent-comment record. */ ?>
+                        </div>
+<?php /*                         Ends the loop over sent comments. */ ?>
+                        <?php endforeach; ?>
+<?php /*                         Explains that only the newest comments are listed. */ ?>
+                        <?php if (count($commentHistory) > 10): ?>
+                        <p class="comment-history-empty">Showing the 10 most recent comments.</p>
+                        <?php endif; ?>
+<?php /*                             Closes the hidden history list. */ ?>
+                        </div>
+<?php /*                         Closes the non-empty history branch. */ ?>
+                        <?php endif; ?>
+<?php /*                     Closes the sent-comments list. */ ?>
+                    </div>
 <?php /*                 Closes the comment field. */ ?>
                 </div>
 <?php /*                 Ends the check for a missing stage application. */ ?>
@@ -1206,6 +1322,44 @@ require_once __DIR__ . '/../../includes/layout/header.php';
             </div>
 <?php /*             Opens the body of the milestone tracker card. */ ?>
             <div class="card-body">
+<?php /*                 Shows whether the latest coordinator comment was seen. */ ?>
+                <?php $latestComment = $panel['commentHistory'][0] ?? null; ?>
+                <?php if ($latestComment): ?>
+<?php /*                 Opens the notification status row. */ ?>
+                <div class="coord-comment-status">
+<?php /*                     Shows the bell icon for the notification. */ ?>
+                    <i class="fas fa-bell" aria-hidden="true"></i>
+<?php /*                     Names the latest comment notification. */ ?>
+                    <span>Latest coordinator comment</span>
+<?php /*                     Shows whether the latest comment is still active. */ ?>
+                    <?php if ($latestComment['coordinatorRemoved']): ?>
+                    <span class="comment-history-state is-removed">Removed by coordinator</span>
+<?php /*                     Shows when the student removed the comment. */ ?>
+                    <?php elseif ($latestComment['studentRemoved']): ?>
+                    <span class="comment-history-state is-student-removed">Removed by student</span>
+<?php /*                     Otherwise marks the latest comment as active. */ ?>
+                    <?php else: ?>
+                    <span class="comment-history-state is-active">Active</span>
+<?php /*                     Closes the latest-comment state check. */ ?>
+                    <?php endif; ?>
+<?php /*                 Closes the notification status row. */ ?>
+                </div>
+<?php /*                 Closes the latest-comment check. */ ?>
+                <?php endif; ?>
+<?php /*                 Shows the newest student upload, which is a student update. */ ?>
+                <p class="coord-student-update">
+<?php /*                     Shows an upload icon before the update text. */ ?>
+                    <i class="fas fa-upload" aria-hidden="true"></i>
+<?php /*                     Prints the newest upload date when one exists. */ ?>
+                    <?php if (!empty($panel['latestUpload'])): ?>
+                    Latest student upload: <strong><?= htmlspecialchars(date('M j, Y g:i A', strtotime((string) $panel['latestUpload']))) ?></strong>
+<?php /*                     Otherwise explains that the student has not uploaded here. */ ?>
+                    <?php else: ?>
+                    No student uploads for this stage yet.
+<?php /*                     Closes the upload-date check. */ ?>
+                    <?php endif; ?>
+<?php /*                 Closes the student update line. */ ?>
+                </p>
 <?php /*                 Checks whether this stage has no milestones defined. */ ?>
                 <?php if (!$panel['milestones']): ?>
 <?php /*                 Shows a message when the stage has no milestones. */ ?>
@@ -1504,6 +1658,17 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                                 $documentFilePath = $document ? uploadStoragePath($document) : null;
                                 // Builds the shareable link copied by the Copy Link button.
                                 $shareUrl = $documentFilePath ? documentShareUrl($document) : '';
+                                // Checks whether this upload is the stage paper document.
+                                $isPaperDocument = (bool) $document
+                                    && classifyUploadDocType((string) ($document['docType'] ?? '')) === 'paper';
+                                // Reads the abstract saved with the stage application.
+                                $abstractText = trim((string) ($stageApp['abstract'] ?? ''));
+                                // Marks the last stage of the student's workflow.
+                                $isFinalStage = $key === ($stageKeys[count($stageKeys) - 1] ?? '');
+                                // Shows the abstract control for final paper documents.
+                                $showDocumentAbstract = $isPaperDocument && ($abstractText !== '' || $isFinalStage);
+                                // Builds a safe id for the hidden abstract box.
+                                $abstractDomId = 'doc-abstract-' . preg_replace('/[^A-Za-z0-9_-]/', '-', (string) ($document['id'] ?? '0'));
                             // Closes the PHP block that prepared the row values.
                             ?>
 <?php /*                             Opens one table row for this document or requirement. */ ?>
@@ -1530,8 +1695,14 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                                     </details>
 <?php /*                                     Starts the branch for documents that are not receipts. */ ?>
                                     <?php else: ?>
-<?php /*                                     Prints the document name in bold. */ ?>
+<?php /*                                     Makes the final paper name open its abstract. */ ?>
+                                    <?php if ($showDocumentAbstract): ?>
+                                    <button type="button" class="doc-abstract-toggle" data-doc-abstract-toggle aria-expanded="false" aria-controls="<?= htmlspecialchars($abstractDomId) ?>" title="View the Brief Description / Abstract"><strong><?= htmlspecialchars($label) ?></strong> <i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+<?php /*                                     Otherwise prints the document name in bold. */ ?>
+                                    <?php else: ?>
                                     <strong><?= htmlspecialchars($label) ?></strong>
+<?php /*                                     Closes the abstract-toggle check. */ ?>
+                                    <?php endif; ?>
 <?php /*                                     Ends the receipt and plain document branch. */ ?>
                                     <?php endif; ?>
 <?php /*                                     Shows the document type when it differs from the label. */ ?>
@@ -1539,6 +1710,23 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                                     Prints the document type in small grey text. */ ?>
                                     <div style="font-size:0.75rem;color:var(--gray-500);"><?= htmlspecialchars($type) ?></div>
 <?php /*                                     Ends the document type check. */ ?>
+                                    <?php endif; ?>
+<?php /*                                     Opens the hidden abstract box for the final paper. */ ?>
+                                    <?php if ($showDocumentAbstract): ?>
+                                    <div class="doc-abstract-box" id="<?= htmlspecialchars($abstractDomId) ?>" hidden>
+<?php /*                                         Labels the abstract box. */ ?>
+                                        <div class="doc-abstract-label"><i class="fas fa-align-left" aria-hidden="true"></i> Brief Description / Abstract</div>
+<?php /*                                         Shows the saved abstract text. */ ?>
+                                        <?php if ($abstractText !== ''): ?>
+                                        <p class="doc-abstract-text"><?= nl2br(htmlspecialchars($abstractText)) ?></p>
+<?php /*                                         Otherwise explains that no abstract was saved. */ ?>
+                                        <?php else: ?>
+                                        <p class="doc-abstract-empty">No abstract was provided for this document.</p>
+<?php /*                                         Closes the abstract text check. */ ?>
+                                        <?php endif; ?>
+<?php /*                                     Closes the abstract box. */ ?>
+                                    </div>
+<?php /*                                     Closes the abstract box check. */ ?>
                                     <?php endif; ?>
 <?php /*                                 Closes the document name cell. */ ?>
                                 </td>
@@ -2484,6 +2672,70 @@ $scheduleAlerts = [
 <?php /* Runs and closes the copy-link script wrapper. */ ?>
 })();
 <?php /* Closes the copy-link script block. */ ?>
+</script>
+
+<?php /* Starts the script that opens or closes the sent-comments history. */ ?>
+<script>
+<?php /* Wraps the toggle handler in an IIFE so its names stay private. */ ?>
+(function () {
+<?php /*     Listens for clicks on every sent-comments arrow. */ ?>
+    document.addEventListener('click', function (event) {
+<?php /*         Finds the arrow button that was clicked. */ ?>
+        var toggle = event.target.closest('[data-comment-history-toggle]');
+<?php /*         Stops when the click was somewhere else. */ ?>
+        if (!toggle) return;
+<?php /*         Finds the sent-comments box that holds the arrow. */ ?>
+        var box = toggle.closest('.comment-history');
+<?php /*         Finds the list that the arrow controls. */ ?>
+        var list = box ? box.querySelector('.comment-history-list') : null;
+<?php /*         Stops when the list is missing. */ ?>
+        if (!list) return;
+<?php /*         Reads whether the list is currently open. */ ?>
+        var isOpen = toggle.getAttribute('aria-expanded') === 'true';
+<?php /*         Updates the arrow state for screen readers. */ ?>
+        toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+<?php /*         Shows or hides the history list. */ ?>
+        list.hidden = isOpen;
+<?php /*         Rotates the arrow to match the list state. */ ?>
+        toggle.classList.toggle('is-open', !isOpen);
+<?php /*         Updates the tooltip to the next action. */ ?>
+        toggle.title = isOpen ? 'Show sent comments' : 'Hide sent comments';
+<?php /*     Closes the arrow click listener. */ ?>
+    });
+<?php /* Runs and closes the history toggle wrapper. */ ?>
+})();
+<?php /* Closes the history toggle script block. */ ?>
+</script>
+
+<?php /* Starts the script that opens a document's abstract. */ ?>
+<script>
+<?php /* Wraps the abstract handler so its names stay private. */ ?>
+(function () {
+<?php /*     Listens for clicks on any document name with an abstract. */ ?>
+    document.addEventListener('click', function (event) {
+<?php /*         Finds the document-name button that was clicked. */ ?>
+        var toggle = event.target.closest('[data-doc-abstract-toggle]');
+<?php /*         Stops when the click was somewhere else. */ ?>
+        if (!toggle) return;
+<?php /*         Reads the id of the abstract box it controls. */ ?>
+        var targetId = toggle.getAttribute('aria-controls');
+<?php /*         Finds the abstract box. */ ?>
+        var box = targetId ? document.getElementById(targetId) : null;
+<?php /*         Stops when the abstract box is missing. */ ?>
+        if (!box) return;
+<?php /*         Reads whether the abstract is currently open. */ ?>
+        var isOpen = toggle.getAttribute('aria-expanded') === 'true';
+<?php /*         Updates the button state for screen readers. */ ?>
+        toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+<?php /*         Shows or hides the abstract box. */ ?>
+        box.hidden = isOpen;
+<?php /*         Rotates the arrow to match the box state. */ ?>
+        toggle.classList.toggle('is-open', !isOpen);
+<?php /*     Closes the document-name click listener. */ ?>
+    });
+<?php /* Runs and closes the abstract wrapper. */ ?>
+})();
+<?php /* Closes the abstract script block. */ ?>
 </script>
 
 <?php /* Loads the shared footer that closes the page layout. */ ?>

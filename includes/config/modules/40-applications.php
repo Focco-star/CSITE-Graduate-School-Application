@@ -1,6 +1,43 @@
 <?php
 /* CSITE configuration module: Application records, latest application lookup, and application updates. */
 
+/**
+ * Make sure the applications table has the Brief Description / Abstract column.
+ *
+ * The column is only used by the final-stage document, but keeping it on the
+ * application row lets the coordinator read it for every document of that
+ * stage. The check runs once per request and is skipped without the DB class.
+ */
+// Creates the application abstract column when it is missing.
+function ensureApplicationAbstractSchema(): void {
+    // Remembers whether the schema was already checked in this request.
+    static $checked = false;
+    // Stops when the check already ran or the DB class is missing.
+    if ($checked || !class_exists('DB')) {
+        // Returns early because there is nothing else to do.
+        return;
+    // Closes the early-return check.
+    }
+    // Marks the check as done so it does not run again in this request.
+    $checked = true;
+    // Starts a guarded block because the table may not exist yet.
+    try {
+        // Reads every column of the applications table.
+        $columns = DB::query('SHOW COLUMNS FROM `applications`')->fetchAll(PDO::FETCH_COLUMN);
+        // Adds the abstract column when it is missing.
+        if (!in_array('abstract', $columns, true)) {
+            // Stores the student's Brief Description / Abstract.
+            DB::getConnection()->exec('ALTER TABLE `applications` ADD COLUMN `abstract` TEXT NULL DEFAULT NULL AFTER `paper_title`');
+        // Closes the abstract column check.
+        }
+    // Ignores schema errors so the page can still render.
+    } catch (Throwable $e) {
+        // Leaves the schema untouched when the check could not run.
+    // Closes the catch block.
+    }
+// Closes the ensureApplicationAbstractSchema function.
+}
+
 // Adds a new application to the session store.
 function addApplicationRecord(array $a): array {
     // Loads the session applications.
@@ -58,6 +95,8 @@ function addApplicationRecord(array $a): array {
 function findApplication(int $id): ?array {
     // Only queries when DB exists and the id is positive.
     if (class_exists('DB') && $id > 0) {
+        // Makes sure the abstract column exists before it is read.
+        ensureApplicationAbstractSchema();
         // Starts the try block for the database lookup.
         try {
             // Prepares the SQL that selects one application with its student details.
@@ -67,7 +106,7 @@ function findApplication(int $id): ?array {
                         COALESCE(NULLIF(TRIM(CONCAT(s.last_name, ", ", s.first_name, IF(s.middle_initial IS NULL OR s.middle_initial = "", "", CONCAT(" ", s.middle_initial)))), ""), u.full_name) AS student,
                         CASE WHEN s.program LIKE "%Computer Science%" THEN "MSCS" WHEN s.program LIKE "%Information Technology%" THEN "MIT" WHEN s.program LIKE "%Mathematics%" THEN "MATH" ELSE s.program END AS program,
                         s.track, s.adviser_name AS adviser, a.presentation_stage AS stage,
-                        a.paper_title AS title, a.status, a.coordinator_comment AS coordinatorComment,
+                        a.paper_title AS title, a.abstract AS abstract, a.status, a.coordinator_comment AS coordinatorComment,
                         a.result, a.submitted_at AS date
                  FROM applications a
                  INNER JOIN users u ON u.user_id = a.user_id
