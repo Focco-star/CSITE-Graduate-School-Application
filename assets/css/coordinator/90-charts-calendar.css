@@ -773,6 +773,10 @@
 .psc-event--completed .psc-event-status { color: #14624a; }
 /* Recolours the badge text for cancelled events. */
 .psc-event--cancelled .psc-event-status { color: #7a3441; }
+/* Matches result badge text to the green approved event chip. */
+.psc-event--result-approved .psc-event-status { color: #14624a; }
+/* Keeps re-presentation text purple even when its schedule is completed. */
+.psc-event--result-re_presentation_required .psc-event-status { color: #3b246d; }
 /* The small more-events button inside a crowded day cell. */
 .psc-more-events { display: block; margin-top: 0.2rem; padding: 0; color: var(--adzu-navy); background: transparent; border: 0; font-size: 0.65rem; font-weight: 700; cursor: pointer; text-align: left; }
 /* Full-screen overlay behind the event details dialog. */
