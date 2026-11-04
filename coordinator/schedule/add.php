@@ -350,9 +350,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'status' => ($_POST['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
         // Closes the array of values given to addScheduleRecord().
         ]);
-        // addScheduleRecord() synchronizes the application status: a confirmed
-        // schedule moves the stage to Scheduled for Presentation, while a
-        // pending schedule leaves the stage at Ready for Presentation.
+        // addScheduleRecord() synchronizes a confirmed re-presentation to
+        // Scheduled for Presentation while keeping the same stage active.
         // Sends the coordinator to the schedule list after saving.
         redirectTo('coordinator/schedule/manage.php');
     // Closes the if that handled a found student and stage.
@@ -818,11 +817,13 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*         Loops over every stage entry to build the options. */ ?>
         stageEntries.forEach(entry => {
 <?php /*             Chooses the suffix text for scheduled or not reached stages. */ ?>
-            const suffix = entry.state === 'scheduled'
+            const suffix = entry.state === 're_presentation_required'
+                ? ' (re-presentation required — reschedule this stage)'
+                : (entry.state === 'scheduled'
 <?php /*                 Suffix for a stage that already has a schedule. */ ?>
                 ? ' (already scheduled)'
 <?php /*                 Suffix for a stage that is still in the future. */ ?>
-                : (entry.state === 'future' ? ' (not reached yet)' : '');
+                : (entry.state === 'future' ? ' (not reached yet)' : ''));
 <?php /*             Creates an option with the label and any suffix. */ ?>
             const option = new Option(entry.label + suffix, entry.label);
 <?php /*             Disables the option when the stage is locked. */ ?>
@@ -850,7 +851,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*         Sets the hint text depending on whether a current stage exists. */ ?>
         hint.textContent = current
 <?php /*             Hint names the current stage and explains locked stages. */ ?>
-            ? 'Current stage: ' + current + '. Locked stages are either already scheduled or not reached yet.'
+        ? 'Current stage: ' + current + '. A stage marked for re-presentation can be scheduled again; other locked stages are already scheduled or not reached yet.'
 <?php /*             Fallback hint saying stages follow track and progress. */ ?>
             : 'The stages offered follow the student\u2019s track and their workflow progress.';
 

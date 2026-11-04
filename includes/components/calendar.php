@@ -475,12 +475,12 @@ if (!function_exists('scheduleCalendarFetch')) {
         $seen   = [];
         // Remembers applications already listed from the schedules table.
         $scheduledApplications = [];
-        // Defines a helper that adds an event only once per app, date and time.
+        // Defines a helper that adds an event only once per schedule, date and time.
         $add = static function (string $date, array $event) use (&$byDate, &$seen): void {
             // Comment: one presentation means one application at one date and time.
             // One presentation = one application at one date and time.
-            // Builds a unique key from application id, date and start time.
-            $key = $event['applicationId'] . '|' . $date . '|' . ($event['start'] ?? '');
+            // Builds a unique key from the schedule attempt, date and start time.
+            $key = $event['id'] . '|' . $date . '|' . ($event['start'] ?? '');
             // Checks whether this presentation was already added.
             if (isset($seen[$key])) {
                 // Skips the duplicate event.
@@ -502,8 +502,8 @@ if (!function_exists('scheduleCalendarFetch')) {
             $pdo,
             // Starts the SQL that joins schedules, applications, users and students.
             "SELECT sc.schedule_id, sc.application_id, sc.presentation_date, sc.start_time, sc.end_time,
-                    sc.venue, sc.status AS schedule_status,
-                    a.paper_title, a.presentation_stage, a.result AS presentation_result,
+                    sc.venue, sc.status AS schedule_status, sc.presentation_result AS schedule_result,
+                    a.paper_title, a.presentation_stage, COALESCE(NULLIF(sc.presentation_result, ''), a.result) AS presentation_result,
                     {$nameSql} AS student_name
              FROM schedules sc
              JOIN applications a ON a.application_id = sc.application_id
@@ -527,7 +527,7 @@ if (!function_exists('scheduleCalendarFetch')) {
                 continue;
             // Closes the date check.
             }
-            // Records the application as already scheduled.
+            // Records the application as already represented by a schedule row.
             $scheduledApplications[(int) $row['application_id']] = true;
             // Adds a calendar event built from this schedule row.
             $add($date, scheduleCalendarEvent(

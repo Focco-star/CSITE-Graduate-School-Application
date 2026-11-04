@@ -167,8 +167,10 @@ function applicationStatusBlockedReason(string $status, array $milestoneSteps, s
     }
 
     // Stops a completed stage from being moved back to an earlier status.
+    $resultRequiresRepresentation = in_array($result, ['requires_revision', 're_presentation_required', 'Requires Major Revisions'], true);
     if ($statusChanged && in_array($currentStatus, ['completed', 'approved'], true) && $status !== $currentStatus
-        && !($currentStatus === 'approved' && $status === 'completed')) {
+        && !($currentStatus === 'approved' && $status === 'completed')
+        && !($status === 'requires_revision' && $resultRequiresRepresentation)) {
         // Explains that a finished stage is closed.
         return 'This stage is already marked as Presentation Complete and cannot be moved back to an earlier status.';
     }
@@ -233,6 +235,14 @@ function applicationStatusBlockedReason(string $status, array $milestoneSteps, s
         // Allows the scheduled status.
         return null;
     // Closes the scheduled branch.
+    }
+
+    // A re-presentation status is valid only when that result was recorded.
+    if ($status === 'requires_revision' || $status === 're_presentation_required') {
+        if (!in_array($result, ['requires_revision', 're_presentation_required', 'Requires Major Revisions'], true)) {
+            return 'The student can be marked as Re-Presentation Required only after that presentation result is recorded.';
+        }
+        return null;
     }
 
     // Checks whether the coordinator chose completed.

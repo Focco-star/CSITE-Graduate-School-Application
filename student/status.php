@@ -33,7 +33,7 @@ require_once __DIR__ . '/../includes/layout/header.php';
     </div>
     <div class="stat-card">
         <div class="stat-icon purple"><i class="fas fa-tasks"></i></div>
-        <div class="stat-value"><?= statusBadge($currentProgress['stageStatus'] ?? 'pending') ?></div>
+        <div class="stat-value"><?= statusBadge(stageRequiresRepresentation($currentProgress) ? 'requires_revision' : ($currentProgress['stageStatus'] ?? 'pending')) ?></div>
         <div class="stat-label">Overall Status</div>
     </div>
     <div class="stat-card">
@@ -59,7 +59,8 @@ require_once __DIR__ . '/../includes/layout/header.php';
                 $p = $progress[$idx] ?? ['stageStatus' => 'pending'];
                 $st = $p['stageStatus'];
                 $isLocked = $lockStates[$stage['key']]['locked'] ?? false;
-                $class = in_array($st, ['completed', 'approved'], true) ? 'completed' : ($st !== 'not_started' && $st !== 'pending' ? 'active' : 'pending');
+                $stageState = workflowStageState($p, $idx, $currentIndex);
+                $class = $stageState === 'done' ? 'completed' : ($stageState === 'active' ? 'active' : 'pending');
                 if ($isLocked) {
                     $class = 'locked';
                 }
@@ -72,10 +73,14 @@ require_once __DIR__ . '/../includes/layout/header.php';
                         <?php if ($isLocked): ?>
                             <span class="status-badge status-locked"><i class="fas fa-lock" aria-hidden="true"></i> Locked</span>
                         <?php else: ?>
-                            <?= statusBadge($st) ?>
+                            <?= statusBadge(stageRequiresRepresentation($p) ? 'requires_revision' : $st) ?>
                         <?php endif; ?>
                     </h4>
-                    <p><?= htmlspecialchars($isLocked ? ($lockStates[$stage['key']]['reason'] ?? 'Locked until the coordinator approves the progression.') : ($p['coordinatorComments'] ?: (STATUSES[$st]['label'] ?? $st))) ?></p>
+                    <p><?= htmlspecialchars($isLocked
+                        ? ($lockStates[$stage['key']]['reason'] ?? 'Locked until the coordinator approves the progression.')
+                        : (stageRequiresRepresentation($p)
+                            ? 'Re-Presentation Required — schedule another presentation'
+                            : ($p['coordinatorComments'] ?: (STATUSES[$st]['label'] ?? $st)))) ?></p>
                     <?php if (!empty($p['presentation']['date'])): ?>
                     <p style="font-size:0.75rem;color:var(--gray-400);margin-top:0.25rem;">
                         <i class="fas fa-calendar"></i> <?= htmlspecialchars($p['presentation']['date']) ?>

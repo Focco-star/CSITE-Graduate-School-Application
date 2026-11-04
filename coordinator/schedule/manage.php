@@ -208,12 +208,27 @@ $schedules = $upcomingPresentations;
 $profileCache = [];
 // Starts an empty cache of student profiles per email.
 $detailsCache = [];
+// Starts an empty cache of application results by application id.
+$applicationCache = [];
 // Loops over each schedule with its index in the list.
 foreach ($schedules as $index => $sch) {
     // Lowercases and trims the schedule's student email.
     $email = strtolower(trim((string) ($sch['studentEmail'] ?? '')));
     // Turns the stage label into a stable stage key.
     $stageKey = stageKeyFromLabel((string) ($sch['stage'] ?? ''));
+    // Loads the application's result once so its re-presentation action can be shown.
+    $applicationId = (int) ($sch['applicationId'] ?? 0);
+    if ($applicationId > 0 && !array_key_exists($applicationId, $applicationCache)) {
+        $applicationCache[$applicationId] = findApplication($applicationId);
+    }
+    $application = $applicationCache[$applicationId] ?? null;
+    $applicationResult = (string) ($application['result'] ?? '');
+    $applicationStatus = (string) ($application['status'] ?? '');
+    $needsRepresentation = in_array($applicationResult, ['requires_revision', 're_presentation_required', 'Requires Major Revisions'], true)
+        || in_array($applicationStatus, ['requires_revision', 're_presentation_required'], true);
+    $schedules[$index]['needsRepresentation'] = $needsRepresentation
+        && !in_array((string) ($sch['status'] ?? ''), ['pending', 'confirmed'], true)
+        && stageKeyFromLabel((string) ($application['stage'] ?? '')) === $stageKey;
 
     // Only load the student's presentation details once per email.
     if ($email !== '' && !array_key_exists($email, $detailsCache)) {
@@ -411,9 +426,9 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /* Styles the pill showing how many presentations a student has. */ ?>
 .psched-count { flex-shrink: 0; padding: 0.2rem 0.6rem; border: 1px solid rgba(37, 99, 235, 0.16); border-radius: 999px; background: rgba(37, 99, 235, 0.08); font-size: 0.72rem; font-weight: 600; color: var(--info); white-space: nowrap; }
 <?php /* Lays the entries out in a responsive auto-fit grid. */ ?>
-.psched-entries { display: grid; gap: 0.85rem; padding: 1rem 1.1rem; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.psched-entries { display: flex; gap: 0.85rem; padding: 1rem 1.1rem; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: thin; }
 <?php /* Styles one presentation card as a vertical flex box. */ ?>
-.psched-entry { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.9rem; border: 1px solid var(--gray-200); border-radius: var(--radius); background: var(--white); }
+.psched-entry { display: flex; flex: 0 0 100%; flex-direction: column; gap: 0.6rem; min-width: 0; padding: 0.9rem; border: 1px solid var(--gray-200); border-radius: var(--radius); background: var(--white); scroll-snap-align: start; }
 <?php /* Puts the stage name and status badge on one row. */ ?>
 .psched-entry-head { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
 <?php /* Styles the stage name as a bold label. */ ?>
@@ -442,6 +457,11 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 .psched-chip i { font-size: 0.66rem; color: var(--gray-400); }
 <?php /* Puts the edit and delete buttons in a row at the bottom. */ ?>
 .psched-actions { display: flex; align-items: center; gap: 0.5rem; margin-top: auto; padding-top: 0.5rem; }
+<?php /* Styles the horizontal presentation history controls. */ ?>
+.psched-slider-nav { display: flex; gap: 0.35rem; margin-left: auto; }
+.psched-slider-nav button { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid var(--gray-200); border-radius: 50%; background: var(--white); color: var(--adzu-navy); cursor: pointer; }
+.psched-slider-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+.psched-result { font-size: 0.8rem; color: var(--gray-700); }
 <?php /* Styles the empty message shown when nothing is scheduled. */ ?>
 .psched-empty { margin: 0; padding: 2rem 1rem; text-align: center; color: var(--gray-400); }
 <?php /* Lays the student search bar and its status text on one row. */ ?>
@@ -525,10 +545,16 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                     </div>
 <?php /*                     Pill showing how many presentations this student has. */ ?>
                     <span class="psched-count"><?= count($group['schedules']) ?> presentation<?= count($group['schedules']) === 1 ? '' : 's' ?></span>
+                    <?php if (count($group['schedules']) > 1): ?>
+                    <div class="psched-slider-nav" aria-label="Presentation history controls">
+                        <button type="button" data-psched-prev aria-label="Previous presentation"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+                        <button type="button" data-psched-next aria-label="Next presentation"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+                    </div>
+                    <?php endif; ?>
 <?php /*                 Closes the group header. */ ?>
                 </header>
 <?php /*                 Grid wrapper that holds one card per presentation. */ ?>
-                <div class="psched-entries">
+                <div class="psched-entries" data-psched-track tabindex="0" aria-label="Presentation history">
 <?php /*                     Loops over each schedule in this group and prepares values. */ ?>
                     <?php foreach ($group['schedules'] as $sch):
                         // Trims the adviser name for display.
@@ -549,6 +575,17 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                         $timeRaw = (string) ($sch['time'] ?? '');
                         // Formats the time as a 12-hour clock, or a dash when it is empty.
                         $timeLabel = $timeRaw !== '' ? date('g:i A', strtotime('2000-01-01 ' . $timeRaw)) : '—';
+                        $presentationResult = (string) ($sch['presentationResult'] ?? '');
+                        $presentationResultLabels = [
+                            'approved' => 'Approved',
+                            'approved_with_revision' => 'Approved with revision',
+                            'Approved with Minor Revisions' => 'Approved with revision',
+                            'Approved with revision' => 'Approved with revision',
+                            'requires_revision' => 'Re-Presentation Required',
+                            're_presentation_required' => 'Re-Presentation Required',
+                            'Requires Major Revisions' => 'Re-Presentation Required',
+                        ];
+                        $presentationResultLabel = $presentationResultLabels[$presentationResult] ?? ($presentationResult !== '' ? $presentationResult : 'Awaiting result');
                     // Closes the PHP block that prepared the display values.
                     ?>
 <?php /*                     Article element for one presentation card. */ ?>
@@ -559,6 +596,9 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                             <span class="psched-stage"><i class="fas fa-layer-group"></i> <?= htmlspecialchars((string) $sch['stage']) ?></span>
 <?php /*                             Status badge showing confirmed or pending. */ ?>
                             <?= statusBadge((string) $sch['status']) ?>
+                            <?php if (!empty($sch['needsRepresentation'])): ?>
+                            <?= statusBadge('requires_revision') ?>
+                            <?php endif; ?>
 <?php /*                         Closes the top row. */ ?>
                         </div>
 <?php /*                         Row holding the date, time and venue. */ ?>
@@ -575,6 +615,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                             <?php endif; ?>
 <?php /*                         Closes the date, time and venue row. */ ?>
                         </div>
+                        <div class="psched-result"><strong>Presentation outcome:</strong> <?= htmlspecialchars($presentationResultLabel) ?></div>
 <?php /*                         Grid holding the adviser, documenter and panel details. */ ?>
                         <div class="psched-team">
 <?php /*                             Block for the adviser entry. */ ?>
@@ -625,6 +666,10 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                         </div>
 <?php /*                         Row holding the action buttons. */ ?>
                         <div class="psched-actions">
+<?php /*                             Offer a direct new schedule when this stage requires another presentation. */ ?>
+                            <?php if (!empty($sch['needsRepresentation']) && (int) ($sch['applicationId'] ?? 0) > 0): ?>
+                            <a href="<?= url('coordinator/schedule/add.php?app=' . urlencode((string) $sch['applicationId'])) ?>" class="btn btn-primary" title="Schedule the required re-presentation"><i class="fas fa-calendar-plus" aria-hidden="true"></i> Schedule Re-Presentation</a>
+                            <?php endif; ?>
 <?php /*                             Only show Edit for real schedule rows, not database-only ones. */ ?>
                             <?php if (strpos((string) ($sch['id'] ?? ''), 'db_') !== 0): ?>
 <?php /*                             Edit button linking to the edit form for this schedule id. */ ?>
@@ -664,10 +709,8 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <script>
 // Runs the student search without affecting the calendar or the schedule cards.
 (function () {
-    // Gets the search field and stops when this page does not have one.
+    // Gets the optional schedule search field.
     var search = document.getElementById('pschedSearch');
-    if (!search) return;
-
     // Collects the student groups and the messages used by the filter.
     var groups = Array.prototype.slice.call(document.querySelectorAll('.psched-group'));
     var empty = document.getElementById('pschedSearchEmpty');
@@ -677,6 +720,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 
     // Shows only the groups whose header matches the typed text.
     function applyFilter() {
+        if (!search) return;
         // Reads and normalizes the search text.
         var query = search.value.trim().toLowerCase();
         // Counts the groups that stay visible.
@@ -704,9 +748,9 @@ require_once __DIR__ . '/../../includes/layout/header.php';
     }
 
     // Filters as the coordinator types.
-    search.addEventListener('input', applyFilter);
+    if (search) search.addEventListener('input', applyFilter);
     // Clears the search and returns focus to the field.
-    if (clear) {
+    if (clear && search) {
         clear.addEventListener('click', function () {
             search.value = '';
             applyFilter();
@@ -714,7 +758,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
         });
     }
     // Clears the search when Escape is pressed.
-    search.addEventListener('keydown', function (event) {
+    if (search) search.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') {
             search.value = '';
             applyFilter();
@@ -723,6 +767,28 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 
     // Applies the initial state when the page loads.
     applyFilter();
+
+    // Adds previous/next controls to each student's presentation history.
+    document.querySelectorAll('.psched-group').forEach(function (group) {
+        var track = group.querySelector('[data-psched-track]');
+        var previous = group.querySelector('[data-psched-prev]');
+        var next = group.querySelector('[data-psched-next]');
+        if (!track || !previous || !next) return;
+
+        function updateControls() {
+            previous.disabled = track.scrollLeft <= 1;
+            next.disabled = track.scrollLeft + track.clientWidth >= track.scrollWidth - 1;
+        }
+
+        previous.addEventListener('click', function () {
+            track.scrollBy({ left: -track.clientWidth, behavior: 'smooth' });
+        });
+        next.addEventListener('click', function () {
+            track.scrollBy({ left: track.clientWidth, behavior: 'smooth' });
+        });
+        track.addEventListener('scroll', updateControls, { passive: true });
+        updateControls();
+    });
 })();
 </script>
 

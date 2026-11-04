@@ -735,8 +735,11 @@
 .psc-event-name { font-size: 0.7rem; font-weight: 600; }
 /* Styles the small status badge shown on an event chip. */
 .psc-event-status {
-    /* Shows the badge inline so it sits beside other content. */
-    display: inline-block;
+    /* Keeps the badge within the event chip while allowing long labels to wrap. */
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
     /* Adds a small gap above the status badge. */
     margin-top: 0.12rem;
     /* Adds tight padding inside the status badge. */
@@ -757,8 +760,9 @@
     line-height: 1.5;
     /* Shows the badge text in uppercase. */
     text-transform: uppercase;
-    /* Keeps the badge text on one line. */
-    white-space: nowrap;
+    /* Wraps long status labels rather than letting them stick out of the chip. */
+    white-space: normal;
+    overflow-wrap: anywhere;
 /* Closes the status badge rule. */
 }
 /* Recolours the badge for confirmed events on white. */
