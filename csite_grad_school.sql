@@ -637,6 +637,7 @@ CREATE TABLE `schedules` (
   `documentor_middle_name` varchar(100) DEFAULT NULL,
   `documentor_last_name` varchar(100) DEFAULT NULL,
   `status` enum('pending','confirmed','completed','cancelled') NOT NULL DEFAULT 'pending',
+  `presentation_result` varchar(50) DEFAULT NULL,
   `notes` text DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -675,6 +676,13 @@ INSERT INTO `schedules` (`schedule_id`, `application_id`, `managed_by_user_id`, 
 (36, 153, 2, '2025-12-13', '09:00:00', '11:00:00', 'CSITE Seminar Room', 11, 'Carla', 'M.', 'Bituin', 'completed', 'Seminar paper proposal approved.', '2026-10-28 15:32:55', '2026-10-28 15:32:55'),
 (37, 155, 2, '2022-09-17', '09:00:00', '11:00:00', 'CSITE Seminar Room', 11, 'Michelle', 'P.', 'Reyes', 'completed', 'Seminar paper proposal approved.', '2026-10-28 15:32:55', '2026-10-28 15:32:55'),
 (38, 156, 2, '2026-05-16', '09:00:00', '11:00:00', 'CSITE Seminar Room', 11, 'Paolo', 'G.', 'Santos', 'completed', 'Final seminar paper presentation passed.', '2026-10-28 15:32:56', '2026-10-28 15:32:56');
+
+UPDATE `schedules` sc
+INNER JOIN `applications` a ON a.`application_id` = sc.`application_id`
+SET sc.`presentation_result` = a.`result`
+WHERE sc.`presentation_result` IS NULL
+  AND a.`result` IS NOT NULL
+  AND a.`result` <> '';
 
 -- --------------------------------------------------------
 
@@ -1240,7 +1248,7 @@ ALTER TABLE `program_tracks`
 --
 ALTER TABLE `schedules`
   ADD PRIMARY KEY (`schedule_id`),
-  ADD UNIQUE KEY `uq_schedules_application` (`application_id`),
+  ADD KEY `idx_schedules_application` (`application_id`,`schedule_id`),
   ADD KEY `idx_schedules_date_time` (`presentation_date`,`start_time`),
   ADD KEY `idx_schedules_manager` (`managed_by_user_id`),
   ADD KEY `idx_schedules_adviser` (`adviser_id`);

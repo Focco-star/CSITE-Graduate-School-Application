@@ -8,8 +8,15 @@
  * presentation_stage (rather than keeping a row per completed stage), so earlier
  * stages legitimately have no row and read as 'not_started'. Scanning back-to-front
  * and taking the furthest stage that actually carries a status makes the stepper
- * land on the stage the student is really at, not on an earlier blank stage.
+ * land on the stage the student is really at. A re-presentation result overrides
+ * an old completed status so that the student remains on that same stage.
  */
+// Checks whether a progress row requires another presentation.
+function stageRequiresRepresentation(array $progressRow): bool {
+    return in_array((string) ($progressRow['result']['value'] ?? ''), ['requires_revision', 're_presentation_required', 'Requires Major Revisions'], true)
+        || in_array((string) ($progressRow['stageStatus'] ?? ''), ['requires_revision', 're_presentation_required'], true);
+}
+
 // Finds which workflow stage the student is currently on.
 function workflowCurrentIndex(array $progress, array $stages): int {
     // Counts how many stages the track has.
@@ -24,6 +31,10 @@ function workflowCurrentIndex(array $progress, array $stages): int {
     for ($i = $count - 1; $i >= 0; $i--) {
         // Reads the progress row for this stage, or an empty array.
         $p = $progress[$i] ?? [];
+        // A re-presentation result keeps this stage current even if an old status says completed.
+        if (stageRequiresRepresentation($p)) {
+            return $i;
+        }
         // Reads the stage status, defaulting to not_started.
         $st = $p['stageStatus'] ?? 'not_started';
         // Checks whether the status means the student started the stage.
@@ -84,9 +95,10 @@ function studentCurrentStageLabel(string $email, array $student): string {
  * Every presentation stage of the student's track, in workflow order, with the
  * state the Schedule Presentation form shows:
  *
- *  - open      : may be scheduled now
- *  - scheduled : already has a presentation schedule (locked)
- *  - future    : the student has not reached the stage yet (locked)
+ *  - open                    : may be scheduled now
+ *  - re_presentation_required: may be scheduled again at the current stage
+ *  - scheduled               : already has an active presentation schedule (locked)
+ *  - future                  : the student has not reached the stage yet (locked)
  *
  * The list follows the milestone sequence of the student's track, so it works
  * the same for thesis, capstone and seminar-paper students.
@@ -119,13 +131,13 @@ function studentPresentationStageChoices(string $email, array $student): array {
 
     // Starts a block comment explaining why a stage cannot be scheduled twice.
     /*
-     * A stage that already has a schedule cannot be scheduled twice. The
-     * schedule table is the record the Presentation Schedules page shows; the
-     * workflow state is checked as well so a presentation recorded before the
-     * schedules table existed still locks its stage.
+     * An active schedule cannot be duplicated. A completed schedule paired
+     * with a re-presentation result is no longer active and may be replaced.
      */
     // Starts the list of stage keys that already have a schedule.
     $scheduledKeys = [];
+    // Tracks schedules that are still pending or confirmed.
+    $activeScheduleKeys = [];
     // Loops over every schedule saved for this student.
     foreach (schedulesForEmail($email) as $schedule) {
         // Turns the schedule's stage text into a stage key.
@@ -134,6 +146,9 @@ function studentPresentationStageChoices(string $email, array $student): array {
         if ($key !== '') {
             // Marks this stage key as already scheduled.
             $scheduledKeys[$key] = true;
+            if (in_array((string) ($schedule['status'] ?? ''), ['pending', 'confirmed'], true)) {
+                $activeScheduleKeys[$key] = true;
+            }
         // Closes the stage key check.
         }
     // Closes the schedule loop.
@@ -163,8 +178,14 @@ function studentPresentationStageChoices(string $email, array $student): array {
         $state = 'open';
         // Starts the reason text as empty.
         $reason = '';
+        // A re-presentation keeps the student on this stage and allows a replacement schedule.
+        $stageProgress = $progress[$index] ?? [];
+        $requiresRepresentation = stageRequiresRepresentation($stageProgress);
+        if ($index === $currentIdx && $requiresRepresentation && !isset($activeScheduleKeys[$key])) {
+            $state = 're_presentation_required';
+            $reason = 'A re-presentation is required for the ' . $label . '. Schedule the student again at this stage.';
         // Checks whether this stage already has a schedule.
-        if (isset($scheduledKeys[$key])) {
+        } elseif (isset($scheduledKeys[$key])) {
             // Marks the stage as scheduled and locked.
             $state = 'scheduled';
             // Explains that the existing schedule should be edited instead.
@@ -183,8 +204,8 @@ function studentPresentationStageChoices(string $email, array $student): array {
             'key' => $key,
             // Stores the stage label.
             'label' => $label,
-            // Locks the stage unless its state is open.
-            'locked' => $state !== 'open',
+            // Re-presentation stages are selectable even though they have a distinct state.
+            'locked' => !in_array($state, ['open', 're_presentation_required'], true),
             // Stores the computed state.
             'state' => $state,
             // Stores the reason shown to the coordinator.
@@ -200,8 +221,8 @@ function studentPresentationStageChoices(string $email, array $student): array {
 }
 
 /**
- * The presentation stages a coordinator may schedule right now: the stages of
- * the student's track that are neither scheduled yet nor still in the future.
+ * The presentation stages a coordinator may schedule right now: open stages,
+ * including the current stage again when its result requires a re-presentation.
  */
 // Returns the stages the coordinator may schedule right now.
 function studentValidPresentationStages(string $email, array $student): array {
@@ -230,6 +251,9 @@ function studentValidPresentationStages(string $email, array $student): array {
 function workflowStageState(array $p, int $idx, int $currentIdx): string {
     // Reads the stage status, defaulting to not_started.
     $st = $p['stageStatus'] ?? 'not_started';
+    if ($idx === $currentIdx && stageRequiresRepresentation($p)) {
+        return 'active';
+    }
     // Treats finished or already passed stages as done.
     if (in_array($st, ['completed', 'approved'], true) || $idx < $currentIdx) {
         // Returns 'done' for this stage.
@@ -667,8 +691,6 @@ function getStudentProgress(string $email, string $track): array {
                 if ((int) ($s['applicationId'] ?? 0) === (int) ($app['id'] ?? 0)) {
                     // Uses the schedule row's confirmed or completed status.
                     $presentationStatus = in_array((string) ($s['status'] ?? ''), ['confirmed', 'completed'], true) ? 'done' : 'pending';
-                    // Stops looking once the matching schedule was found.
-                    break;
                 // Closes the application match check.
                 }
             // Closes the schedule loop.
@@ -691,8 +713,6 @@ function getStudentProgress(string $email, string $track): array {
                     $presentationPanel = (string) ($s['panel'] ?? '');
                     // Marks the presentation done only when confirmed.
                     $presentationStatus = ($s['status'] ?? 'pending') === 'confirmed' ? 'done' : 'pending';
-                    // Stops looking after the first matching schedule.
-                    break;
                 // Closes the application match check.
                 }
             // Closes the schedule loop.
@@ -710,11 +730,15 @@ function getStudentProgress(string $email, string $track): array {
             'requires_revision' => 're_presentation_required',
         ][$resultVal] ?? $resultVal;
         // Adds the finished progress row to the list.
+        $stageStatus = (string) ($app['status'] ?? 'pending');
+        if (in_array($resultVal, ['requires_revision', 're_presentation_required'], true)) {
+            $stageStatus = 'requires_revision';
+        }
         $rows[] = [
             // Stores the stage key.
             'stageKey' => $stage['key'],
             // Stores the application's stage status.
-            'stageStatus' => $app['status'],
+            'stageStatus' => $stageStatus,
             // Stores the paper state, date and review status.
             'paper' => ['status' => $paperStatus, 'submitted' => $paperUpload['date'] ?? '', 'review' => $paperWf],
             // Stores the adviser endorsement state, date and review.

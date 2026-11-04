@@ -256,7 +256,7 @@ foreach ($stages as $idx => $stage) {
         // Marks whether this is the stage the student is on now.
         'isCurrent' => $idx === $currentIdx,
         // Marks stages that are finished or already passed.
-        'isDone'    => in_array($row['stageStatus'] ?? 'not_started', ['completed', 'approved'], true) || $idx < $currentIdx,
+        'isDone'    => workflowStageState($row, $idx, $currentIdx) === 'done',
         // Marks the stage locked so the view can hide upload buttons.
         'isLocked'  => $lockStates[$stage['key']]['locked'] ?? false,
         // Keeps the coordinator comments that belong to this stage.
@@ -400,9 +400,9 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
             // True when the stage has a real submitted status.
             $stageIsSubmitted = !in_array($stageStatus, ['not_started', 'pending', 'draft', ''], true);
             // Badge label: Locked, the real status label, or Not Started.
-            $stageStatusLabel = $block['isLocked'] ? 'Locked' : ($stageIsSubmitted ? (STATUSES[$stageStatus]['label'] ?? 'Submitted') : 'Not Started');
+            $stageStatusLabel = $block['isLocked'] ? 'Locked' : (stageRequiresRepresentation($progress[$block['index']] ?? []) ? STATUSES['requires_revision']['label'] : ($stageIsSubmitted ? (STATUSES[$stageStatus]['label'] ?? 'Submitted') : 'Not Started'));
             // Badge CSS class that matches the label above.
-            $stageStatusClass = $block['isLocked'] ? 'status-locked' : ($stageIsSubmitted ? (STATUSES[$stageStatus]['class'] ?? 'status-submitted') : 'status-pending');
+            $stageStatusClass = $block['isLocked'] ? 'status-locked' : (stageRequiresRepresentation($progress[$block['index']] ?? []) ? STATUSES['requires_revision']['class'] : ($stageIsSubmitted ? (STATUSES[$stageStatus]['class'] ?? 'status-submitted') : 'status-pending'));
             // Keeps current or finished stages expanded by default.
             // A stage with a new coordinator comment also opens so it is seen.
             $openByDefault = $block['isCurrent'] || $block['isDone'] || !empty($block['notifications']);

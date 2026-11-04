@@ -303,6 +303,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         if ($resultWasPosted && in_array($effectiveResult, ['approved', 'approved_with_revision'], true)) {
             // Moves the application to Presentation Complete.
             $effectiveStatus = 'completed';
+        // A required re-presentation keeps the student on this stage.
+        } elseif ($resultWasPosted && in_array($effectiveResult, ['requires_revision', 're_presentation_required'], true)) {
+            $effectiveStatus = 'requires_revision';
         // Otherwise, checking readiness moves the stage to Ready for Presentation.
         } elseif ($readyPosted && $preReadyDone && in_array($effectiveStatus, ['submitted', 'under_review'], true)) {
             // Sets the ready status from the readiness milestone.
@@ -311,7 +314,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         }
 
         // Advanced statuses always keep readiness on record.
-        if (in_array($effectiveStatus, ['ready_for_presentation', 'scheduled', 'completed'], true)) {
+        if (in_array($effectiveStatus, ['ready_for_presentation', 'scheduled', 'requires_revision', 'completed'], true)) {
             // Marks the readiness milestone as done when saving an advanced status.
             $readyPosted = true;
         // Closes the advanced status check.
@@ -521,6 +524,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
             // Marks the linked schedule completed when the application is complete.
             if ($resultWasPosted && $updatedFields['result'] !== '') {
                 // Marks the presentation itself complete for every recorded outcome.
+                setScheduleResultForApplication((int) $app['id'], $updatedFields['result']);
                 setScheduleStatusForApplication((int) $app['id'], 'completed');
             // Closes the completed-application sync.
             }
@@ -604,6 +608,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
                 } else {
                     // Marks the stage completed and stores the approved result.
                     updateApplicationRecord($actionAppId, ['status' => 'completed', 'result' => $actionResult]);
+                    setScheduleResultForApplication($actionAppId, $actionResult);
                     // Completes the linked presentation schedule as well.
                     setScheduleStatusForApplication($actionAppId, 'completed');
                     // Confirms the approval was saved.

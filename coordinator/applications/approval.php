@@ -48,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         // Closes the array of fields to update.
         ]);
         if (function_exists('setScheduleStatusForApplication')) {
+            setScheduleResultForApplication((int) $app['id'], $result);
             setScheduleStatusForApplication((int) $app['id'], 'completed');
         }
         // Tells the coordinator the result was recorded.

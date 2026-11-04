@@ -161,8 +161,9 @@ define('STATUSES', [
     'approved'                 => ['label' => 'Approved',                 'class' => 'status-approved'],
     // Status confirmed uses the confirmed style.
     'confirmed'                => ['label' => 'Confirmed',                'class' => 'status-confirmed'],
-    // Status requires_revision uses the revision style.
-    'requires_revision'        => ['label' => 'Requires Revision',        'class' => 'status-revision'],
+    // Both stored spellings use the same presentation outcome label.
+    'requires_revision'        => ['label' => 'Re-Presentation Required', 'class' => 'status-revision'],
+    're_presentation_required' => ['label' => 'Re-Presentation Required', 'class' => 'status-revision'],
     // Status completed shows Presentation Complete.
     'completed'                => ['label' => 'Presentation Complete',    'class' => 'status-completed'],
     // Status verified uses the approved style.
@@ -174,9 +175,8 @@ define('STATUSES', [
 
 /**
  * The application statuses the coordinator may set from the Applications -> Edit
- * page. These are the states the coordinator works with; the older prototype
- * states (for_payment, payment_recorded, approved, requires_revision) stay in
- * the STATUSES map so that records written before the change still render.
+ * page. Legacy payment and approval states remain in STATUSES so records written
+ * before the workflow change still render.
  */
 // Lists the statuses a coordinator may choose on the edit page.
 define('COORDINATOR_STATUSES', [
@@ -188,6 +188,8 @@ define('COORDINATOR_STATUSES', [
     'ready_for_presentation',
     // Allows the scheduled status.
     'scheduled',
+    // Allows a stage whose result requires another presentation.
+    'requires_revision',
     // Allows the completed status.
     'completed',
 // Ends the list of coordinator statuses.

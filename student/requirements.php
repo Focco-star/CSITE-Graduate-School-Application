@@ -219,7 +219,7 @@ require_once __DIR__ . '/../includes/layout/header.php';
     // Uses saved progress, or blank progress for the stage.
     $p = $progress[$idx] ?? blankStageProgress($stage);
     // True when the stage is completed or approved.
-    $isDone = in_array($p['stageStatus'], ['completed', 'approved'], true);
+    $isDone = !stageRequiresRepresentation($p) && in_array($p['stageStatus'], ['completed', 'approved'], true);
     // Explains that the dashboard shows the same milestones.
     // Shared with the dashboard so both show the same milestones, worded for
     // Continues: the wording follows the student's own track and stage.

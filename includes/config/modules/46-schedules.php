@@ -24,7 +24,7 @@ function findSchedule(string $id): ?array {
                         u.email AS studentEmail,
                         TRIM(CONCAT(s.last_name, ", ", s.first_name, IF(s.middle_initial IS NULL OR s.middle_initial = "", "", CONCAT(" ", s.middle_initial)))) AS studentName,
                         a.presentation_stage AS stage, sc.presentation_date AS date,
-                        sc.start_time AS time, sc.venue, sc.status, ap.name AS adviser,
+                        sc.start_time AS time, sc.venue, sc.status, sc.presentation_result AS presentationResult, ap.name AS adviser,
                         TRIM(CONCAT_WS(" ", sc.documentor_first_name, sc.documentor_middle_name, sc.documentor_last_name)) AS documentor,
                         GROUP_CONCAT(CONCAT(pm.last_name, ", ", pm.first_name, IF(pm.middle_name IS NULL OR pm.middle_name = "", "", CONCAT(" ", pm.middle_name)) ) ORDER BY spa.assignment_id SEPARATOR ", ") AS panel
                  FROM schedules sc
@@ -73,7 +73,7 @@ function databaseSchedules(): array {
                     u.email AS studentEmail,
                     TRIM(CONCAT(s.last_name, ", ", s.first_name, IF(s.middle_initial IS NULL OR s.middle_initial = "", "", CONCAT(" ", s.middle_initial)))) AS studentName,
                     a.presentation_stage AS stage, sc.presentation_date AS date,
-                    sc.start_time AS time, sc.venue, sc.status, ap.name AS adviser,
+                    sc.start_time AS time, sc.venue, sc.status, sc.presentation_result AS presentationResult, ap.name AS adviser,
                     TRIM(CONCAT_WS(" ", sc.documentor_first_name, sc.documentor_middle_name, sc.documentor_last_name)) AS documentor,
                     GROUP_CONCAT(CONCAT(pm.last_name, ", ", pm.first_name, IF(pm.middle_name IS NULL OR pm.middle_name = "", "", CONCAT(" ", pm.middle_name)) ) ORDER BY spa.assignment_id SEPARATOR ", ") AS panel
              FROM schedules sc
@@ -191,7 +191,7 @@ function schedulesForEmail(string $email): array {
         // Starts the guarded block for the schedule query.
         try {
             // Prepares the query for this student's schedules, ordered by date and time.
-            $stmt = DB::getConnection()->prepare('SELECT sc.schedule_id AS id, sc.application_id AS applicationId, u.email AS studentEmail, a.presentation_stage AS stage, sc.presentation_date AS date, sc.start_time AS time, sc.venue, sc.status FROM schedules sc INNER JOIN applications a ON a.application_id = sc.application_id INNER JOIN users u ON u.user_id = a.user_id WHERE u.email = :email ORDER BY sc.presentation_date, sc.start_time');
+            $stmt = DB::getConnection()->prepare('SELECT sc.schedule_id AS id, sc.application_id AS applicationId, u.email AS studentEmail, a.presentation_stage AS stage, sc.presentation_date AS date, sc.start_time AS time, sc.venue, sc.status, sc.presentation_result AS presentationResult FROM schedules sc INNER JOIN applications a ON a.application_id = sc.application_id INNER JOIN users u ON u.user_id = a.user_id WHERE u.email = :email ORDER BY sc.schedule_id ASC');
             // Runs the query with the student's email.
             $stmt->execute(['email' => $email]);
             // Returns all schedule rows for the student.
@@ -736,9 +736,9 @@ function setScheduleStatusForApplication(int $applicationId, string $status): vo
     if (class_exists('DB')) {
         // Starts the guarded database update.
         try {
-            // Updates the schedule row linked to the application.
+            // Updates only the latest presentation attempt for this application.
             DB::getConnection()
-                ->prepare('UPDATE schedules SET status = :status WHERE application_id = :application_id')
+                ->prepare('UPDATE schedules SET status = :status WHERE application_id = :application_id ORDER BY schedule_id DESC LIMIT 1')
                 ->execute(['status' => $status, 'application_id' => $applicationId]);
         // Catches database errors so the caller can continue.
         } catch (Throwable $e) {
@@ -751,7 +751,8 @@ function setScheduleStatusForApplication(int $applicationId, string $status): vo
 
     // Also updates the fallback schedule store.
     $schedules = storeGet('schedules');
-    // Loops over the stored schedules.
+    // Finds the latest stored attempt for the application.
+    $latestIndex = null;
     foreach ($schedules as $index => $schedule) {
         // Skips schedules that belong to another application.
         if ((int) ($schedule['applicationId'] ?? 0) !== $applicationId) {
@@ -759,15 +760,74 @@ function setScheduleStatusForApplication(int $applicationId, string $status): vo
             continue;
         // Closes the application check.
         }
-        // Stores the new schedule status.
-        $schedules[$index]['status'] = $status;
-        // Writes the updated list back to the store.
-        storeSet('schedules', $schedules);
-        // Stops after the matching schedule was updated.
-        break;
+        $latestIndex = $index;
     // Closes the loop over schedules.
     }
+    if ($latestIndex !== null) {
+        $schedules[$latestIndex]['status'] = $status;
+        storeSet('schedules', $schedules);
+    }
 // Ends setScheduleStatusForApplication.
+}
+
+/**
+ * Saves the recorded outcome against only the latest presentation attempt.
+ */
+function setScheduleResultForApplication(int $applicationId, string $result): void {
+    if ($applicationId <= 0) {
+        return;
+    }
+
+    if (class_exists('DB')) {
+        try {
+            DB::getConnection()
+                ->prepare('UPDATE schedules SET presentation_result = :result WHERE application_id = :application_id ORDER BY schedule_id DESC LIMIT 1')
+                ->execute([
+                    'result' => $result !== '' ? $result : null,
+                    'application_id' => $applicationId,
+                ]);
+        } catch (Throwable $e) {
+            error_log('[schedule result sync] ' . $e->getMessage());
+        }
+    }
+
+    $schedules = storeGet('schedules');
+    $latestIndex = null;
+    foreach ($schedules as $index => $schedule) {
+        if ((int) ($schedule['applicationId'] ?? 0) === $applicationId) {
+            $latestIndex = $index;
+        }
+    }
+    if ($latestIndex !== null) {
+        $schedules[$latestIndex]['presentationResult'] = $result;
+        storeSet('schedules', $schedules);
+    }
+}
+
+/**
+ * Starts a new attempt after a re-presentation result without changing history.
+ */
+function clearApplicationResultForReschedule(int $applicationId): void {
+    if ($applicationId <= 0) {
+        return;
+    }
+
+    if (class_exists('DB')) {
+        DB::getConnection()->prepare(
+            "UPDATE applications SET result = NULL, status = 'ready_for_presentation'
+             WHERE application_id = :application_id
+               AND (result IN ('requires_revision', 're_presentation_required', 'Requires Major Revisions')
+                    OR status IN ('requires_revision', 're_presentation_required'))"
+        )->execute(['application_id' => $applicationId]);
+    }
+
+    $app = findApplication($applicationId);
+    if ($app && (
+        in_array((string) ($app['result'] ?? ''), ['requires_revision', 're_presentation_required', 'Requires Major Revisions'], true)
+        || in_array((string) ($app['status'] ?? ''), ['requires_revision', 're_presentation_required'], true)
+    )) {
+        updateApplicationRecord($applicationId, ['result' => '', 'status' => 'ready_for_presentation']);
+    }
 }
 
 /**
@@ -915,26 +975,15 @@ function addScheduleRecord(array $s): array {
         $pdo->beginTransaction();
         // Starts the try block that can roll the transaction back.
         try {
-            // Prepares the INSERT statement for the schedules table.
+            // Prepares a distinct schedule row for this presentation attempt.
             $stmt = $pdo->prepare(
-                // Starts the SQL text that inserts or updates the schedule row.
+                // Starts the SQL text that inserts a new schedule row.
                 'INSERT INTO schedules
                     (application_id, managed_by_user_id, presentation_date, start_time, venue, adviser_id,
-                     documentor_first_name, documentor_middle_name, documentor_last_name, status)
+                     documentor_first_name, documentor_middle_name, documentor_last_name, status, presentation_result)
                  VALUES
                     (:application_id, :managed_by_user_id, :presentation_date, :start_time, :venue, :adviser_id,
-                     :documentor_first_name, :documentor_middle_name, :documentor_last_name, :status)
-                 ON DUPLICATE KEY UPDATE
-                    schedule_id = LAST_INSERT_ID(schedule_id),
-                    managed_by_user_id = VALUES(managed_by_user_id),
-                    presentation_date = VALUES(presentation_date),
-                    start_time = VALUES(start_time),
-                    venue = VALUES(venue),
-                    adviser_id = VALUES(adviser_id),
-                    documentor_first_name = VALUES(documentor_first_name),
-                    documentor_middle_name = VALUES(documentor_middle_name),
-                    documentor_last_name = VALUES(documentor_last_name),
-                    status = VALUES(status)'
+                     :documentor_first_name, :documentor_middle_name, :documentor_last_name, :status, NULL)'
             // Closes the insert statement text.
             );
             // Binds every schedule column value for the insert.
@@ -961,24 +1010,15 @@ function addScheduleRecord(array $s): array {
                 'status' => ($s['status'] ?? 'pending') === 'confirmed' ? 'confirmed' : 'pending',
             // Closes the execute parameter array.
             ]);
-            // Reads the schedule id of the inserted or updated row.
+            // Reads the schedule id of the inserted attempt.
             $scheduleId = (int) $pdo->lastInsertId();
-            // Checks whether MySQL did not return a schedule id.
-            if ($scheduleId <= 0) {
-                // Prepares a lookup of the schedule id for this application.
-                $scheduleStmt = $pdo->prepare('SELECT schedule_id FROM schedules WHERE application_id = :application_id LIMIT 1');
-                // Runs the schedule id lookup.
-                $scheduleStmt->execute(['application_id' => (int) $s['applicationId']]);
-                // Reads the found schedule id, or zero when missing.
-                $scheduleId = (int) ($scheduleStmt->fetchColumn() ?: 0);
-            // Closes the missing schedule id check.
-            }
             // Checks again that a usable schedule id exists.
             if ($scheduleId <= 0) {
                 // Throws an error because the saved row cannot be found.
                 throw new RuntimeException('The schedule could not be loaded after saving.');
             // Closes the schedule id check.
             }
+            clearApplicationResultForReschedule((int) $s['applicationId']);
             // Removes the old panel assignments before saving the new ones.
             $pdo->prepare('DELETE FROM schedule_panel_assignments WHERE schedule_id = :schedule_id')
                 // Runs the delete for this schedule id.
@@ -1073,6 +1113,7 @@ function addScheduleRecord(array $s): array {
         'notifications' => [],
         // Defaults the status to pending.
         'status' => 'pending',
+        'presentationResult' => '',
         // Stamps the record with the current date and time.
         'createdAt' => date('c'),
     // Merges the submitted schedule fields over the defaults.
