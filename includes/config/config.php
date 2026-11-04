@@ -28,4 +28,5 @@ require_once __DIR__ . '/modules/61-drafts.php';
 require_once __DIR__ . '/modules/62-requirements.php';
 require_once __DIR__ . '/modules/63-account-validation.php';
 require_once __DIR__ . '/modules/64-document-sharing.php';
+require_once __DIR__ . '/modules/65-student-notifications.php';
 require_once __DIR__ . '/modules/99-bootstrap.php';

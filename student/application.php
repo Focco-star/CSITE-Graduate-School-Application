@@ -567,6 +567,8 @@ if ($existingApplication) {
     $formValues['title']   = (string) ($existingApplication['title'] ?? $formValues['title']);
     // Takes the adviser name from the existing application.
     $formValues['adviser'] = (string) ($existingApplication['adviser'] ?? $formValues['adviser']);
+    // Takes the Brief Description / Abstract from the existing application.
+    $formValues['abstract'] = (string) ($existingApplication['abstract'] ?? $formValues['abstract']);
     // Also restores the receipt details the student entered before.
     // The receipt details the student entered are kept as well.
     // Reads the receipt number, amount and date from the application.
@@ -950,6 +952,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
             // Gets the readable stage name that will be stored.
             $stageLabel = $stages[$stageKey]['label'];
 
+            // Makes sure the application abstract column exists before saving.
+            ensureApplicationAbstractSchema();
             // Starts a transaction so all writes succeed or none do.
             $pdo->beginTransaction();
 
@@ -967,14 +971,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                 if ($reusedApplicationId > 0) {
                     // Prepares the update of the reused application.
                     $pdo->prepare(
-                        // Sets the real title and marks the row submitted.
+                        // Sets the real title, abstract and submitted status.
                         'UPDATE applications
-                         SET paper_title = :paper_title, status = :status
+                         SET paper_title = :paper_title, abstract = :abstract, status = :status
                          WHERE application_id = :id AND user_id = :user_id'
                     // Runs the update with the new values.
                     )->execute([
                         // Passes the real paper title.
                         'paper_title' => $title,
+                        // Passes the Brief Description / Abstract.
+                        'abstract'    => $abstract,
                         // Marks the reused application as submitted.
                         'status'      => 'submitted',
                         // Targets the reused application id.
@@ -993,15 +999,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                     // the coordinator.
                     // Prepares the update of the existing submission.
                     $pdo->prepare(
-                        // Updates the title only when it is not empty, plus the stage label.
+                        // Updates the title, abstract, and stage label.
                         'UPDATE applications
                          SET paper_title = COALESCE(NULLIF(:paper_title, ""), paper_title),
+                             abstract = :abstract,
                              presentation_stage = :presentation_stage
                          WHERE application_id = :id AND user_id = :user_id'
                     // Runs the update with the new values.
                     )->execute([
                         // The new title, ignored by COALESCE when it is blank.
                         'paper_title'        => $title,
+                        // The Brief Description / Abstract entered by the student.
+                        'abstract'           => $abstract,
                         // Confirms the presentation stage label.
                         'presentation_stage' => $stageLabel,
                         // Targets the existing application id.
@@ -1014,9 +1023,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                 } else {
                     // Prepares the insert statement.
                     $insertApplication = $pdo->prepare(
-                        // Inserts the user, stage, title and submitted status.
-                        'INSERT INTO applications (user_id, presentation_stage, paper_title, status)
-                         VALUES (:user_id, :presentation_stage, :paper_title, :status)'
+                        // Inserts the user, stage, title, abstract and submitted status.
+                        'INSERT INTO applications (user_id, presentation_stage, paper_title, abstract, status)
+                         VALUES (:user_id, :presentation_stage, :paper_title, :abstract, :status)'
                     // Ends the prepared insert statement.
                     );
                     // Runs the insert with the new values.
@@ -1027,6 +1036,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                         'presentation_stage' => $stageLabel,
                         // The title the student typed.
                         'paper_title' => $title,
+                        // The Brief Description / Abstract entered by the student.
+                        'abstract' => $abstract,
                         // Marks the new application as submitted.
                         'status' => 'submitted',
                     // Closes the insert parameters.

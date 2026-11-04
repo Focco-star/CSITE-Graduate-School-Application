@@ -606,6 +606,8 @@ function applicationById(int $id): ?array {
         return null;
     // Closes the guard check.
     }
+    // Makes sure the abstract column exists before it is read.
+    ensureApplicationAbstractSchema();
     // Starts the block that may throw database errors.
     try {
         // Starts the application select statement.
@@ -625,6 +627,7 @@ function applicationById(int $id): ?array {
                 s.adviser_name AS adviser,
                 a.presentation_stage AS stage,
                 a.paper_title AS title,
+                a.abstract AS abstract,
                 a.status,
                 a.coordinator_comment AS coordinatorComment,
                 a.grad_school_endorsed AS gradSchoolEndorsed,
@@ -748,13 +751,15 @@ function applicationsForStudent(string $email): array {
         return [];
     // Closes the guard check.
     }
+    // Makes sure the abstract column exists before it is read.
+    ensureApplicationAbstractSchema();
     // Starts the block that may throw database errors.
     try {
         // Starts the application select statement.
         $stmt = DB::getConnection()->prepare(
             // Selects the application fields for the student email.
             'SELECT a.application_id AS id, a.user_id, a.presentation_stage AS stage, a.paper_title AS title,
-                    a.status, a.submitted_at AS date, a.result,
+                    a.abstract AS abstract, a.status, a.submitted_at AS date, a.result,
                     a.coordinator_comment AS coordinatorComment,
                     a.grad_school_endorsed AS gradSchoolEndorsed,
                     a.payment_recorded AS paymentRecorded,
