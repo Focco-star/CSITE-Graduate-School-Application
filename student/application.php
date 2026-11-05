@@ -534,6 +534,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Finds an application this student already submitted for the current stage.
 $existingApplication = applicationForStage($mockStudent['email'], $currentStageKey);
+$assignedPanel = !empty($existingApplication['id'])
+    ? databaseApplicationPanelMembers((int) $existingApplication['id'])
+    : [];
 
 // Builds the values that will fill the form fields.
 $formValues = [
@@ -956,6 +959,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
             ensureApplicationAbstractSchema();
             // Starts a transaction so all writes succeed or none do.
             $pdo->beginTransaction();
+            $savedApplicationId = 0;
+            $createdNewApplication = false;
 
             // Only touches the application row when the student typed details.
             if ($hasDetails) {
@@ -969,6 +974,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                 $reusedApplicationId = csiteFillPlaceholderApplication($pdo, $userId, $stageLabel, $title);
                 // When a placeholder was reused, update its title and status.
                 if ($reusedApplicationId > 0) {
+                    $savedApplicationId = $reusedApplicationId;
                     // Prepares the update of the reused application.
                     $pdo->prepare(
                         // Sets the real title, abstract and submitted status.
@@ -991,6 +997,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                     ]);
                 // Otherwise update the submission that already exists.
                 } elseif ($existing) {
+                    $savedApplicationId = (int) $existing['id'];
                     // Notes that only the details are refreshed here.
                     // The application for this stage already exists: refresh the
                     // The status stays under the coordinator's control.
@@ -1021,6 +1028,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                     ]);
                 // Otherwise a brand new application row is inserted.
                 } else {
+                    $createdNewApplication = true;
                     // Prepares the insert statement.
                     $insertApplication = $pdo->prepare(
                         // Inserts the user, stage, title, abstract and submitted status.
@@ -1042,13 +1050,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                         'status' => 'submitted',
                     // Closes the insert parameters.
                     ]);
+                    $savedApplicationId = (int) $pdo->lastInsertId();
                 // Closes the placeholder, existing or new application branch.
+                }
+
+                if ($savedApplicationId > 0) {
+                    $assignedPanelCountStmt = $pdo->prepare(
+                        'SELECT COUNT(*) FROM application_panel_assignments WHERE application_id = :application_id'
+                    );
+                    $assignedPanelCountStmt->execute(['application_id' => $savedApplicationId]);
+                    $hasAssignedPanel = (int) $assignedPanelCountStmt->fetchColumn() > 0;
+                } else {
+                    $hasAssignedPanel = true;
+                }
+
+                if (!$hasAssignedPanel && $savedApplicationId > 0) {
+                    $previousApplicationStmt = $pdo->prepare(
+                        'SELECT application_id
+                         FROM applications
+                         WHERE user_id = :user_id
+                           AND archived_at IS NULL
+                           AND application_id <> :application_id
+                         ORDER BY submitted_at DESC, application_id DESC
+                         LIMIT 1'
+                    );
+                    $previousApplicationStmt->execute([
+                        'user_id' => $userId,
+                        'application_id' => $savedApplicationId,
+                    ]);
+                    $previousApplicationId = (int) ($previousApplicationStmt->fetchColumn() ?: 0);
+                    if ($previousApplicationId > 0) {
+                        $copyPanelStmt = $pdo->prepare(
+                            'INSERT IGNORE INTO application_panel_assignments
+                                (application_id, panel_member_id, panel_role)
+                             SELECT :application_id, panel_member_id, panel_role
+                             FROM application_panel_assignments
+                             WHERE application_id = :previous_application_id'
+                        );
+                        $copyPanelStmt->execute([
+                            'application_id' => $savedApplicationId,
+                            'previous_application_id' => $previousApplicationId,
+                        ]);
+                    }
                 }
 
                 // Prepares saving the adviser name on the student row.
                 $pdo->prepare('UPDATE students SET adviser_name = :adviser_name WHERE user_id = :user_id')
                     // Writes the adviser name and user id.
                     ->execute(['adviser_name' => $adviser, 'user_id' => $userId]);
+                $adviserIdStmt = $pdo->prepare('SELECT adviser_id FROM advisor_pool WHERE TRIM(name) = :name LIMIT 1');
+                $adviserIdStmt->execute(['name' => trim($adviser)]);
+                $savedAdviserId = (int) ($adviserIdStmt->fetchColumn() ?: 0);
+                if ($savedApplicationId > 0 && $savedAdviserId > 0) {
+                    $pdo->prepare('UPDATE schedules SET adviser_id = :adviser_id WHERE application_id = :application_id')
+                        ->execute(['adviser_id' => $savedAdviserId, 'application_id' => $savedApplicationId]);
+                }
 
                 // Prepares a query that reads the student identity fields.
                 $identityStmt = $pdo->prepare(
@@ -1664,6 +1720,25 @@ require_once __DIR__ . '/../includes/layout/header.php';
 <?php /*                 Closes the enrollment date field. */ ?>
                 </div>
 <?php /*             Closes the adviser and date row. */ ?>
+            </div>
+            <div class="form-field">
+                <label>Academic Assessment Panel</label>
+                <div class="form-row">
+                    <?php for ($panelSlot = 0; $panelSlot < 3; $panelSlot++): ?>
+                    <div class="form-field">
+                        <label>Panel Member <?= $panelSlot + 1 ?></label>
+                        <select class="locked-select" aria-label="Assigned panel member <?= $panelSlot + 1 ?>" disabled aria-disabled="true">
+                            <option value="" selected disabled><?= htmlspecialchars($assignedPanel[$panelSlot]['name'] ?? 'Not assigned', ENT_QUOTES, 'UTF-8') ?></option>
+                            <?php foreach ($assignedPanel as $index => $member): ?>
+                                <?php if ($index !== $panelSlot): ?>
+                                    <option disabled><?= htmlspecialchars('Panel Member ' . ($index + 1) . ': ' . ($member['name'] ?? ''), ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endfor; ?>
+                </div>
+                <p class="field-hint">Panel assignments are set by the coordinator after assessment review.</p>
             </div>
 <?php /*             Shows the abstract field only on the final stage. */ ?>
             <?php if ($showAbstract): ?>

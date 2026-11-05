@@ -119,13 +119,34 @@ foreach ($documenterOpts as $documenter) {
 }
 // Starts the preselected student email as empty text.
 $preselected = '';
+$preApp = null;
 // Only runs the preselect logic when an app id is in the URL.
 if (!empty($_GET['app'])) {
-    // Finds the application whose id came from the query string.
-    $preApp = findApplication((int) $_GET['app']);
+    // Loads the database application so its adviser and panel assignments can prefill the form.
+    $preApp = applicationById((int) $_GET['app']) ?: findApplication((int) $_GET['app']);
     // Uses that application's student email as the preselected student.
     $preselected = $preApp['studentEmail'] ?? '';
 // Closes the if that handled the app query parameter.
+}
+$prefillAdviser = (string) ($preApp['adviser'] ?? '');
+$prefillPanel = !empty($preApp['id']) ? databaseApplicationPanelMembers((int) $preApp['id']) : [];
+$prefillPanelNames = array_map(
+    static fn (array $member): string => trim((string) ($member['name'] ?? '') . (!empty($member['qualification']) ? ' (' . $member['qualification'] . ')' : '')),
+    $prefillPanel
+);
+$prefillDocumentor = '';
+if (!empty($preApp['id'])) {
+    foreach (array_reverse(databaseSchedules()) as $existingSchedule) {
+        if ((int) ($existingSchedule['applicationId'] ?? 0) !== (int) $preApp['id']) {
+            continue;
+        }
+        $documentorWords = preg_split('/\s+/', trim((string) ($existingSchedule['documentor'] ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if ($documentorWords) {
+            $documentorLast = array_pop($documentorWords);
+            $prefillDocumentor = trim($documentorLast . ', ' . implode(' ', $documentorWords));
+        }
+        break;
+    }
 }
 
 // Prepares an empty map from student email to stage information.
@@ -635,7 +656,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                         Loops over adviser rows and flags those marked unavailable. */ ?>
                         <?php foreach ($adviserOpts as $adviser): $isUnavailable = ($adviser['availability'] ?? '') !== 'available'; ?>
 <?php /*                         Option is disabled when the adviser is not available. */ ?>
-                        <option <?= $isUnavailable ? 'disabled' : '' ?>><?= htmlspecialchars($adviser['name']) ?><?= $isUnavailable ? ' [Unavailable]' : '' ?></option>
+                        <option value="<?= htmlspecialchars($adviser['name']) ?>" <?= $isUnavailable ? 'disabled' : '' ?> <?= strcasecmp($prefillAdviser, (string) $adviser['name']) === 0 ? 'selected' : '' ?>><?= htmlspecialchars($adviser['name']) ?><?= $isUnavailable ? ' [Unavailable]' : '' ?></option>
 <?php /*                         Closes the loop over the adviser options. */ ?>
                         <?php endforeach; ?>
 <?php /*                         Shows a disabled note when the adviser pool has no rows. */ ?>
@@ -657,7 +678,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                         Placeholder option for panel member 1. */ ?>
                         <option value="">Select panel member</option>
 <?php /*                         Loops over all panel members to fill panel drop-down 1. */ ?>
-                        <?php foreach ($panelOpts as $p): ?><option><?= htmlspecialchars($p) ?></option><?php endforeach; ?>
+                        <?php foreach ($panelOpts as $p): ?><option <?= ($prefillPanelNames[0] ?? '') === $p ? 'selected' : '' ?>><?= htmlspecialchars($p) ?></option><?php endforeach; ?>
 <?php /*                     Closes the panel 1 drop-down. */ ?>
                     </select>
 <?php /*                 Closes the panel 1 field wrapper. */ ?>
@@ -671,7 +692,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                         Placeholder option for panel member 2. */ ?>
                         <option value="">Select panel member</option>
 <?php /*                         Loops over all panel members to fill panel drop-down 2. */ ?>
-                        <?php foreach ($panelOpts as $p): ?><option><?= htmlspecialchars($p) ?></option><?php endforeach; ?>
+                        <?php foreach ($panelOpts as $p): ?><option <?= ($prefillPanelNames[1] ?? '') === $p ? 'selected' : '' ?>><?= htmlspecialchars($p) ?></option><?php endforeach; ?>
 <?php /*                     Closes the panel 2 drop-down. */ ?>
                     </select>
 <?php /*                 Closes the panel 2 field wrapper. */ ?>
@@ -689,7 +710,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                         Placeholder option for panel member 3. */ ?>
                         <option value="">Select panel member</option>
 <?php /*                         Loops over all panel members to fill panel drop-down 3. */ ?>
-                        <?php foreach ($panelOpts as $p): ?><option><?= htmlspecialchars($p) ?></option><?php endforeach; ?>
+                        <?php foreach ($panelOpts as $p): ?><option <?= ($prefillPanelNames[2] ?? '') === $p ? 'selected' : '' ?>><?= htmlspecialchars($p) ?></option><?php endforeach; ?>
 <?php /*                     Closes the panel 3 drop-down. */ ?>
                     </select>
 <?php /*                 Closes the panel 3 field wrapper. */ ?>
@@ -705,7 +726,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                         Loops over the available documenter options. */ ?>
                         <?php foreach ($documenterOptions as $documenter): ?>
 <?php /*                         Option value is the name; the label adds the qualification in brackets. */ ?>
-                        <option value="<?= htmlspecialchars($documenter['name']) ?>"><?= htmlspecialchars($documenter['name'] . ($documenter['qualification'] !== '' ? ' (' . $documenter['qualification'] . ')' : '')) ?></option>
+                        <option value="<?= htmlspecialchars($documenter['name']) ?>" <?= $prefillDocumentor === $documenter['name'] ? 'selected' : '' ?>><?= htmlspecialchars($documenter['name'] . ($documenter['qualification'] !== '' ? ' (' . $documenter['qualification'] . ')' : '')) ?></option>
 <?php /*                         Closes the loop over the documenter options. */ ?>
                         <?php endforeach; ?>
 <?php /*                         Shows a disabled note when no documenter is available. */ ?>

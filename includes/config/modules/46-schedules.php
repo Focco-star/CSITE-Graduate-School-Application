@@ -156,6 +156,43 @@ function databaseApplicationPanelMembers(int $applicationId): array {
             ['application_id' => $applicationId]
         )->fetchAll();
 
+        if (!$rows) {
+            $pdo = DB::getConnection();
+            $fallback = $pdo->prepare(
+                'SELECT pm.*, spa.panel_role
+                 FROM schedule_panel_assignments spa
+                 INNER JOIN schedules sc ON sc.schedule_id = spa.schedule_id
+                 INNER JOIN applications previous_app ON previous_app.application_id = sc.application_id
+                 INNER JOIN panel_members pm ON pm.panel_member_id = spa.panel_member_id
+                 WHERE previous_app.user_id = (
+                     SELECT user_id FROM applications WHERE application_id = :current_application_id
+                 )
+                   AND previous_app.application_id <> :current_application_id_for_previous
+                 ORDER BY sc.schedule_id DESC, spa.assignment_id
+                 LIMIT 3'
+            );
+            $fallback->execute([
+                'current_application_id' => $applicationId,
+                'current_application_id_for_previous' => $applicationId,
+            ]);
+            $rows = $fallback->fetchAll();
+
+            if ($rows) {
+                $insert = $pdo->prepare(
+                    'INSERT IGNORE INTO application_panel_assignments
+                        (application_id, panel_member_id, panel_role)
+                     VALUES (:application_id, :panel_member_id, :panel_role)'
+                );
+                foreach ($rows as $row) {
+                    $insert->execute([
+                        'application_id' => $applicationId,
+                        'panel_member_id' => (int) $row['panel_member_id'],
+                        'panel_role' => (string) ($row['panel_role'] ?? 'member'),
+                    ]);
+                }
+            }
+        }
+
         return array_map(static function (array $row): array {
             $member = normalizePanelMemberRow($row);
             $member['panel_role'] = (string) ($row['panel_role'] ?? 'member');
@@ -167,35 +204,86 @@ function databaseApplicationPanelMembers(int $applicationId): array {
     }
 }
 
+function replaceApplicationPanelMembers(PDO $pdo, int $applicationId, array $panelMemberIds): void {
+    if ($applicationId <= 0) {
+        return;
+    }
+
+    $ids = array_values(array_unique(array_filter(array_map('intval', $panelMemberIds), static fn (int $id): bool => $id > 0)));
+    $delete = $pdo->prepare('DELETE FROM application_panel_assignments WHERE application_id = :application_id');
+    $delete->execute(['application_id' => $applicationId]);
+
+    $insert = $pdo->prepare(
+        'INSERT INTO application_panel_assignments (application_id, panel_member_id, panel_role)
+         SELECT :application_id, panel_member_id, :panel_role
+         FROM panel_members
+         WHERE panel_member_id = :panel_member_id'
+    );
+    foreach ($ids as $id) {
+        $insert->execute([
+            'application_id' => $applicationId,
+            'panel_member_id' => $id,
+            'panel_role' => 'member',
+        ]);
+    }
+}
+
+function applicationPanelMemberIdsFromText(PDO $pdo, string $panelText): array {
+    $ids = [];
+    $panelRows = $pdo->query('SELECT panel_member_id, first_name, middle_name, last_name FROM panel_members')->fetchAll();
+    foreach ($panelRows as $panelRow) {
+        $panelName = trim($panelRow['last_name'] . ', ' . $panelRow['first_name'] . (!empty($panelRow['middle_name']) ? ' ' . $panelRow['middle_name'] : ''));
+        if ($panelName !== '' && str_contains($panelText, $panelName)) {
+            $ids[] = (int) $panelRow['panel_member_id'];
+        }
+    }
+    return $ids;
+}
+
+function replaceSchedulePanelMembersForApplication(PDO $pdo, int $applicationId, array $panelMemberIds): void {
+    if ($applicationId <= 0) {
+        return;
+    }
+
+    $ids = array_values(array_unique(array_filter(array_map('intval', $panelMemberIds), static fn (int $id): bool => $id > 0)));
+    $scheduleStmt = $pdo->prepare('SELECT schedule_id FROM schedules WHERE application_id = :application_id');
+    $scheduleStmt->execute(['application_id' => $applicationId]);
+    $scheduleIds = $scheduleStmt->fetchAll(PDO::FETCH_COLUMN);
+    $delete = $pdo->prepare('DELETE FROM schedule_panel_assignments WHERE schedule_id = :schedule_id');
+    $insert = $pdo->prepare('INSERT INTO schedule_panel_assignments (schedule_id, panel_member_id, panel_role) VALUES (:schedule_id, :panel_member_id, :panel_role)');
+    foreach ($scheduleIds as $scheduleId) {
+        $delete->execute(['schedule_id' => (int) $scheduleId]);
+        foreach ($ids as $memberId) {
+            $insert->execute([
+                'schedule_id' => (int) $scheduleId,
+                'panel_member_id' => $memberId,
+                'panel_role' => 'member',
+            ]);
+        }
+    }
+}
+
 function saveApplicationPanelMembers(int $applicationId, array $panelMemberIds): void {
     if (!class_exists('DB') || $applicationId <= 0) {
         return;
     }
 
-    $ids = array_values(array_unique(array_filter(array_map('intval', $panelMemberIds), static fn (int $id): bool => $id > 0)));
     $pdo = DB::getConnection();
-    $pdo->beginTransaction();
+    $startedTransaction = false;
 
     try {
-        $delete = $pdo->prepare('DELETE FROM application_panel_assignments WHERE application_id = :application_id');
-        $delete->execute(['application_id' => $applicationId]);
-
-        $insert = $pdo->prepare(
-            'INSERT INTO application_panel_assignments (application_id, panel_member_id, panel_role)
-             SELECT :application_id, panel_member_id, :panel_role
-             FROM panel_members
-             WHERE panel_member_id = :panel_member_id'
-        );
-        foreach ($ids as $id) {
-            $insert->execute([
-                'application_id' => $applicationId,
-                'panel_member_id' => $id,
-                'panel_role' => 'member',
-            ]);
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+            $startedTransaction = true;
         }
-        $pdo->commit();
+        replaceApplicationPanelMembers($pdo, $applicationId, $panelMemberIds);
+        if ($startedTransaction) {
+            $pdo->commit();
+        }
     } catch (Throwable $e) {
-        $pdo->rollBack();
+        if ($startedTransaction && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         throw $e;
     }
 }
@@ -1087,28 +1175,11 @@ function addScheduleRecord(array $s): array {
             $assignmentStmt = $pdo->prepare('INSERT IGNORE INTO schedule_panel_assignments (schedule_id, panel_member_id, panel_role) VALUES (:schedule_id, :panel_member_id, :panel_role)');
             // Reads the panel text submitted by the coordinator.
             $panelText = (string) ($s['panel'] ?? '');
-            // Loads every panel member so names can be matched.
-            $panelRows = $pdo->query('SELECT panel_member_id, first_name, middle_name, last_name FROM panel_members')->fetchAll();
-            // Loops over each panel member row.
-            foreach ($panelRows as $panelRow) {
-                // Builds the member's displayed name as 'Last, First Middle'.
-                $panelName = trim($panelRow['last_name'] . ', ' . $panelRow['first_name'] . (!empty($panelRow['middle_name']) ? ' ' . $panelRow['middle_name'] : ''));
-                // Skips members whose name is not in the panel text.
-                if ($panelName === '' || !str_contains($panelText, $panelName)) {
-                    // Continues to the next panel member.
-                    continue;
-                // Closes the name match check.
-                }
-                // Reads the panel member id as an integer.
-                $memberId = (int) $panelRow['panel_member_id'];
-                // Checks that the panel member id is valid.
-                if ($memberId > 0) {
-                    // Links this panel member to the schedule as a member.
-                    $assignmentStmt->execute(['schedule_id' => $scheduleId, 'panel_member_id' => $memberId, 'panel_role' => 'member']);
-                // Closes the valid member id check.
-                }
-            // Ends the panel member loop.
+            $panelMemberIds = applicationPanelMemberIdsFromText($pdo, $panelText);
+            foreach ($panelMemberIds as $memberId) {
+                $assignmentStmt->execute(['schedule_id' => $scheduleId, 'panel_member_id' => $memberId, 'panel_role' => 'member']);
             }
+            replaceApplicationPanelMembers($pdo, (int) $s['applicationId'], $panelMemberIds);
             // Starts the note about keeping the tracker in step with the schedule.
             // Keep the Milestone Tracker in step with the schedule that was
             // Explains that a confirmed schedule verifies the presentation step.
@@ -1265,19 +1336,9 @@ function updateScheduleRecord(string $id, array $patch): ?array {
             $assignmentStmt = $pdo->prepare('INSERT IGNORE INTO schedule_panel_assignments (schedule_id, panel_member_id, panel_role) VALUES (:schedule_id, :panel_member_id, "member")');
             // Reads the panel text from the patch.
             $panelText = (string) $patch['panel'];
-            // Loads every panel member so names can be matched.
-            $panelRows = $pdo->query('SELECT panel_member_id, first_name, middle_name, last_name FROM panel_members')->fetchAll();
-            // Loops over each panel member row.
-            foreach ($panelRows as $panelRow) {
-                // Builds the member's displayed name as 'Last, First Middle'.
-                $panelName = trim($panelRow['last_name'] . ', ' . $panelRow['first_name'] . (!empty($panelRow['middle_name']) ? ' ' . $panelRow['middle_name'] : ''));
-                // Checks whether this member's name appears in the panel text.
-                if ($panelName !== '' && str_contains($panelText, $panelName)) {
-                    // Links the matching panel member to the schedule.
-                    $assignmentStmt->execute(['schedule_id' => (int) $id, 'panel_member_id' => (int) $panelRow['panel_member_id']]);
-                // Closes the name match check.
-                }
-            // Ends the panel member loop.
+            $panelMemberIds = applicationPanelMemberIdsFromText($pdo, $panelText);
+            foreach ($panelMemberIds as $memberId) {
+                $assignmentStmt->execute(['schedule_id' => (int) $id, 'panel_member_id' => $memberId]);
             }
         // Closes the panel patch check.
         }
@@ -1306,6 +1367,9 @@ function updateScheduleRecord(string $id, array $patch): ?array {
                 $appId = (int) ($scheduleRow['application_id'] ?? 0);
                 // Only syncs when the schedule belongs to an application.
                 if ($appId > 0) {
+                    if (isset($patch['panel'])) {
+                        replaceApplicationPanelMembers($pdo, $appId, applicationPanelMemberIdsFromText($pdo, (string) $patch['panel']));
+                    }
                     // Builds the schedule data sent to the workflow sync.
                     $sync = [
                         // Uses the stored presentation date.
@@ -1319,7 +1383,7 @@ function updateScheduleRecord(string $id, array $patch): ?array {
                     // Closes the sync data array.
                     ];
                     // Adds the panel text when the patch included one.
-                    if (isset($patch['panel']) && trim((string) $patch['panel']) !== '') {
+                    if (isset($patch['panel'])) {
                         // Stores the trimmed panel text for the sync.
                         $sync['panel'] = (string) $patch['panel'];
                     // Closes the panel check.

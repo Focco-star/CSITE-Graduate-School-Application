@@ -582,6 +582,7 @@ function ensureStageApplication(string $email, string $stageKey, string $stageLa
                 $stmt->execute(['user_id' => $userId, 'stage' => $canonLabel]);
                 // Fetches the matching application row.
                 $row = $stmt->fetch();
+                $databaseApplicationId = (int) ($row['application_id'] ?? 0);
                 // Checks whether MySQL already has this application.
                 if ($row) {
                     // Checks whether the database row is still unsubmitted.
@@ -623,7 +624,46 @@ function ensureStageApplication(string $email, string $stageKey, string $stageLa
                         'status' => 'submitted',
                     // Closes the insert values.
                     ]);
+                    $databaseApplicationId = (int) $pdo->lastInsertId();
                 // Closes the new database row branch.
+                }
+                if ($databaseApplicationId > 0) {
+                    $assignedPanelCountStmt = $pdo->prepare(
+                        'SELECT COUNT(*) FROM application_panel_assignments WHERE application_id = :application_id'
+                    );
+                    $assignedPanelCountStmt->execute(['application_id' => $databaseApplicationId]);
+                    $hasAssignedPanel = (int) $assignedPanelCountStmt->fetchColumn() > 0;
+                } else {
+                    $hasAssignedPanel = true;
+                }
+                if (!$hasAssignedPanel && $databaseApplicationId > 0) {
+                    $previousStmt = $pdo->prepare(
+                        'SELECT application_id
+                         FROM applications
+                         WHERE user_id = :user_id
+                           AND archived_at IS NULL
+                           AND application_id <> :application_id
+                         ORDER BY submitted_at DESC, application_id DESC
+                         LIMIT 1'
+                    );
+                    $previousStmt->execute([
+                        'user_id' => $userId,
+                        'application_id' => $databaseApplicationId,
+                    ]);
+                    $previousApplicationId = (int) ($previousStmt->fetchColumn() ?: 0);
+                    if ($previousApplicationId > 0) {
+                        $copyPanelStmt = $pdo->prepare(
+                            'INSERT IGNORE INTO application_panel_assignments
+                                (application_id, panel_member_id, panel_role)
+                             SELECT :application_id, panel_member_id, panel_role
+                             FROM application_panel_assignments
+                             WHERE application_id = :previous_application_id'
+                        );
+                        $copyPanelStmt->execute([
+                            'application_id' => $databaseApplicationId,
+                            'previous_application_id' => $previousApplicationId,
+                        ]);
+                    }
                 }
             // Closes the user id check.
             }

@@ -63,6 +63,17 @@ $email      = (string) ($app['studentEmail'] ?? '');
 $studentProfile   = $email !== '' ? studentProfileForEmail($email) : null;
 // Loads per-stage presentation details such as the adviser for this student.
 $presentationTeam = $email !== '' ? studentPresentationDetails($email) : [];
+$adviserOptions = [];
+if (class_exists('DB')) {
+    try {
+        $adviserOptions = DB::query("SELECT name FROM advisor_pool WHERE availability = 'available' ORDER BY name")->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) {
+        error_log('[application adviser options] ' . $e->getMessage());
+    }
+    if ($studentProfile && !empty($studentProfile['adviser']) && !in_array($studentProfile['adviser'], $adviserOptions, true)) {
+        array_unshift($adviserOptions, $studentProfile['adviser']);
+    }
+}
 
 /* ------------------------------------------------------------------
  * POST: Save Process
@@ -199,9 +210,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $app) {
         if ($isDatabaseApplication && (int) ($app['id'] ?? 0) > 0) {
             try {
                 saveApplicationPanelMembers((int) $app['id'], $postedPanelIds);
+                $syncPdo = DB::getConnection();
+                replaceSchedulePanelMembersForApplication($syncPdo, (int) $app['id'], $postedPanelIds);
+                $postedAdviser = trim((string) ($stagePosted['adviser'] ?? ''));
+                if ($postedAdviser !== '' && in_array($postedAdviser, $adviserOptions, true)) {
+                    $adviserStmt = $syncPdo->prepare('SELECT adviser_id FROM advisor_pool WHERE name = :name LIMIT 1');
+                    $adviserStmt->execute(['name' => $postedAdviser]);
+                    $adviserId = (int) ($adviserStmt->fetchColumn() ?: 0);
+                    if ($adviserId > 0) {
+                        $userIdStmt = $syncPdo->prepare('SELECT user_id FROM users WHERE email = :email LIMIT 1');
+                        $userIdStmt->execute(['email' => $email]);
+                        $studentUserId = (int) ($userIdStmt->fetchColumn() ?: 0);
+                        if ($studentUserId > 0) {
+                            $studentStmt = $syncPdo->prepare('UPDATE students SET adviser_name = :name WHERE user_id = :user_id');
+                            $studentStmt->execute(['name' => $postedAdviser, 'user_id' => $studentUserId]);
+                        }
+                        $scheduleStmt = $syncPdo->prepare('UPDATE schedules SET adviser_id = :adviser_id WHERE application_id = :application_id');
+                        $scheduleStmt->execute(['adviser_id' => $adviserId, 'application_id' => (int) $app['id']]);
+                    }
+                }
             } catch (Throwable $e) {
                 error_log('[application panel save] ' . $e->getMessage());
-                $processError = 'The panel assignment could not be saved. Apply the database migration and try again.';
+                $processError = 'The panel assignment could not be saved: ' . $e->getMessage();
             }
         }
 
@@ -1190,6 +1220,18 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                     </div>
                     <p class="field-hint">Assign the academic assessment team using the same panel-member selectors as presentation scheduling. A presentation date can be scheduled later.</p>
                 </div>
+                <div class="form-field" style="margin-top:1rem;">
+                    <label>Adviser</label>
+                    <select name="stage_data[<?= htmlspecialchars($key) ?>][adviser]">
+                        <option value="">Select adviser</option>
+                        <?php foreach ($adviserOptions as $adviserOption): ?>
+                            <option value="<?= htmlspecialchars($adviserOption, ENT_QUOTES, 'UTF-8') ?>" <?= strcasecmp($stageAdviser, $adviserOption) === 0 ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($adviserOption, ENT_QUOTES, 'UTF-8') ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="field-hint">Changing this adviser updates the student profile and linked presentation schedules.</p>
+                </div>
 <?php /*                 Ends the check for a missing stage application. */ ?>
                 <?php endif; ?>
 <?php /*             Closes the details card body. */ ?>
@@ -2130,6 +2172,26 @@ $scheduleAlerts = [
     const form = document.getElementById('processForm');
 <?php /*     Stops the script when the form is not on the page. */ ?>
     if (!form) return;
+
+    document.querySelectorAll('.stage-panel').forEach(function (panel) {
+        const selects = Array.from(panel.querySelectorAll('.panel-member-select'));
+        function updatePanelChoices() {
+            const selectedValues = selects.map(function (select) {
+                return select.value;
+            }).filter(Boolean);
+            selects.forEach(function (select) {
+                Array.from(select.options).forEach(function (option) {
+                    option.disabled = option.value !== ''
+                        && option.value !== select.value
+                        && selectedValues.indexOf(option.value) !== -1;
+                });
+            });
+        }
+        selects.forEach(function (select) {
+            select.addEventListener('change', updatePanelChoices);
+        });
+        updatePanelChoices();
+    });
 
 <?php /*     Gets the stage slider container. */ ?>
     const slider = document.getElementById('stageSlider');
