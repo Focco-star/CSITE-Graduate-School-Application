@@ -833,4 +833,5 @@
     // Runs boot() immediately when the page is already loaded.
     else boot();
 // Closes and runs the dashboard script function.
-})();
+})();
+

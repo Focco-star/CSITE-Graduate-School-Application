@@ -369,13 +369,14 @@
 /* Section label comment for the Quick Summary block. */
 /* --- 3. Quick Summary ---------------------------------------------------
    The summary closes the page with the same navy header as the calendar and
-   the chart, then four accent-tinted figure cards. */
+   the chart, then four accent-tinted figure cards. Each card is now a button
+   that opens a vertical dropdown listing the programs in that stage. */
 /* Styles the Quick Summary card that closes the dashboard page. */
 .quick-summary {
     /* Leaves space below the summary card. */
     margin-bottom: 1.5rem;
-    /* Clips the dark header to the rounded card corners. */
-    overflow: hidden;
+    /* CHANGED: stays visible so the dropdown panels are not clipped. */
+    overflow: visible;
     /* Adds a light grey border around the card. */
     border: 1px solid var(--gray-200);
     /* Rounds the summary card corners. */
@@ -386,6 +387,10 @@
     box-shadow: 0 1px 2px rgba(6, 2, 151, 0.05), 0 12px 30px rgba(6, 2, 151, 0.07);
 /* Closes the .quick-summary rule. */
 }
+
+/* NEW: keeps the rounded corners now that the card no longer clips its children. */
+.quick-summary-header { border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.quick-summary-body   { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 
 /* Styles the dark header bar of the Quick Summary. */
 .quick-summary-header {
@@ -534,7 +539,10 @@
 /* Closes the wide-screen media query. */
 }
 
-/* Styles each clickable summary figure card. */
+/* NEW: wraps one card plus its dropdown; the dropdown is positioned against this. */
+.quick-summary-item { position: relative; }
+
+/* Styles each summary figure card (now a button that opens the dropdown). */
 .quick-summary-stat {
     /* Lets the accent bar be placed inside the card. */
     position: relative;
@@ -558,8 +566,18 @@
     background: var(--white);
     /* Adds a very soft shadow under the card. */
     box-shadow: 0 1px 2px rgba(6, 2, 151, 0.04);
-    /* Removes the underline because the card is a link. */
+    /* Removes the underline in case a link style leaks in. */
     text-decoration: none;
+    /* NEW: makes the button fill its wrapper like the old link did. */
+    width: 100%;
+    /* NEW: inherits the page font instead of the browser button font. */
+    font: inherit;
+    /* NEW: keeps the card text left aligned like before. */
+    text-align: left;
+    /* NEW: shows the hand cursor because the card is clickable. */
+    cursor: pointer;
+    /* NEW: removes native button styling. */
+    appearance: none;
     /* Animates lift, shadow, and border colour on hover. */
     transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
 /* Closes the summary stat rule. */
@@ -702,7 +720,7 @@
 /* Closes the summary icon rule. */
 }
 
-/* Styles the small circular arrow at the card top right. */
+/* Styles the small circular chevron at the card top right. */
 .quick-summary-arrow {
     /* Centres the arrow in its circle. */
     display: flex;
@@ -740,6 +758,23 @@
 /* Closes the arrow hover rule. */
 }
 
+/* NEW: the chevron points down, so it nudges down on hover instead of sliding right. */
+.quick-summary-item .quick-summary-stat:hover .quick-summary-arrow,
+.quick-summary-item .quick-summary-stat:focus-visible .quick-summary-arrow {
+    transform: translateY(2px);
+}
+
+/* NEW: highlights the open card and flips its chevron (declared after the hover rule so it wins). */
+.quick-summary-item.is-open .quick-summary-stat {
+    border-color: var(--qs-line, rgba(6, 2, 151, 0.18));
+    box-shadow: 0 14px 30px rgba(6, 2, 151, 0.12);
+}
+.quick-summary-item.is-open .quick-summary-stat .quick-summary-arrow {
+    color: var(--qs-ink, var(--adzu-navy));
+    border-color: var(--qs-line, var(--gray-300));
+    transform: rotate(180deg);
+}
+
 /* Styles the big number shown on each summary card. */
 .quick-summary-value {
     /* Uses the heading font for the number. */
@@ -774,6 +809,129 @@
     /* Shows the caption in medium grey. */
     color: var(--gray-500);
 /* Closes the summary label rule. */
+}
+
+/* --- NEW: Quick Summary dropdown panel ---------------------------------- */
+/* The vertical dropdown card that hangs under the summary card. */
+.quick-summary-panel {
+    /* Floats the panel under its card without moving the cards around it. */
+    position: absolute;
+    /* Starts the panel just below the card. */
+    top: calc(100% + 0.5rem);
+    /* Matches the card width on the right. */
+    right: 0;
+    /* Matches the card width on the left. */
+    left: 0;
+    /* Keeps the panel above the neighbouring cards. */
+    z-index: 20;
+    /* Caps the height so long program lists scroll. */
+    max-height: 340px;
+    /* Lets long lists scroll inside the panel. */
+    overflow-y: auto;
+    /* Sets the panel inner padding. */
+    padding: 0.85rem 1rem 0.9rem;
+    /* Draws the panel border in the card line colour. */
+    border: 1px solid var(--qs-line, var(--gray-200));
+    /* Adds the coloured accent line along the top of the panel. */
+    border-top: 3px solid var(--qs-accent, var(--adzu-navy));
+    /* Rounds the panel corners. */
+    border-radius: var(--radius-lg);
+    /* Gives the panel a white background. */
+    background: var(--white);
+    /* Adds a deeper shadow so the panel floats. */
+    box-shadow: 0 18px 38px rgba(6, 2, 151, 0.16);
+    /* Plays a short slide-in when the panel opens. */
+    animation: qsPanelIn 160ms ease-out;
+/* Closes the panel rule. */
+}
+/* Makes sure the hidden attribute really hides the panel. */
+.quick-summary-panel[hidden] { display: none; }
+
+/* Slides the panel in from slightly above while fading it in. */
+@keyframes qsPanelIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Column titles at the top of the dropdown. */
+.quick-summary-panel-head {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid var(--gray-200);
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gray-500);
+}
+
+/* Removes default list styling from the program list. */
+.quick-summary-panel-list { margin: 0; padding: 0; list-style: none; }
+
+/* One program row: name on the left, count on the right, share bar underneath. */
+.quick-summary-panel-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+    row-gap: 0.3rem;
+    align-items: baseline;
+    padding: 0.55rem 0;
+    border-bottom: 1px dashed var(--gray-200);
+}
+.quick-summary-panel-row:last-child { border-bottom: 0; }
+
+/* Program name text. */
+.quick-summary-panel-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--gray-800);
+    overflow-wrap: anywhere;
+}
+
+/* Student count for that program. */
+.quick-summary-panel-count {
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--qs-ink, var(--adzu-navy));
+}
+
+/* Thin bar showing this program's share of the card total. */
+.quick-summary-panel-bar {
+    grid-column: 1 / -1;
+    height: 5px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--qs-tint, rgba(6, 2, 151, 0.1));
+}
+.quick-summary-panel-bar i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--qs-accent, var(--adzu-navy));
+}
+
+/* Total line at the bottom of the dropdown. */
+.quick-summary-panel-total {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.45rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--gray-200);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--gray-500);
+}
+.quick-summary-panel-total strong { color: var(--qs-ink, var(--adzu-navy)); }
+
+/* Message shown when a stage has no students or the breakdown is unavailable. */
+.quick-summary-panel-empty {
+    margin: 0.4rem 0 0.2rem;
+    font-size: 0.8rem;
+    color: var(--gray-500);
 }
 
 /* Section label comment for the responsive dashboard rules. */
@@ -838,6 +996,8 @@
     .quick-summary-body { padding: 1rem; }
     /* Shows one summary card per row on phones. */
     .quick-summary-grid { grid-template-columns: 1fr; }
+    /* NEW: on phones the dropdown pushes content down instead of overlapping the next card. */
+    .quick-summary-panel { position: static; max-height: none; margin-top: 0.5rem; }
 /* Closes the phone media query. */
 }
 
@@ -860,6 +1020,12 @@
     .quick-summary-stat:hover .quick-summary-arrow,
     /* Stops the arrow from sliding for reduced motion users. */
     .quick-summary-stat:focus-visible .quick-summary-arrow { transform: none; }
+    /* NEW: stops the chevron nudge for the dropdown cards. */
+    .quick-summary-item .quick-summary-stat:hover .quick-summary-arrow,
+    .quick-summary-item .quick-summary-stat:focus-visible .quick-summary-arrow { transform: none; }
+    /* NEW: keeps the flipped chevron on an open card even while hovered. */
+    .quick-summary-item.is-open .quick-summary-stat .quick-summary-arrow { transform: rotate(180deg); }
+    /* NEW: skips the open animation of the dropdown panel. */
+    .quick-summary-panel { animation: none; }
 /* Closes the reduced-motion media query. */
 }
-

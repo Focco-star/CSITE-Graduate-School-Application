@@ -583,8 +583,6 @@
 .psc-swatch-confirmed { background: #8e9bff; box-shadow: 0 0 0 3px rgba(142, 155, 255, 0.2); }
 /* Colours the pending swatch gray with a soft ring. */
 .psc-swatch-pending { background: #b6bcc5; box-shadow: 0 0 0 3px rgba(182, 188, 197, 0.2); }
-/* Colours the completed swatch green, matching the completed event background. */
-.psc-swatch-completed { background: #8fd9b8; box-shadow: 0 0 0 3px rgba(143, 217, 184, 0.2); }
 .psc-swatch-result-approved { background: #8fd9b8; box-shadow: 0 0 0 3px rgba(143, 217, 184, 0.2); }
 .psc-swatch-result-approved_with_revision { background: #f5cf54; box-shadow: 0 0 0 3px rgba(245, 207, 84, 0.2); }
 .psc-swatch-result-re_presentation_required { background: #a78bfa; box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2); }

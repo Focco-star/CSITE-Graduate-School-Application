@@ -724,8 +724,6 @@ if (!function_exists('renderScheduleCalendar')) {
             <li><span class="psc-swatch psc-swatch-confirmed" aria-hidden="true"></span>Confirmed</li>
 <?php /*             Shows the pending colour swatch in the legend. */ ?>
             <li><span class="psc-swatch psc-swatch-pending" aria-hidden="true"></span>Pending</li>
-<?php /*             Shows the completed colour swatch in the legend. */ ?>
-            <li><span class="psc-swatch psc-swatch-completed" aria-hidden="true"></span>Completed</li>
             <li><span class="psc-swatch psc-swatch-result-approved" aria-hidden="true"></span>Approved</li>
             <li><span class="psc-swatch psc-swatch-result-approved_with_revision" aria-hidden="true"></span>Approved with revision</li>
             <li><span class="psc-swatch psc-swatch-result-re_presentation_required" aria-hidden="true"></span>Re-Presentation Required</li>
