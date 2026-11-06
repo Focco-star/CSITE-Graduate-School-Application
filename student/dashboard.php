@@ -229,6 +229,8 @@ require_once __DIR__ . '/../includes/layout/header.php';
 $milestoneTotal = 0;
 // Counter for milestones the coordinator already verified.
 $milestoneDone = 0;
+// Counter for submitted milestones that still wait for the coordinator.
+$milestoneSubmitted = 0;
 // Holds one block of tracker data per stage.
 $milestoneBlocks = [];
 // Loops over every stage to build its milestone block.
@@ -243,6 +245,16 @@ foreach ($stages as $idx => $stage) {
     $milestoneTotal += $stats['total'];
     // Adds this stage's completed milestones to the overall count.
     $milestoneDone += $stats['done'];
+    // Counts the milestones that were sent and still wait for review.
+    foreach ($steps as $milestoneStep) {
+        // Checks whether this milestone is submitted but not yet verified.
+        if (($milestoneStep['state']['status'] ?? 'pending') === 'submitted') {
+            // Adds this submitted milestone to the waiting count.
+            $milestoneSubmitted++;
+        // Closes the submitted milestone check.
+        }
+    // Closes the loop that counts awaiting-review milestones.
+    }
     // Starts the array entry that describes this stage for the view.
     $milestoneBlocks[] = [
         // Stores the stage definition, such as its label and key.
@@ -289,7 +301,7 @@ $milestonePct = $milestoneTotal > 0 ? (int) round($milestoneDone * 100 / $milest
 <?php /*             Closes the message button. */ ?>
             </button>
 <?php /*             Text such as 3 of 12 milestones complete. */ ?>
-            <span class="ms-overview-text"><?= (int) $milestoneDone ?> of <?= (int) $milestoneTotal ?> milestones complete</span>
+            <span class="ms-overview-text"><?= (int) $milestoneDone ?> of <?= (int) $milestoneTotal ?> milestones complete<?php if ($milestoneSubmitted > 0): ?><span class="ms-overview-submitted"> &middot; <?= (int) $milestoneSubmitted ?> awaiting review</span><?php endif; ?></span>
 <?php /*             Progress bar filled to the completion percentage. */ ?>
             <span class="ms-overview-bar"><span class="ms-overview-fill" style="width:<?= (int) $milestonePct ?>%;"></span></span>
 <?php /*         Closes the overview wrapper. */ ?>
@@ -565,6 +577,9 @@ $assignedPanel = $stageApplicationId > 0 ? databaseApplicationPanelMembers($stag
                         ?>
 <?php /*                         Upload link that opens the Application page for this document. */ ?>
                         <a class="btn btn-sm btn-primary" href="<?= url('student/application.php?stage=' . urlencode($stage['key']) . '&docType=' . urlencode($stepDocType)) ?>"><i class="fas <?= htmlspecialchars($stepActionIcon, ENT_QUOTES, 'UTF-8') ?>"></i> <?= htmlspecialchars($stepActionLabel, ENT_QUOTES, 'UTF-8') ?></a>
+<?php /*                         Shows a disabled button while a submitted document waits for review. */ ?>
+                        <?php elseif ($stepDocType !== '' && $isSubmitted): ?>
+                        <button type="button" class="btn btn-sm btn-outline" disabled aria-disabled="true" title="This document is waiting for the coordinator to review it."><i class="fas fa-clock" aria-hidden="true"></i> Awaiting review</button>
 <?php /*                         Closes the if that shows the Upload button. */ ?>
                         <?php endif; ?>
 <?php /*                     Closes the step action column. */ ?>

@@ -128,7 +128,7 @@ function pendingStudentAccounts(): array {
         return DB::query(
             "SELECT u.user_id, u.full_name, u.email, u.created_at, u.account_status,
                     s.student_id, s.first_name, s.last_name, s.middle_initial,
-                    s.age, s.gender, s.program, s.track, s.enrollment_date
+                    s.age, s.gender, s.birthdate, s.sex, s.program, s.track, s.enrollment_date
                FROM `users` u
                LEFT JOIN `students` s ON s.user_id = u.user_id
               WHERE u.`role` = 'student' AND u.`account_status` = 'pending'

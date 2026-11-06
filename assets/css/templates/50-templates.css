@@ -740,8 +740,32 @@
 
 /* Creates a two-column grid for register form fields. */
 .register-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.25rem; }
-/* Creates a three-column grid with narrower first columns. */
-.register-grid-3 { display: grid; grid-template-columns: 0.5fr 0.7fr 1fr; gap: 0 1.25rem; }
+/* Creates a three-column grid that keeps the Middle Initial label on one line. */
+.register-grid-3 { display: grid; grid-template-columns: 0.8fr 1.15fr 1fr; gap: 0 1.25rem; }
+/* Lets grid fields shrink instead of overflowing their column. */
+.register-grid-2 > *, .register-grid-3 > * { min-width: 0; }
+
+/* Gives the native date field enough room for YYYY-MM-DD and its picker button. */
+.input-icon-wrap input[type="date"] {
+    /* Uses a slightly smaller date text so the full format fits. */
+    font-size: 0.82rem;
+    /* Leaves just enough room for the calendar icon on the left. */
+    padding-left: 2.25rem;
+/* Closes the date input rule. */
+}
+
+/* Hides the decorative left icon on the birthdate field; the picker button is enough. */
+.input-icon-wrap.birthdate-field > i { display: none; }
+/* Uses the space the hidden icon would have taken for the date text. */
+.input-icon-wrap.birthdate-field .date-picker input {
+    /* Starts the date text near the left edge. */
+    padding-left: 0.9rem;
+    /* Keeps the date text away from the calendar button. */
+    padding-right: 3rem;
+    /* Keeps the date format comfortably inside the narrower field. */
+    font-size: 0.84rem;
+/* Closes the birthdate input rule. */
+}
 
 /* Starts phone rules for widths up to 640px. */
 @media (max-width: 640px) {

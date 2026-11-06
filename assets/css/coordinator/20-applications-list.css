@@ -342,4 +342,17 @@ tr.app-child-row[hidden] { display: none; }
     color: var(--gray-500);
 /* Closes the attachment status note rule. */
 }
-
+
+/* Marks newly submitted applications in the coordinator list. */
+.badge-new {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--adzu-gold);
+    color: #1f2937;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}

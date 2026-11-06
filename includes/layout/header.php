@@ -147,20 +147,123 @@ unset($csiteStyleSections, $csiteStyleSection, $csiteStyleFile);
             </div>
 <?php /*             Starts the area that holds the profile and logout controls. */ ?>
             <div class="topbar-user">
-<?php /*                 Shows the account validation bell to coordinators only. */ ?>
+<?php /*                 Shows the notification bell to coordinators only. */ ?>
                 <?php if ($role === 'coordinator'): ?>
-<?php /*                 Opens the list of students waiting for account validation. */ ?>
-                <a href="<?= url('coordinator/students/pending.php') ?>" class="topbar-notification<?= $pendingAccountCount > 0 ? ' has-count' : '' ?>" title="<?= (int) $pendingAccountCount ?> student account<?= $pendingAccountCount === 1 ? '' : 's' ?> waiting for validation" aria-label="<?= (int) $pendingAccountCount ?> student account<?= $pendingAccountCount === 1 ? '' : 's' ?> waiting for validation">
-<?php /*                     Bell icon that marks the notification area. */ ?>
-                    <i class="fas fa-bell" aria-hidden="true"></i>
-<?php /*                     Shows the badge only when students are waiting. */ ?>
-                    <?php if ($pendingAccountCount > 0): ?>
-<?php /*                     Caps the visible count at 9+. */ ?>
-                    <span class="topbar-notification-badge"><?= $pendingAccountCount > 9 ? '9+' : (int) $pendingAccountCount ?></span>
-<?php /*                     Closes the badge check. */ ?>
-                    <?php endif; ?>
-<?php /*                 Closes the notification link. */ ?>
-                </a>
+<?php /*                 Loads the latest notifications for the bell panel. */ ?>
+                <?php $coordinatorBell = coordinatorNotifications((int) ($_SESSION['user']['id'] ?? $_SESSION['user']['user_id'] ?? 0)); ?>
+<?php /*                 Remembers the page to reopen after a notification is removed. */ ?>
+                <?php $notificationReturnPath = coordinatorNotificationReturnPath(); ?>
+<?php /*                 Opens the notification bell wrapper. */ ?>
+                <div class="topbar-notif" data-topbar-notif>
+<?php /*                     Button that opens and closes the notification panel. */ ?>
+                    <button type="button" class="topbar-notification<?= (int) $coordinatorBell['unseen'] > 0 ? ' has-count' : '' ?>" data-notif-toggle aria-expanded="false" aria-controls="coordinatorNotificationPanel" title="Notifications" aria-label="Notifications">
+<?php /*                         Bell icon that marks the notification area. */ ?>
+                        <i class="fas fa-bell" aria-hidden="true"></i>
+<?php /*                         Shows the badge only when something is new. */ ?>
+                        <?php if ((int) $coordinatorBell['unseen'] > 0): ?>
+<?php /*                         Caps the visible count at 9+. */ ?>
+                        <span class="topbar-notification-badge"><?= (int) $coordinatorBell['unseen'] > 9 ? '9+' : (int) $coordinatorBell['unseen'] ?></span>
+<?php /*                         Closes the badge check. */ ?>
+                        <?php endif; ?>
+<?php /*                     Closes the notification button. */ ?>
+                    </button>
+<?php /*                     Panel that lists new notifications and viewed updates. */ ?>
+                    <div class="notif-panel" id="coordinatorNotificationPanel" hidden>
+<?php /*                         Header of the notification panel. */ ?>
+                        <div class="notif-panel-head">
+<?php /*                             Panel title. */ ?>
+                            <strong><i class="fas fa-bell" aria-hidden="true"></i> Notifications</strong>
+<?php /*                             Shows how many items are new. */ ?>
+                            <span><?= (int) $coordinatorBell['unseen'] ?> new</span>
+<?php /*                         Closes the panel header. */ ?>
+                        </div>
+<?php /*                         Scrollable body of the panel. */ ?>
+                        <div class="notif-panel-body">
+<?php /*                             Heading for unseen notifications. */ ?>
+                            <div class="notif-section-title">New</div>
+<?php /*                             Shows the empty state when nothing is new. */ ?>
+                            <?php if (!$coordinatorBell['new']): ?>
+                            <p class="notif-empty">No new notifications. You are all caught up.</p>
+<?php /*                             Otherwise lists every unseen notification. */ ?>
+                            <?php else: ?>
+<?php /*                                 Loops over the unseen notifications, newest first. */ ?>
+                                <?php foreach ($coordinatorBell['new'] as $notification): ?>
+<?php /*                                 One unseen notification linking to the action page. */ ?>
+                                <div class="notif-item is-new">
+<?php /*                                     Link portion that opens the notification. */ ?>
+                                    <a class="notif-item-link" href="<?= url('coordinator/notifications.php?open=' . (int) $notification['notification_id']) ?>">
+<?php /*                                         Icon that matches the notification type. */ ?>
+                                        <span class="notif-item-icon"><i class="fas <?= $notification['type'] === 'account' ? 'fa-user-check' : ($notification['type'] === 'document' ? 'fa-file-arrow-up' : 'fa-file-circle-check') ?>" aria-hidden="true"></i></span>
+<?php /*                                         Title, message and time of the notification. */ ?>
+                                        <span class="notif-item-body">
+<?php /*                                             Action title. */ ?>
+                                            <strong><?= htmlspecialchars((string) $notification['title']) ?></strong>
+<?php /*                                             Action message. */ ?>
+                                            <span><?= htmlspecialchars((string) $notification['message']) ?></span>
+<?php /*                                             When the notification was created. */ ?>
+                                            <em><?= htmlspecialchars(coordinatorNotificationTime((string) $notification['created_at'])) ?></em>
+<?php /*                                         Closes the notification body. */ ?>
+                                        </span>
+<?php /*                                     Closes the unseen notification link. */ ?>
+                                    </a>
+<?php /*                                     Form that removes this notification. */ ?>
+                                    <form method="post" action="<?= url('coordinator/notification_remove.php') ?>" class="notif-remove-form">
+                                        <input type="hidden" name="notification_id" value="<?= (int) $notification['notification_id'] ?>">
+                                        <input type="hidden" name="return" value="<?= htmlspecialchars($notificationReturnPath) ?>">
+                                        <button type="submit" class="notif-remove" title="Remove notification" aria-label="Remove notification"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                                    </form>
+<?php /*                                 Closes the unseen notification row. */ ?>
+                                </div>
+<?php /*                                 Ends the unseen notification loop. */ ?>
+                                <?php endforeach; ?>
+<?php /*                             Closes the non-empty notification branch. */ ?>
+                            <?php endif; ?>
+
+<?php /*                             Heading for notifications already viewed. */ ?>
+                            <div class="notif-section-title">Updates</div>
+<?php /*                             Shows the empty state when nothing was viewed yet. */ ?>
+                            <?php if (!$coordinatorBell['updates']): ?>
+                            <p class="notif-empty">Notifications you open will stay here for reference.</p>
+<?php /*                             Otherwise lists the viewed notifications. */ ?>
+                            <?php else: ?>
+<?php /*                                 Loops over the viewed notifications, newest first. */ ?>
+                                <?php foreach ($coordinatorBell['updates'] as $notification): ?>
+<?php /*                                 One viewed notification linking straight to its page. */ ?>
+                                <div class="notif-item">
+<?php /*                                     Link portion that opens the notification. */ ?>
+                                    <a class="notif-item-link" href="<?= url((string) $notification['link']) ?>">
+<?php /*                                         Icon that matches the notification type. */ ?>
+                                        <span class="notif-item-icon"><i class="fas <?= $notification['type'] === 'account' ? 'fa-user-check' : ($notification['type'] === 'document' ? 'fa-file-arrow-up' : 'fa-file-circle-check') ?>" aria-hidden="true"></i></span>
+<?php /*                                         Title, message and viewed time. */ ?>
+                                        <span class="notif-item-body">
+<?php /*                                             Action title. */ ?>
+                                            <strong><?= htmlspecialchars((string) $notification['title']) ?></strong>
+<?php /*                                             Action message. */ ?>
+                                            <span><?= htmlspecialchars((string) $notification['message']) ?></span>
+<?php /*                                             When the notification was viewed. */ ?>
+                                            <em>Viewed <?= htmlspecialchars(coordinatorNotificationTime((string) $notification['seen_at'])) ?></em>
+<?php /*                                         Closes the notification body. */ ?>
+                                        </span>
+<?php /*                                     Closes the viewed notification link. */ ?>
+                                    </a>
+<?php /*                                     Form that removes this notification. */ ?>
+                                    <form method="post" action="<?= url('coordinator/notification_remove.php') ?>" class="notif-remove-form">
+                                        <input type="hidden" name="notification_id" value="<?= (int) $notification['notification_id'] ?>">
+                                        <input type="hidden" name="return" value="<?= htmlspecialchars($notificationReturnPath) ?>">
+                                        <button type="submit" class="notif-remove" title="Remove notification" aria-label="Remove notification"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+                                    </form>
+<?php /*                                 Closes the viewed notification row. */ ?>
+                                </div>
+<?php /*                                 Ends the viewed notification loop. */ ?>
+                                <?php endforeach; ?>
+<?php /*                             Closes the viewed notification branch. */ ?>
+                            <?php endif; ?>
+<?php /*                         Closes the panel body. */ ?>
+                        </div>
+<?php /*                     Closes the notification panel. */ ?>
+                    </div>
+<?php /*                 Closes the notification bell wrapper. */ ?>
+                </div>
 <?php /*                 Closes the coordinator notification check. */ ?>
                 <?php endif; ?>
 <?php /*                 Checks whether the current user is a student. */ ?>

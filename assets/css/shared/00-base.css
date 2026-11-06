@@ -1261,22 +1261,31 @@ img { max-width: 100%; height: auto; }
 .pw-toggle {
     /* Positions the toggle absolutely inside the input. */
     position: absolute;
-    /* Places the toggle 0.8rem from the right edge. */
-    right: 0.8rem;
+    /* Places the toggle 0.55rem from the right edge. */
+    right: 0.55rem;
     /* Moves the toggle to the middle of the input. */
     top: 50%;
     /* Pulls the toggle up to center it vertically. */
     transform: translateY(-50%);
-    /* Removes the default button background. */
-    background: none;
+    /* Gives the toggle a round clickable area. */
+    width: 1.55rem;
+    height: 1.55rem;
+    /* Centers the eye icon inside the round area. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* Gives the toggle a light background that shows on dark and white inputs. */
+    background: rgba(255, 255, 255, 0.92);
     /* Removes the default button border. */
     border: none;
+    /* Makes the toggle round. */
+    border-radius: 50%;
     /* Shows a pointer cursor on the toggle. */
     cursor: pointer;
-    /* Colors the eye icon a faint white. */
-    color: rgba(255,255,255,0.4);
-    /* Sets the toggle icon size to 0.9rem. */
-    font-size: 0.9rem;
+    /* Colors the eye icon dark so it is visible on the white circle. */
+    color: #374151;
+    /* Sets the toggle icon size to 0.82rem. */
+    font-size: 0.82rem;
     /* Removes extra padding from the toggle. */
     padding: 0;
     /* Sets the toggle line height to 1. */
@@ -1284,6 +1293,18 @@ img { max-width: 100%; height: auto; }
     /* Keeps the toggle above the input. */
     z-index: 2;
 /* Closes the password toggle rule. */
+}
+
+/* Strengthens the toggle on hover and keyboard focus. */
+.pw-toggle:hover,
+.pw-toggle:focus-visible {
+    /* Uses a solid white circle when hovered. */
+    background: #ffffff;
+    /* Uses the main navy color for the icon. */
+    color: var(--adzu-navy);
+    /* Adds a subtle ring around the focused toggle. */
+    box-shadow: 0 0 0 2px rgba(6, 2, 151, 0.18);
+/* Closes the password toggle hover rule. */
 }
 
 /* Makes the login submit button full width with a small top gap. */
@@ -1898,4 +1919,6 @@ select.doc-review-select:focus {
     border-top: 1px solid var(--gray-200);
 /* Closes the form actions rule. */
 }
-
+
+/* Spaces the client-side summary above the form fields. */
+.form-validation-summary { margin-bottom: 1rem; }

@@ -77,6 +77,12 @@ function openDocumentTypes(array $milestoneSteps): array {
             continue;
         // Closes the done check.
         }
+        // A submitted document is waiting for the coordinator, so it stays closed.
+        if ($state === 'submitted') {
+            // Stops without opening this or any later document.
+            break;
+        // Closes the submitted check.
+        }
         // Notes that the first unfinished milestone is the current work.
         // The first milestone that is not finished is the work of the student
         // Explains that later milestones wait for this one.

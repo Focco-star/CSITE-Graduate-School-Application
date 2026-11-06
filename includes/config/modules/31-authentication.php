@@ -379,6 +379,10 @@ function addRegisteredStudent(array $input): array {
         'middleInitial' => rtrim(trim($input['middleInitial'] ?? ''), '.'),
         // Stores the age, or an empty string.
         'age' => $input['age'] ?? '',
+        // Stores the birthdate, or an empty string.
+        'birthdate' => $input['birthdate'] ?? '',
+        // Stores the biological sex, or an empty string.
+        'sex' => $input['sex'] ?? ($input['gender'] ?? ''),
         // Stores the gender, or an empty string.
         'gender' => $input['gender'] ?? '',
         // Stores the program code.
@@ -489,6 +493,10 @@ function authenticateStudent(string $email, string $password): array {
                 'middleInitial' => $student['middleInitial'] ?? '',
                 // Copies the age, or empty text.
                 'age' => $student['age'] ?? '',
+                // Copies the birthdate, or empty text.
+                'birthdate' => $student['birthdate'] ?? '',
+                // Copies the biological sex, or empty text.
+                'sex' => $student['sex'] ?? ($student['gender'] ?? ''),
                 // Copies the gender, or empty text.
                 'gender' => $student['gender'] ?? '',
                 // Copies the email.
@@ -558,6 +566,10 @@ function updateLoggedInStudentProfile(array $input): void {
         $s['middleInitial'] = $input['middleInitial'] ?? $s['middleInitial'];
         // Updates the age when one was typed.
         $s['age'] = $input['age'] ?? $s['age'];
+        // Updates the birthdate when one was typed.
+        $s['birthdate'] = $input['birthdate'] ?? ($s['birthdate'] ?? '');
+        // Updates the biological sex when one was typed.
+        $s['sex'] = $input['sex'] ?? ($input['gender'] ?? ($s['sex'] ?? ''));
         // Updates the gender when one was typed.
         $s['gender'] = $input['gender'] ?? $s['gender'];
         // Updates the program when one was typed.
@@ -584,6 +596,10 @@ function updateLoggedInStudentProfile(array $input): void {
             'middleInitial' => $s['middleInitial'],
             // Copies the age into the account.
             'age' => $s['age'],
+            // Copies the birthdate into the account.
+            'birthdate' => $s['birthdate'] ?? '',
+            // Copies the biological sex into the account.
+            'sex' => $s['sex'] ?? ($s['gender'] ?? ''),
             // Copies the gender into the account.
             'gender' => $s['gender'],
             // Copies the email into the account.

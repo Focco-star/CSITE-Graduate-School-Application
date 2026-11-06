@@ -31,10 +31,26 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['review_user_i
     if ($reviewUserId > 0 && $newStatus !== '') {
         // Saves the decision and checks that a pending account was changed.
         if (setStudentAccountStatus($reviewUserId, $newStatus, $reviewerId)) {
+            // Reads the student name so the on-page message is specific.
+            $reviewedName = '';
+            // Guards the name lookup against a database error.
+            try {
+                // Finds the reviewed account.
+                $reviewedUser = DB::find('users', ['user_id' => $reviewUserId]);
+                // Reads the full name from the account.
+                $reviewedName = trim((string) ($reviewedUser['full_name'] ?? ''));
+            // Catches a lookup error and uses the generic name.
+            } catch (Throwable $e) {
+                // Leaves the name empty.
+                $reviewedName = '';
+            // Closes the lookup guard.
+            }
+            // Chooses the readable subject for the message.
+            $reviewedSubject = $reviewedName !== '' ? $reviewedName : 'The student';
             // Tells the coordinator the decision was saved.
             setFlash('success', $newStatus === 'approved'
-                ? 'Student account approved. The student can now sign in.'
-                : 'Student account rejected. The student cannot sign in and was told to contact the coordinator.');
+                ? 'Student account approved. ' . $reviewedSubject . ' can now sign in.'
+                : 'Student account rejected. ' . $reviewedSubject . ' cannot sign in and was told to contact the coordinator.');
         // Explains that the account was already reviewed or could not be changed.
         } else {
             // Shows a safe error when the account was already handled.
@@ -157,10 +173,18 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                         </td>
 <?php /*                         Opens the details cell. */ ?>
                         <td style="font-size:0.8rem;color:var(--gray-600);">
-<?php /*                             Shows age and gender when they were entered. */ ?>
-                            <?= (int) ($account['age'] ?? 0) > 0 ? (int) $account['age'] . ' years old' : '—' ?>
-<?php /*                             Separates the age and gender details. */ ?>
-                            <?php if (!empty($account['gender'])): ?><span aria-hidden="true"> &middot; </span><?= htmlspecialchars((string) $account['gender']) ?><?php endif; ?>
+<?php /*                             Shows the birthdate and sex entered at registration. */ ?>
+                            <?php
+                            // Reads the birthdate stored for this account.
+                            $accountBirthdate = trim((string) ($account['birthdate'] ?? ''));
+                            // Reads the sex, falling back to the legacy gender column.
+                            $accountSex = normalizeSex($account['sex'] ?? ($account['gender'] ?? ''));
+                            // Works out the age from the birthdate, or keeps the stored age.
+                            $accountAge = $accountBirthdate !== '' ? ageFromBirthdate($accountBirthdate) : (int) ($account['age'] ?? 0);
+                            ?>
+                            <?= $accountBirthdate !== '' ? htmlspecialchars(date('M j, Y', strtotime($accountBirthdate))) . ' (' . (int) $accountAge . ' years old)' : htmlspecialchars($accountAge > 0 ? $accountAge . ' years old' : '—') ?>
+<?php /*                             Separates the birthdate and sex details. */ ?>
+                            <?php if ($accountSex !== ''): ?><span aria-hidden="true"> &middot; </span><?= htmlspecialchars($accountSex) ?><?php endif; ?>
 <?php /*                         Closes the details cell. */ ?>
                         </td>
 <?php /*                         Opens the registration date cell. */ ?>
@@ -177,8 +201,12 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                                 <input type="hidden" name="review_user_id" value="<?= (int) $account['user_id'] ?>">
 <?php /*                                 Approve button that unlocks the student login. */ ?>
                                 <button type="submit" name="decision" value="approve" class="btn btn-sm btn-success" title="Approve this student account"><i class="fas fa-check" aria-hidden="true"></i> Approve</button>
-<?php /*                                 Reject button that keeps the student out of the portal. */ ?>
-                                <button type="submit" name="decision" value="reject" class="btn btn-sm btn-outline" title="Reject this student account" onclick="return confirm('Reject this student account? The student will not be able to sign in.');"><i class="fas fa-xmark" aria-hidden="true"></i> Reject</button>
+<?php /*                                 Reject button opening an on-page confirmation. */ ?>
+                                <button type="submit" name="decision" value="reject" class="btn btn-sm btn-outline" title="Reject this student account"
+                                        data-reject-account
+                                        data-student="<?= htmlspecialchars($accountName) ?>"
+                                        data-id="<?= htmlspecialchars((string) ($account['student_id'] ?? '')) ?>"
+                                        data-email="<?= htmlspecialchars((string) ($account['email'] ?? '')) ?>"><i class="fas fa-xmark" aria-hidden="true"></i> Reject</button>
 <?php /*                             Closes the review form. */ ?>
                             </form>
 <?php /*                         Closes the actions cell. */ ?>
@@ -252,6 +280,126 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 </div>
 <?php /* Closes the review history check. */ ?>
 <?php endif; ?>
+
+<?php /* On-page confirmation shown before an account is rejected. */ ?>
+<div class="confirm-overlay" id="rejectAccountModal" role="dialog" aria-modal="true" aria-labelledby="rejectAccountTitle">
+<?php /*     The confirmation card. */ ?>
+    <div class="confirm-modal" role="document">
+<?php /*         Header with the warning icon and title. */ ?>
+        <div class="confirm-header">
+            <span class="confirm-icon"><i class="fas fa-user-xmark" aria-hidden="true"></i></span>
+            <h3 id="rejectAccountTitle">Reject this student account?</h3>
+        </div>
+<?php /*         Body with the student details and the consequence. */ ?>
+        <div class="confirm-body">
+            <p class="confirm-intro">This student will not be able to sign in to the portal.</p>
+            <table class="confirm-details">
+                <tr><th>Student</th><td data-reject-name>&mdash;</td></tr>
+                <tr><th>ADZU ID</th><td data-reject-id>&mdash;</td></tr>
+                <tr><th>Email</th><td data-reject-email>&mdash;</td></tr>
+            </table>
+            <div class="confirm-notice"><i class="fas fa-circle-info" aria-hidden="true"></i> The account stays on record. If the student contacts you, you can still approve it later.</div>
+        </div>
+<?php /*         Footer with Cancel and Reject account. */ ?>
+        <div class="confirm-footer">
+            <button type="button" class="btn btn-outline" data-reject-cancel>Cancel</button>
+            <button type="button" class="btn confirm-submit is-delete" data-reject-confirm><i class="fas fa-xmark" aria-hidden="true"></i> Reject account</button>
+        </div>
+    </div>
+</div>
+
+<?php /* Starts the reject confirmation behaviour. */ ?>
+<script>
+(function () {
+    // Finds the confirmation modal.
+    var modal = document.getElementById('rejectAccountModal');
+    // Stops when this page has no modal.
+    if (!modal) return;
+    // Finds the detail fields and buttons.
+    var nameField = modal.querySelector('[data-reject-name]');
+    var idField = modal.querySelector('[data-reject-id]');
+    var emailField = modal.querySelector('[data-reject-email]');
+    var cancelButton = modal.querySelector('[data-reject-cancel]');
+    var confirmButton = modal.querySelector('[data-reject-confirm]');
+    // Remembers the form and button waiting for confirmation.
+    var pendingForm = null;
+    var pendingButton = null;
+    // Remembers where focus came from.
+    var lastFocus = null;
+
+    // Opens the confirmation with the chosen student's details.
+    function openModal(button) {
+        // Saves the form and button for the confirm step.
+        pendingButton = button;
+        pendingForm = button.closest('form');
+        lastFocus = document.activeElement;
+        // Fills the student details.
+        nameField.textContent = button.dataset.student || '—';
+        idField.textContent = button.dataset.id || '—';
+        emailField.textContent = button.dataset.email || '—';
+        // Shows the modal and locks the page scroll.
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        // Focuses the safe Cancel button first.
+        cancelButton.focus();
+    }
+
+    // Closes the confirmation without changing the account.
+    function closeModal() {
+        // Hides the modal and restores scrolling.
+        modal.classList.remove('open');
+        document.body.style.overflow = '';
+        // Clears the pending action.
+        pendingForm = null;
+        pendingButton = null;
+        // Returns focus to the Reject button.
+        if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+    }
+
+    // Opens the modal from any Reject button.
+    document.querySelectorAll('[data-reject-account]').forEach(function (button) {
+        button.addEventListener('click', function (event) {
+            // Stops the form from submitting before the confirmation.
+            event.preventDefault();
+            // Shows the on-page confirmation.
+            openModal(button);
+        });
+    });
+
+    // Cancels the rejection.
+    cancelButton.addEventListener('click', closeModal);
+
+    // Closes when the dark backdrop is clicked.
+    modal.addEventListener('click', function (event) {
+        // Only reacts to clicks on the overlay itself.
+        if (event.target === modal) closeModal();
+    });
+
+    // Closes with the Escape key.
+    document.addEventListener('keydown', function (event) {
+        // Only reacts when the modal is open.
+        if (event.key === 'Escape' && modal.classList.contains('open')) closeModal();
+    });
+
+    // Sends the rejection after the coordinator confirms.
+    confirmButton.addEventListener('click', function () {
+        // Stops when there is no form to submit.
+        if (!pendingForm || !pendingButton) return;
+        // Uses requestSubmit so the reject button's decision value is sent.
+        if (typeof pendingForm.requestSubmit === 'function') {
+            pendingForm.requestSubmit(pendingButton);
+        } else {
+            // Falls back to a hidden field on older browsers.
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'decision';
+            hidden.value = 'reject';
+            pendingForm.appendChild(hidden);
+            pendingForm.submit();
+        }
+    });
+})();
+</script>
 
 <?php /* Includes the shared footer that closes the page layout. */ ?>
 <?php require_once __DIR__ . '/../../includes/layout/footer.php'; ?>

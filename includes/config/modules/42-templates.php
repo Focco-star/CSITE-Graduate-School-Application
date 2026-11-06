@@ -1,6 +1,14 @@
 <?php
 /* CSITE configuration module: Template rows, workflow/course grouping, template library, and template CRUD. */
 
+// Builds the download URL of one template row.
+function templateDownloadUrl(int $templateId): string {
+    // Routes the download through the template endpoint so a missing local
+    // copy can be fetched from Google Drive before the file is sent.
+    return url('template_download.php?id=' . $templateId);
+// Ends the templateDownloadUrl function.
+}
+
 // Loads active templates with their track and stage details.
 function databaseTemplateRows(string $trackCode = ''): array {
     // Returns an empty list when the DB class is missing.
@@ -36,8 +44,8 @@ function databaseTemplateRows(string $trackCode = ''): array {
            , ['track_code_filter' => strtolower($trackCode), 'track_code' => strtolower($trackCode)])->fetchAll();
         // Loops through the template rows by reference.
         foreach ($rows as &$row) {
-            // Adds the public URL for the template file.
-            $row['url'] = templateFileUrl((string) $row['filePath']);
+            // Adds the download URL for the template file.
+            $row['url'] = templateDownloadUrl((int) $row['id']);
             // Starts the formatted modified date empty.
             $row['modifiedLabel'] = '';
             // Starts the relative modified time empty.

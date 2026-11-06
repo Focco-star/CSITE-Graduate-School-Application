@@ -251,10 +251,13 @@
         form.addEventListener('submit', e => {
             // Starts by assuming the form is valid.
             let valid = true;
+            // Collects the readable labels of empty required fields.
+            const missingLabels = [];
+
             // Loops over every field marked required.
             form.querySelectorAll('[required]').forEach(field => {
-                // Finds the field's wrapper, or uses its parent.
-                const group = field.closest('.form-field') || field.parentElement;
+                // Finds the field's wrapper, including the register form's form-group.
+                const group = field.closest('.form-field, .form-group') || field.parentElement;
                 // Removes any old error styling from the wrapper.
                 group?.classList.remove('has-error');
                 // Removes any old required-field error message.
@@ -274,10 +277,58 @@
                     err.textContent = 'This field is required.';
                     // Adds the message under the field.
                     group?.appendChild(err);
+
+                    // Reads the field's label for the summary.
+                    const labelEl = group?.querySelector('label');
+                    // Uses the label text, or the field name as a fallback.
+                    const labelText = labelEl
+                        ? labelEl.textContent.replace(/\*/g, '').replace(/\s+/g, ' ').trim()
+                        : (field.getAttribute('aria-label') || field.name || 'This field');
+                    // Adds the label once, in the order the fields appear.
+                    if (labelText && !missingLabels.includes(labelText)) {
+                        // Remembers the missing field label.
+                        missingLabels.push(labelText);
+                    }
                 // Closes the empty-field check.
                 }
             // Closes the loop over required fields.
             });
+
+            // Removes an older summary before rebuilding it.
+            form.querySelector('.form-validation-summary')?.remove();
+            // Adds one clear summary listing every missing field.
+            if (missingLabels.length) {
+                // Creates the summary alert.
+                const summary = document.createElement('div');
+                // Reuses the danger alert styling and a summary class.
+                summary.className = 'alert alert-danger form-validation-summary';
+                // Tells assistive tech this is an alert.
+                summary.setAttribute('role', 'alert');
+                // Adds the warning icon.
+                const icon = document.createElement('i');
+                // Uses the same icon as the server error.
+                icon.className = 'fas fa-exclamation-circle';
+                // Hides the icon from screen readers because the text explains it.
+                icon.setAttribute('aria-hidden', 'true');
+                // Builds the list with commas and a final "and".
+                let listText = missingLabels[0];
+                // Uses "and" for two fields.
+                if (missingLabels.length === 2) {
+                    // Joins two labels naturally.
+                    listText = missingLabels[0] + ' and ' + missingLabels[1];
+                // Uses commas and "and" for three or more fields.
+                } else if (missingLabels.length > 2) {
+                    // Joins every label except the last with commas.
+                    listText = missingLabels.slice(0, -1).join(', ') + ', and ' + missingLabels[missingLabels.length - 1];
+                // Closes the list formatting branch.
+                }
+                // Writes the readable message.
+                summary.appendChild(icon);
+                summary.appendChild(document.createTextNode(' Please complete the following required field' + (missingLabels.length === 1 ? '' : 's') + ': ' + listText + '.'));
+                // Puts the summary at the top of the form.
+                form.insertBefore(summary, form.firstChild);
+            // Closes the summary check.
+            }
 
             // Loops over every email field in the form.
             form.querySelectorAll('[type="email"]').forEach(field => {
@@ -581,6 +632,41 @@
         showTrackHint(trackSelect.value);
     // Closes the track change handler.
     });
+
+    // Restores a program and track that were posted before a validation error.
+    if (programValue && programValue.value && programList && programLabel && programToggle) {
+        // Finds the option that matches the saved program code.
+        const savedProgram = programList.querySelector('.program-option[data-code="' + programValue.value + '"]');
+        // Runs only when the saved program is still in the list.
+        if (savedProgram) {
+            // Marks the saved option as selected.
+            savedProgram.classList.add('selected');
+            // Shows the saved program name on the picker button.
+            programLabel.textContent = savedProgram.textContent.trim();
+            // Styles the picker as having a chosen value.
+            programToggle.classList.add('has-value');
+            // Rebuilds the track dropdown for the saved program.
+            fillTracks(savedProgram.dataset.tracks || '');
+            // Reads the track that was posted with the form.
+            const savedTrack = window.CSITE_SELECTED_TRACK || '';
+            // Selects the saved track when it is still valid.
+            if (trackSelect && savedTrack) {
+                // Looks for the saved track option.
+                const trackOption = [...trackSelect.options].find(function (option) { return option.value === savedTrack; });
+                // Applies the saved track when it exists.
+                if (trackOption) {
+                    // Sets the dropdown to the saved track.
+                    trackSelect.value = savedTrack;
+                // Closes the saved-track check.
+                }
+            // Closes the track-select check.
+            }
+            // Shows the workflow hint for the restored track.
+            showTrackHint(trackSelect ? trackSelect.value : '');
+        // Closes the saved-program check.
+        }
+    // Closes the program-restore block.
+    }
 
     // Loops over every filter bar that controls a table or list.
     document.querySelectorAll('[data-filter-table]').forEach(bar => {
@@ -886,6 +972,15 @@
             // Moves the input inside its new wrapper.
             wrap.appendChild(input);
 
+            // Marks the birthdate field so it can drop the duplicate left icon.
+            if (input.dataset.birthdate !== undefined) {
+                // Flags the wrapper itself.
+                wrap.setAttribute('data-birthdate', '');
+                // Flags the surrounding icon wrapper for the CSS rule.
+                wrap.closest('.input-icon-wrap')?.classList.add('birthdate-field');
+            // Closes the birthdate check.
+            }
+
             // Changes the input to a plain text field.
             input.type = 'text';
             // Shows the expected YYYY-MM-DD format as a placeholder.
@@ -995,15 +1090,41 @@
         let active = null;   // { input, btn }
         // Holds the year and month the calendar is viewing.
         let viewY = 0, viewM = 0;
+        // Tracks the delayed outside-click close.
+        let closeTimer = 0;
+
+        // Cancels a close that was waiting for a possible select change.
+        function cancelClose() {
+            // Clears the pending timer when one exists.
+            if (closeTimer) {
+                // Stops the close from running.
+                clearTimeout(closeTimer);
+                // Forgets the timer.
+                closeTimer = 0;
+            // Closes the timer check.
+            }
+        // Closes the cancelClose function.
+        }
+
+        // Delays the outside close so choosing a month or year can cancel it.
+        function scheduleClose() {
+            // Cancels any earlier pending close.
+            cancelClose();
+            // Closes after a short pause, long enough for the select change.
+            closeTimer = setTimeout(close, 250);
+        // Closes the scheduleClose function.
+        }
 
         // Defines fillYears, which rebuilds the year dropdown.
         function fillYears(selectedYear) {
             // Reads the current year from the clock.
             const now = new Date().getFullYear();
-            // Starts 40 years back, or earlier if the chosen year is older.
-            const from = Math.min(now - 40, selectedYear);
-            // Ends 10 years ahead, or later if the chosen year is newer.
-            const to = Math.max(now + 10, selectedYear);
+            // True when the active field asks for a date of birth.
+            const isBirthdate = active && active.input.dataset.birthdate !== undefined;
+            // Birthdates use a full range; other dates stay close to today.
+            const from = isBirthdate ? 1900 : Math.min(now - 40, selectedYear);
+            // Birthdates end at the current year; other dates look a little ahead.
+            const to = isBirthdate ? now : Math.max(now + 10, selectedYear);
             // Starts with an empty option string.
             let html = '';
             // Adds one option per year, newest first.
@@ -1017,8 +1138,11 @@
         function render() {
             // Stops when no date field is active.
             if (!active) return;
-            // Refreshes the year dropdown so it includes the view year.
-            fillYears(viewY);
+            // True when the field asks for a date of birth.
+            const isBirthdate = active.input.dataset.birthdate !== undefined;
+            // Adds the viewed year only when it is missing, so choosing a year
+            // never rebuilds the open year dropdown.
+            if (!yearSel.querySelector('option[value="' + viewY + '"]')) fillYears(viewY);
             // Selects the month being viewed.
             monthSel.value = String(viewM);
             // Selects the year being viewed.
@@ -1034,6 +1158,8 @@
             // Disables the Today shortcut when today is outside the field's bounds.
             const todayBtn = pop.querySelector('[data-dp-today]');
             todayBtn.disabled = (minISO && todayISO < minISO) || (maxISO && todayISO > maxISO);
+            // Hides the Today shortcut for a birthdate, where it does not apply.
+            todayBtn.hidden = isBirthdate;
             // Builds the selected date in the same form.
             const selectedISO = selected ? toISO(selected) : '';
             // Finds the first day of the month being viewed.
@@ -1092,16 +1218,22 @@
 
         // Defines open, which shows the calendar for one field.
         function open(input, btn) {
+            // Stops any close that was waiting from an earlier click.
+            cancelClose();
             // Tells the previously active button it is collapsed.
             if (active) active.btn.setAttribute('aria-expanded', 'false');
             // Remembers the new active input and button.
             active = { input, btn };
-            // Uses the field's date, or today, as the starting month.
-            const base = parseISO(input.value) || new Date();
+            // True when the field asks for a date of birth.
+            const isBirthdate = input.dataset.birthdate !== undefined;
+            // Uses the field's date, a birth-year default, or today.
+            const base = parseISO(input.value) || (isBirthdate ? new Date(2000, 0, 1) : new Date());
             // Sets the calendar year from that date.
             viewY = base.getFullYear();
             // Sets the calendar month from that date.
             viewM = base.getMonth();
+            // Builds the year list once when the calendar opens.
+            fillYears(viewY);
             // Tells assistive tech the button is expanded.
             btn.setAttribute('aria-expanded', 'true');
             // Shows the popover with the open class.
@@ -1115,6 +1247,8 @@
 
         // Defines close, which hides the calendar popover.
         function close() {
+            // Cancels any close that was already waiting.
+            cancelClose();
             // Stops when no date field is active.
             if (!active) return;
             // Tells the button it is collapsed again.
@@ -1165,9 +1299,9 @@
         // Moves one month forward when the right arrow is clicked.
         pop.querySelector('[data-dp-next]').addEventListener('click', () => shiftMonth(1));
         // Jumps to the month picked in the month dropdown.
-        monthSel.addEventListener('change', () => { viewM = +monthSel.value; render(); });
+        monthSel.addEventListener('change', () => { cancelClose(); viewM = +monthSel.value; render(); });
         // Jumps to the year picked in the year dropdown.
-        yearSel.addEventListener('change', () => { viewY = +yearSel.value; render(); });
+        yearSel.addEventListener('change', () => { cancelClose(); viewY = +yearSel.value; render(); });
         // Fills in today's date when Today is clicked.
         pop.querySelector('[data-dp-today]').addEventListener('click', () => commit(toISO(new Date())));
         // Empties the field when Clear is clicked.
@@ -1187,8 +1321,10 @@
             if (!active) return;
             // Keeps the calendar open for clicks on it or its field.
             if (pop.contains(e.target) || active.btn.contains(e.target) || active.input.contains(e.target)) return;
-            // Closes the calendar for any other click.
-            close();
+            // Keeps the calendar open while the month or year dropdown is used.
+            if (e.target && (e.target.tagName === 'SELECT' || e.target.tagName === 'OPTION')) return;
+            // Delays the close so a month or year change can cancel it.
+            scheduleClose();
         // Closes the outside click handler.
         });
         // Listens for keys pressed on the page.
@@ -2105,6 +2241,227 @@
         // Closes the loop over the selects.
         });
     // Closes and runs the select-menu helper function.
+    })();
+
+    // Starts the coordinator notification bell behaviour.
+    (function () {
+        // Finds the bell wrapper on the page.
+        const wrap = document.querySelector('[data-topbar-notif]');
+        // Stops when this page has no bell.
+        if (!wrap) return;
+        // Finds the button that opens the panel.
+        const toggle = wrap.querySelector('[data-notif-toggle]');
+        // Finds the panel itself.
+        const panel = wrap.querySelector('.notif-panel');
+        // Stops when the panel is missing.
+        if (!toggle || !panel) return;
+        // Closes the panel and updates its accessibility state.
+        function closePanel() {
+            // Hides the panel.
+            panel.hidden = true;
+            // Marks the button as collapsed.
+            toggle.setAttribute('aria-expanded', 'false');
+            // Removes the open look from the wrapper.
+            wrap.classList.remove('is-open');
+        }
+        // Opens the panel and updates its accessibility state.
+        function openPanel() {
+            // Shows the panel.
+            panel.hidden = false;
+            // Marks the button as expanded.
+            toggle.setAttribute('aria-expanded', 'true');
+            // Adds the open look to the wrapper.
+            wrap.classList.add('is-open');
+        }
+        // Toggles the panel when the bell is clicked.
+        toggle.addEventListener('click', function (event) {
+            // Stops the document click handler from closing it immediately.
+            event.stopPropagation();
+            // Opens a closed panel, or closes an open one.
+            if (panel.hidden) { openPanel(); } else { closePanel(); }
+        });
+        // Closes the panel when the coordinator clicks elsewhere.
+        document.addEventListener('click', function (event) {
+            // Checks whether the click landed outside the bell wrapper.
+            if (!wrap.contains(event.target)) closePanel();
+        });
+        // Closes the panel with the Escape key.
+        document.addEventListener('keydown', function (event) {
+            // Runs only for Escape.
+            if (event.key === 'Escape') closePanel();
+        });
+    // Closes and runs the notification bell helper.
+    })();
+
+    // Starts the homepage attention card behaviour.
+    (function () {
+        // Finds the attention card on the homepage.
+        const section = document.querySelector('[data-home-attention]');
+        // Stops when this page has no attention card.
+        if (!section) return;
+        // Finds the button, list, dropdown wrapper and empty note.
+        const toggle = section.querySelector('[data-attention-toggle]');
+        const list = section.querySelector('[data-attention-list]');
+        const dropdown = section.querySelector('[data-attention-dropdown]');
+        const empty = section.querySelector('[data-attention-empty]');
+        const total = section.querySelector('[data-attention-total]');
+
+        // Opens and closes the notification list.
+        if (toggle && list) {
+            toggle.addEventListener('click', function () {
+                // Reads whether the list is currently hidden.
+                const open = list.hidden;
+                // Shows a hidden list or hides an open one.
+                list.hidden = !open;
+                // Updates the accessibility state.
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                // Turns the caret to match the state.
+                toggle.classList.toggle('is-open', open);
+            });
+        }
+
+        // Reads the endpoint that returns the current counts.
+        const endpoint = section.dataset.attentionEndpoint;
+        // Stops when there is no endpoint or the browser cannot fetch.
+        if (!endpoint || !window.fetch) return;
+
+        // Updates one of the two visible counts.
+        function setCount(name, value) {
+            section.querySelectorAll('[data-attention-count="' + name + '"]').forEach(function (element) {
+                element.textContent = String(value);
+            });
+        }
+
+        // Rebuilds the notification list with safe DOM nodes.
+        function renderNotifications(items) {
+            // Stops when there is no list.
+            if (!list) return;
+            // Clears the old rows.
+            list.textContent = '';
+            // Adds one row per notification.
+            items.forEach(function (item) {
+                // Creates the list item, its row wrapper, and the link.
+                const li = document.createElement('li');
+                const row = document.createElement('div');
+                row.className = 'home-attention-list-item';
+                const link = document.createElement('a');
+                link.href = item.url;
+                // Creates the icon that matches the notification type.
+                const icon = document.createElement('span');
+                icon.className = 'home-attention-list-icon';
+                const iconGlyph = document.createElement('i');
+                iconGlyph.className = 'fas ' + (item.type === 'account' ? 'fa-user-check' : (item.type === 'document' ? 'fa-file-arrow-up' : 'fa-file-circle-check'));
+                icon.appendChild(iconGlyph);
+                // Creates the title and message block.
+                const body = document.createElement('span');
+                body.className = 'home-attention-list-body';
+                const title = document.createElement('strong');
+                title.textContent = item.title;
+                const message = document.createElement('span');
+                message.textContent = item.message;
+                body.appendChild(title);
+                body.appendChild(message);
+                // Creates the time label.
+                const time = document.createElement('span');
+                time.className = 'home-attention-list-time';
+                time.textContent = item.time;
+                // Assembles the link portion of the row.
+                link.appendChild(icon);
+                link.appendChild(body);
+                link.appendChild(time);
+                row.appendChild(link);
+                // Creates the form that removes this notification.
+                const removeForm = document.createElement('form');
+                removeForm.method = 'post';
+                removeForm.action = section.dataset.attentionRemoveEndpoint || '';
+                removeForm.className = 'home-attention-remove-form';
+                const idInput = document.createElement('input');
+                idInput.type = 'hidden';
+                idInput.name = 'notification_id';
+                idInput.value = String(item.id);
+                const returnInput = document.createElement('input');
+                returnInput.type = 'hidden';
+                returnInput.name = 'return';
+                returnInput.value = section.dataset.attentionReturn || 'coordinator/homepage.php';
+                const removeButton = document.createElement('button');
+                removeButton.type = 'submit';
+                removeButton.className = 'home-attention-remove';
+                removeButton.title = 'Remove notification';
+                removeButton.setAttribute('aria-label', 'Remove notification');
+                const removeIcon = document.createElement('i');
+                removeIcon.className = 'fas fa-xmark';
+                removeIcon.setAttribute('aria-hidden', 'true');
+                removeButton.appendChild(removeIcon);
+                removeForm.appendChild(idInput);
+                removeForm.appendChild(returnInput);
+                removeForm.appendChild(removeButton);
+                row.appendChild(removeForm);
+                // Adds the finished row to the list.
+                li.appendChild(row);
+                list.appendChild(li);
+            });
+        }
+
+        // Applies a fresh set of counts and notifications.
+        function apply(data) {
+            // Updates the two main tiles.
+            setCount('applications', data.new_applications);
+            setCount('accounts', data.pending_accounts);
+            // Updates the notification count and rows.
+            if (total) total.textContent = String(data.notifications.length);
+            renderNotifications(data.notifications);
+            // Shows the dropdown only when there is something to list.
+            const hasItems = data.notifications.length > 0;
+            if (dropdown) dropdown.hidden = !hasItems;
+            if (empty) empty.hidden = hasItems;
+            // Collapses an emptied list.
+            if (!hasItems && list) {
+                list.hidden = true;
+                if (toggle) {
+                    toggle.setAttribute('aria-expanded', 'false');
+                    toggle.classList.remove('is-open');
+                }
+            }
+            // Keeps the bell badge in sync with the same data.
+            const bell = document.querySelector('[data-notif-toggle]');
+            if (bell) {
+                let badge = bell.querySelector('.topbar-notification-badge');
+                if (data.unseen > 0) {
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'topbar-notification-badge';
+                        bell.appendChild(badge);
+                    }
+                    badge.textContent = data.unseen > 9 ? '9+' : String(data.unseen);
+                    bell.classList.add('has-count');
+                } else {
+                    if (badge) badge.remove();
+                    bell.classList.remove('has-count');
+                }
+            }
+        }
+
+        // Fetches the latest counts from the server.
+        function refresh() {
+            fetch(endpoint, {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin',
+                cache: 'no-store'
+            }).then(function (response) {
+                return response.ok ? response.json() : null;
+            }).then(function (data) {
+                if (data) apply(data);
+            }).catch(function () {
+                // Keeps the current values when the request fails.
+            });
+        }
+
+        // Refreshes every 30 seconds and whenever the tab becomes visible.
+        setInterval(refresh, 30000);
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) refresh();
+        });
+    // Closes and runs the homepage attention helper.
     })();
 
 // Closes the outer script wrapper that began earlier in the file.

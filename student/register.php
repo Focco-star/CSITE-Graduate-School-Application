@@ -20,34 +20,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $first = formatPersonName($_POST['firstName'] ?? '');
     // Cleans and formats the typed last name.
     $last = formatPersonName($_POST['lastName'] ?? '');
-    // Reads the ADZU email and trims spaces.
-    $email = trim($_POST['email'] ?? '');
+    // Reads the ADZU email, trims spaces, and stores it in lowercase.
+    $email = strtolower(trim((string) ($_POST['email'] ?? '')));
     // Reads the chosen program code from the form.
-    $program = $_POST['program'] ?? '';
+    $program = trim((string) ($_POST['program'] ?? ''));
     // Reads the first password field.
     $password = $_POST['password'] ?? '';
     // Reads the password confirmation field.
     $confirm = $_POST['confirmPassword'] ?? '';
-    // Reads the age value, trimmed.
-    $age = trim($_POST['age'] ?? '');
-    // Reads the chosen gender.
-    $gender = $_POST['gender'] ?? '';
+    // Reads the birthdate value, trimmed.
+    $birthdate = trim((string) ($_POST['birthdate'] ?? ''));
+    // Reads the chosen biological sex and normalises it.
+    $sex = normalizeSex($_POST['sex'] ?? '');
     // Reads the middle initial, uppercased and trimmed.
-    $middleInitial = strtoupper(trim($_POST['middleInitial'] ?? ''));
+    $middleInitial = strtoupper(trim((string) ($_POST['middleInitial'] ?? '')));
     // Reads the typed ADZU ID number.
-    $studentIdRaw = trim($_POST['studentId'] ?? '');
-    // Explains which track the student follows for this course.
-    // The track the student follows. A course that can be followed in more
-    // Continues: a course may offer more than one track to choose from.
-    // than one way lets the student choose.
+    $studentIdRaw = trim((string) ($_POST['studentId'] ?? ''));
     // Reads the track chosen by the student.
-    $track = trim($_POST['track'] ?? '');
+    $track = trim((string) ($_POST['track'] ?? ''));
 
-    // Requires first name, last name, email, program, password, and ID.
-    if ($first === '' || $last === '' || $email === '' || $program === '' || $password === '' || $studentIdRaw === '') {
-        // Sets an error asking the student to complete required fields.
-        $registerError = 'Please complete all required fields.';
-    // Requires the student ID to be 4 to 10 digits only.
+    // When a program has only one track, use it without asking the student.
+    if ($program !== '' && isset(PROGRAMS[$program])) {
+        // Reads the tracks allowed for the chosen program.
+        $programTracks = getTracksForProgram($program);
+        // Fills in the only track when there is just one.
+        if (count($programTracks) === 1) {
+            // Uses the program's single track.
+            $track = $programTracks[0];
+        // Closes the single-track check.
+        }
+    // Closes the program check.
+    }
+
+    // Collects every required field that was left empty.
+    $missingFields = [];
+    // Checks each required text field in form order.
+    foreach ([
+        'First Name'        => $first,
+        'Last Name'         => $last,
+        'Middle Initial'    => $middleInitial,
+        'Birthdate'         => $birthdate,
+        'Sex'               => $sex,
+        'Program'           => $program,
+        'ADZU Email'        => $email,
+        'ADZU ID Number'    => $studentIdRaw,
+        'Password'          => $password,
+        'Re-enter Password' => $confirm,
+    ] as $label => $value) {
+        // Adds the label when its value is empty.
+        if (trim((string) $value) === '') {
+            // Remembers the missing field name.
+            $missingFields[] = $label;
+        // Closes the empty-value check.
+        }
+    // Closes the required field loop.
+    }
+    // Requires a track when the program allows more than one.
+    if ($program !== '' && isset(PROGRAMS[$program]) && count(getTracksForProgram($program)) > 1 && $track === '') {
+        // Adds the track to the missing fields.
+        $missingFields[] = 'Track';
+    // Closes the track check.
+    }
+
+    // Reports every missing field by name instead of a generic message.
+    if ($missingFields) {
+        // Copies the list so the message can format it safely.
+        $missingNames = $missingFields;
+        // Formats one item, two items, or a longer list with "and".
+        if (count($missingNames) === 1) {
+            // Uses the single field name.
+            $missingText = $missingNames[0];
+        } elseif (count($missingNames) === 2) {
+            // Joins two field names with "and".
+            $missingText = $missingNames[0] . ' and ' . $missingNames[1];
+        } else {
+            // Uses the last field for the final "and" item.
+            $lastMissing = array_pop($missingNames);
+            // Joins the rest with commas and the last with "and".
+            $missingText = implode(', ', $missingNames) . ', and ' . $lastMissing;
+        }
+        // Builds a readable list of the missing fields.
+        $registerError = 'Please complete the following required field' . (count($missingFields) === 1 ? '' : 's') . ': ' . $missingText . '.';
+    // Validates the student ID format.
     } elseif (!ctype_digit($studentIdRaw) || strlen($studentIdRaw) < 4 || strlen($studentIdRaw) > 10) {
         // Sets an error about the invalid ADZU ID number.
         $registerError = 'Enter a valid ADZU ID number (4–10 digits).';
@@ -59,6 +113,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!in_array($track, getTracksForProgram($program), true)) {
         // Sets an error telling the student to pick their program's track.
         $registerError = 'Select the track your program follows.';
+    // Validates the birthdate.
+    } elseif (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthdate) || ageFromBirthdate($birthdate) < 15) {
+        // Sets an error about an invalid or future birthdate.
+        $registerError = 'Enter a valid birthdate.';
+    // Validates the sex value.
+    } elseif (!in_array($sex, ['Male', 'Female', 'Intersex'], true)) {
+        // Sets an error about the missing sex value.
+        $registerError = 'Select your sex.';
     // Validates that the email looks like a real email address.
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         // Sets an error about the invalid email address.
@@ -85,7 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // If that email is already registered, refuse the sign-up.
             if ($existingUser) {
                 // Throws an error so the catch block can show the message.
-                throw new LogicException('An account with this email address already exists.');
+                throw new LogicException('This email address is already registered. Sign in with that account instead.');
             // Closes the existing-user check.
             }
 
@@ -136,10 +198,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'last_name'      => $last,
                 // Stores the middle initial without a trailing dot.
                 'middle_initial' => rtrim($middleInitial, '.'),
-                // Casts the age to a whole number.
-                'age'            => (int) $age,
-                // Stores the selected gender.
-                'gender'         => $gender,
+                // Works out the age from the birthdate.
+                'age'            => ageFromBirthdate($birthdate),
+                // Stores the birthdate.
+                'birthdate'      => $birthdate,
+                // Stores the biological sex.
+                'sex'            => $sex,
+                // Keeps the legacy gender column in sync with the sex value.
+                'gender'         => $sex,
                 // Stores the full program name, falling back to the code.
                 'program'        => PROGRAMS[$program] ?? $program,
                 // Stores the chosen track: thesis, capstone, or seminar.
@@ -190,7 +256,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Sends the student to the login page without signing them in.
             redirectTo('student/login.php');
 
-        // Catches any exception thrown while saving the account.
+        // Catches a duplicate-key or other database error while saving.
+        } catch (PDOException $e) {
+            // Rolls back the transaction if one is still open.
+            if (isset($pdo) && $pdo->inTransaction()) {
+                // Cancels the half-saved inserts.
+                $pdo->rollBack();
+            // Closes the rollback if.
+            }
+            // Shows a friendly message for a duplicate email or ID.
+            $registerError = ((string) ($e->getCode() ?? '') === '23000')
+                ? 'This email address or ADZU ID number is already registered.'
+                : 'The account could not be created. Please try again.';
+        // Catches the readable validation errors raised above.
         } catch (Exception $e) {
             // Rolls back the transaction if one is still open.
             if (isset($pdo) && $pdo->inTransaction()) {
@@ -211,11 +289,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // what the student typed; otherwise the verified Google profile fills the
 // name and the ADZU email.
 // Reads the posted first name so a failed submit keeps it.
-$prefillFirst = trim((string) ($_POST['firstName'] ?? ''));
+$prefillFirst = formatPersonName($_POST['firstName'] ?? '');
 // Reads the posted last name for the same reason.
-$prefillLast  = trim((string) ($_POST['lastName'] ?? ''));
-// Reads the posted email for the same reason.
-$prefillEmail = trim((string) ($_POST['email'] ?? ''));
+$prefillLast  = formatPersonName($_POST['lastName'] ?? '');
+// Reads the posted email for the same reason and keeps it lowercase.
+$prefillEmail = strtolower(trim((string) ($_POST['email'] ?? '')));
+// Reads the posted middle initial.
+$prefillMiddle = strtoupper(trim((string) ($_POST['middleInitial'] ?? '')));
+// Reads the posted birthdate.
+$prefillBirthdate = trim((string) ($_POST['birthdate'] ?? ''));
+// Reads the posted sex.
+$prefillSex = normalizeSex($_POST['sex'] ?? '');
+// Reads the posted program code.
+$prefillProgram = trim((string) ($_POST['program'] ?? ''));
+// Reads the posted track code.
+$prefillTrack = trim((string) ($_POST['track'] ?? ''));
+// Reads the posted ADZU ID number.
+$prefillStudentId = trim((string) ($_POST['studentId'] ?? ''));
 
 // If Google verified the student, use it to fill blanks.
 if ($googleProfile) {
@@ -289,7 +379,7 @@ $trackHints = [
         <?php endif; ?>
 
 <?php /*         Registration form posting back to this same page. */ ?>
-        <form class="login-form" action="<?= url('student/register.php') ?>" method="post" data-validate>
+        <form class="login-form" action="<?= url('student/register.php') ?>" method="post" data-validate novalidate>
 <?php /*             Section label for the personal information fields. */ ?>
             <div class="form-section-label">Personal Information</div>
 
@@ -331,54 +421,54 @@ $trackHints = [
 <?php /*                 Group for the middle initial. */ ?>
                 <div class="form-group">
 <?php /*                     Label for the middle initial input. */ ?>
-                    <label for="middleInitial">Middle Initial</label>
+                    <label for="middleInitial">Middle Initial <span class="required">*</span></label>
 <?php /*                     Icon wrapper around the middle initial input. */ ?>
                     <div class="input-icon-wrap">
 <?php /*                         User icon inside the middle initial box. */ ?>
                         <i class="fas fa-user"></i>
 <?php /*                         Short text input for the middle initial, forced uppercase. */ ?>
-                        <input type="text" id="middleInitial" name="middleInitial" placeholder="e.g. R" maxlength="2" style="text-transform:uppercase;">
+                        <input type="text" id="middleInitial" name="middleInitial" placeholder="e.g. R" maxlength="2" style="text-transform:uppercase;" value="<?= htmlspecialchars($prefillMiddle) ?>" required>
 <?php /*                     Closes the middle initial wrapper. */ ?>
                     </div>
 <?php /*                 Closes the middle initial group. */ ?>
                 </div>
-<?php /*                 Group for the age field. */ ?>
+<?php /*                 Group for the birthdate field. */ ?>
                 <div class="form-group">
-<?php /*                     Label for the age input. */ ?>
-                    <label for="age">Age *</label>
-<?php /*                     Icon wrapper around the age input. */ ?>
+<?php /*                     Label for the birthdate input. */ ?>
+                    <label for="birthdate">Birthdate *</label>
+<?php /*                     Icon wrapper around the birthdate input. */ ?>
                     <div class="input-icon-wrap">
-<?php /*                         Calendar icon inside the age box. */ ?>
+<?php /*                         Calendar icon inside the birthdate box. */ ?>
                         <i class="fas fa-calendar-alt"></i>
-<?php /*                         Number input for age, limited from 18 to 99. */ ?>
-                        <input type="number" id="age" name="age" placeholder="Age" min="18" max="99" required>
-<?php /*                     Closes the age wrapper. */ ?>
+<?php /*                         Date input that cannot pick a future date. */ ?>
+                        <input type="date" id="birthdate" name="birthdate" max="<?= date('Y-m-d') ?>" value="<?= htmlspecialchars($prefillBirthdate) ?>" data-birthdate required>
+<?php /*                     Closes the birthdate wrapper. */ ?>
                     </div>
-<?php /*                 Closes the age group. */ ?>
+<?php /*                 Closes the birthdate group. */ ?>
                 </div>
-<?php /*                 Group for the gender dropdown. */ ?>
+<?php /*                 Group for the biological sex dropdown. */ ?>
                 <div class="form-group">
-<?php /*                     Label for the gender dropdown. */ ?>
-                    <label for="gender">Gender *</label>
-<?php /*                     Icon wrapper around the gender select. */ ?>
+<?php /*                     Label for the sex dropdown. */ ?>
+                    <label for="sex">Sex *</label>
+<?php /*                     Icon wrapper around the sex select. */ ?>
                     <div class="input-icon-wrap">
-<?php /*                         Gender icon inside the select box. */ ?>
+<?php /*                         Venus and Mars icon inside the select box. */ ?>
                         <i class="fas fa-venus-mars"></i>
-<?php /*                         Dropdown listing the gender choices. */ ?>
-                        <select id="gender" name="gender" required>
+<?php /*                         Dropdown listing the biological sex choices. */ ?>
+                        <select id="sex" name="sex" required>
 <?php /*                             Placeholder option that cannot be submitted. */ ?>
-                            <option value="" disabled selected>Select</option>
-<?php /*                             Gender option Male. */ ?>
-                            <option>Male</option>
-<?php /*                             Gender option Female. */ ?>
-                            <option>Female</option>
-<?php /*                             Gender option Prefer not to say. */ ?>
-                            <option>Prefer not to say</option>
-<?php /*                         Closes the gender dropdown. */ ?>
+                            <option value="" disabled <?= $prefillSex === '' ? 'selected' : '' ?>>Select</option>
+<?php /*                             One option for each valid sex value. */ ?>
+                            <?php foreach (['Male', 'Female', 'Intersex'] as $sexOption): ?>
+<?php /*                             Keeps the posted value selected after an error. */ ?>
+                            <option value="<?= htmlspecialchars($sexOption) ?>" <?= $prefillSex === $sexOption ? 'selected' : '' ?>><?= htmlspecialchars($sexOption) ?></option>
+<?php /*                             Ends the sex option loop. */ ?>
+                            <?php endforeach; ?>
+<?php /*                         Closes the sex dropdown. */ ?>
                         </select>
-<?php /*                     Closes the gender icon wrapper. */ ?>
+<?php /*                     Closes the sex icon wrapper. */ ?>
                     </div>
-<?php /*                 Closes the gender group. */ ?>
+<?php /*                 Closes the sex group. */ ?>
                 </div>
 <?php /*             Closes the three-column grid. */ ?>
             </div>
@@ -390,7 +480,7 @@ $trackHints = [
 <?php /*                 Label saying a program must be chosen. */ ?>
                 <label>Program *</label>
 <?php /*                 Hidden input that stores the chosen program code. */ ?>
-                <input type="hidden" name="program" id="programValue" required>
+                <input type="hidden" name="program" id="programValue" value="<?= htmlspecialchars($prefillProgram) ?>" required>
 <?php /*                 Wrapper for the custom program dropdown. */ ?>
                 <div class="program-picker">
 <?php /*                     Button that opens the program list. */ ?>
@@ -480,7 +570,7 @@ $trackHints = [
 <?php /*                     ID card icon inside the ID box. */ ?>
                     <i class="fas fa-id-card"></i>
 <?php /*                     Text input for the ADZU ID number, required. */ ?>
-                    <input type="text" id="studentId" name="studentId" placeholder="e.g. 259344" required>
+                    <input type="text" id="studentId" name="studentId" placeholder="e.g. 259344" value="<?= htmlspecialchars($prefillStudentId) ?>" required>
 <?php /*                 Closes the ID wrapper. */ ?>
                 </div>
 <?php /*             Closes the ID group. */ ?>
@@ -571,6 +661,8 @@ window.CSITE_TRACK_LABELS = <?= json_encode([
     'seminar'  => 'Seminar Paper',
 // Closes the track label map and prints it as JSON.
 ]) ?>;
+<?php /* Passes the posted track so the form can restore it after an error. */ ?>
+window.CSITE_SELECTED_TRACK = <?= json_encode($prefillTrack) ?>;
 <?php /* Closes the script block. */ ?>
 </script>
 

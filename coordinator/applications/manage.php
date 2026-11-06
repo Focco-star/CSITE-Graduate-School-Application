@@ -316,8 +316,8 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                 <option value="">All Programs</option>
 <?php /*                 Loops over each program code in the PROGRAMS list. */ ?>
                 <?php foreach (array_keys(PROGRAMS) as $code): ?>
-<?php /*                 Adds one option for the program code. */ ?>
-                <option><?= htmlspecialchars($code) ?></option>
+<?php /*                 Adds one option for the program, showing its full name. */ ?>
+                <option value="<?= htmlspecialchars($code) ?>"><?= htmlspecialchars(PROGRAMS[$code] ?? $code) ?></option>
 <?php /*                 Ends the program dropdown loop. */ ?>
                 <?php endforeach; ?>
 <?php /*             Closes the program dropdown. */ ?>
@@ -560,6 +560,8 @@ require_once __DIR__ . '/../../includes/layout/header.php';
                                 <div class="app-details-top">
 <?php /*                                     Shows a coloured badge for the application status. */ ?>
                                     <?= statusBadge($primary['status']) ?>
+<?php /*                                     Marks newly submitted applications so they stand out. */ ?>
+                                    <?php if (($primary['status'] ?? '') === 'submitted'): ?><span class="badge-new">New</span><?php endif; ?>
 <?php /*                                     Shows the track name as a small chip. */ ?>
                                     <span class="track-chip"><?= htmlspecialchars($rowTrack) ?></span>
 <?php /*                                 Closes the top line. */ ?>
@@ -569,7 +571,7 @@ require_once __DIR__ . '/../../includes/layout/header.php';
 <?php /*                                 Opens the program, stage, adviser, and date details. */ ?>
                                 <div class="app-details-meta">
 <?php /*                                     Shows the application program. */ ?>
-                                    <span class="app-meta-item"><i class="fas fa-graduation-cap" aria-hidden="true"></i><span class="app-meta-label">Program</span><span class="app-meta-value"><?= htmlspecialchars($rowProgram) ?></span></span>
+                                    <span class="app-meta-item"><i class="fas fa-graduation-cap" aria-hidden="true"></i><span class="app-meta-label">Program</span><span class="app-meta-value"><?= htmlspecialchars(PROGRAMS[$rowProgram] ?? $rowProgram) ?></span></span>
 <?php /*                                     Shows the current presentation stage. */ ?>
                                     <span class="app-meta-item"><i class="fas fa-layer-group" aria-hidden="true"></i><span class="app-meta-label">Stage</span><span class="app-meta-value"><?= htmlspecialchars($primary['stage']) ?></span></span>
 <?php /*                                     Shows the adviser, or a dash when empty. */ ?>

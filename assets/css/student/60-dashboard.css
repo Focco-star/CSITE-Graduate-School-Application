@@ -20,6 +20,8 @@
 .ms-overview-fill { height: 100%; background: linear-gradient(90deg, var(--adzu-gold), #f2c14e); border-radius: 99px; transition: width .35s ease; }
 /* Styles the small percentage text beside the bar. */
 .ms-overview-text { font-size: 0.78rem; color: var(--gray-600); font-weight: 600; white-space: nowrap; }
+/* Softens the separate count of documents waiting for review. */
+.ms-overview-submitted { color: var(--gray-500); font-weight: 500; }
 
 /* Starts the message icon that opens all coordinator comments. */
 .ms-message-btn {

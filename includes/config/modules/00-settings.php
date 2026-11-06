@@ -199,12 +199,12 @@ define('COORDINATOR_STATUSES', [
 define('PROGRAMS', [
     // MSCS is the Master of Science in Computer Science.
     'MSCS'      => 'Master of Science in Computer Science',
-    // MSLIS is the Master of Library and Information Science.
-    'MSLIS'     => 'Master of Library and Information Science',
+    // MSLIS is the Master of Science in Library and Information Science (thesis).
+    'MSLIS'     => 'Master of Science in Library and Information Science',
     // MIT is the Master in Information Technology.
     'MIT'       => 'Master in Information Technology',
-    // MLIS is the Master in Library and Information System.
-    'MLIS'      => 'Master in Library and Information System',
+    // MLIS is the Master of Library and Information Science (capstone).
+    'MLIS'      => 'Master of Library and Information Science',
     // MATH is the Master in Mathematics Education.
     'MATH'      => 'Master in Mathematics Education',
     // MSED_CHEM is Science Education major in Chemistry.

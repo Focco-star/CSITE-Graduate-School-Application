@@ -59,15 +59,70 @@ function studentWelcomeName(?array $student, ?array $user = null): string {
 function formatPersonName(?string $name): string {
     // Trims and collapses spaces in the name.
     $name = trim(preg_replace('/\s+/', ' ', (string) $name) ?? '');
-    // Leaves empty or already mixed-case names unchanged.
-    if ($name === '' || ($name !== strtoupper($name) && $name !== strtolower($name))) {
-        // Returns the name as it is.
+    // Returns empty text unchanged.
+    if ($name === '') {
+        // Returns the empty name.
         return $name;
-    // Ends the unchanged case check.
+    // Ends the empty-name check.
     }
-    // Capitalises each word of an all-caps or all-lower name.
+    // Converts every word to proper case, including hyphenated and apostrophe names.
+    // This also fixes names typed in mixed case, such as "cARPO" or "mj".
     return ucwords(strtolower($name), " \t\r\n\f\v-'");
 // Ends the formatPersonName function.
+}
+
+// Normalises a biological sex value to its readable form.
+function normalizeSex(?string $sex): string {
+    // Reads the value in lowercase without spaces.
+    $value = strtolower(trim((string) $sex));
+    // Maps the common short forms to Male.
+    if ($value === 'male' || $value === 'm') {
+        // Returns the readable sex value.
+        return 'Male';
+    // Ends the male check.
+    }
+    // Maps the common short forms to Female.
+    if ($value === 'female' || $value === 'f') {
+        // Returns the readable sex value.
+        return 'Female';
+    // Ends the female check.
+    }
+    // Returns any other value unchanged, such as Intersex.
+    return trim((string) $sex);
+// Ends the normalizeSex function.
+}
+
+// Works out a person's age from a birthdate.
+function ageFromBirthdate(?string $birthdate): int {
+    // Reads the birthdate as text.
+    $date = trim((string) $birthdate);
+    // Returns zero when no birthdate was given.
+    if ($date === '') {
+        // Returns the empty age.
+        return 0;
+    // Ends the empty birthdate check.
+    }
+    // Starts a guarded block so an invalid date never breaks a page.
+    try {
+        // Parses the birthdate.
+        $born = new DateTime($date);
+        // Reads today's date without a time.
+        $today = new DateTime('today');
+        // Rejects birthdates in the future.
+        if ($born > $today) {
+            // Returns zero for an impossible birthdate.
+            return 0;
+        // Ends the future-date check.
+        }
+        // Returns the completed years.
+        return $born->diff($today)->y;
+    // Catches an invalid date string.
+    } catch (Throwable $e) {
+        // Returns zero when the date cannot be read.
+        return 0;
+    // Ends the invalid-date handler.
+    }
+// Ends the ageFromBirthdate function.
 }
 
 /**
@@ -158,6 +213,12 @@ function programCodeForStudent(array $student): string {
         return $program;
     // Ends the known code check.
     }
+    // Library programs share almost the same name, so their track decides the code.
+    if (stripos($program, 'library') !== false) {
+        // Returns MLIS for the capstone track and MSLIS for the thesis track.
+        return (($student['track'] ?? '') === 'capstone') ? 'MLIS' : 'MSLIS';
+    // Ends the library program check.
+    }
     // Finds the code whose label matches the stored value.
     $code = array_key_first(array_filter(PROGRAMS, static fn($label) => $label === $program));
     // Returns the code when a label matched.
@@ -205,8 +266,18 @@ function upsertStudentIdentity(array $input, int $userId): array {
     $track = $input['track'] ?? getTrackForProgram($input['program'] ?? 'MSCS');
     // Reads the gender from the input.
     $gender = trim((string) ($input['gender'] ?? ''));
-    // Reads the age as a whole number.
-    $age = (int) ($input['age'] ?? 0);
+    // Reads the biological sex from the input, falling back to gender.
+    $sex = normalizeSex($input['sex'] ?? $input['gender'] ?? '');
+    // Reads the birthdate from the input.
+    $birthdate = trim((string) ($input['birthdate'] ?? ''));
+    // Works out the age from the birthdate, or keeps the supplied age.
+    $age = $birthdate !== '' ? ageFromBirthdate($birthdate) : (int) ($input['age'] ?? 0);
+    // Keeps the legacy gender column in step with the sex value.
+    if ($sex !== '') {
+        // Uses the normalised sex as the legacy gender value.
+        $gender = $sex;
+    // Ends the sex fallback.
+    }
     // Builds the standard display name for users.full_name.
     $fullName = canonicalStudentName($first, $last, $mi);
 
@@ -244,10 +315,6 @@ function upsertStudentIdentity(array $input, int $userId): array {
                 'last_name' => $last,
                 // New middle initial without a dot.
                 'middle_initial' => $mi,
-                // New age.
-                'age' => $age,
-                // New gender.
-                'gender' => $gender,
                 // Full program label.
                 'program' => $programLabel,
                 // Selected track.
@@ -256,6 +323,30 @@ function upsertStudentIdentity(array $input, int $userId): array {
                 'adviser_name' => trim((string) ($input['adviser_name'] ?? $existing['adviser_name'] ?? '')),
             // Ends the update values.
             ];
+            // Adds the birthdate and its age when a birthdate was supplied.
+            if ($birthdate !== '') {
+                // Stores the birthdate.
+                $patch['birthdate'] = $birthdate;
+                // Stores the age worked out from the birthdate.
+                $patch['age'] = ageFromBirthdate($birthdate);
+            // Keeps a supplied age when no birthdate came with it.
+            } elseif (array_key_exists('age', $input)) {
+                // Stores the supplied age.
+                $patch['age'] = (int) $input['age'];
+            // Closes the age branch.
+            }
+            // Adds the biological sex when one was supplied.
+            if ($sex !== '') {
+                // Stores the biological sex.
+                $patch['sex'] = $sex;
+                // Keeps the legacy gender column in sync.
+                $patch['gender'] = $sex;
+            // Keeps a supplied gender when no sex came with it.
+            } elseif (array_key_exists('gender', $input)) {
+                // Stores the supplied gender.
+                $patch['gender'] = trim((string) $input['gender']);
+            // Closes the gender branch.
+            }
             // Updates the students row for this student id.
             DB::update('students', $patch, ['student_id' => (int) $existing['student_id']]);
             // Updates users.full_name to match the new name.
@@ -281,9 +372,13 @@ function upsertStudentIdentity(array $input, int $userId): array {
         // Reflects the saved middle initial in the returned row.
         $existing['middle_initial'] = $mi;
         // Reflects the saved age in the returned row.
-        $existing['age'] = $age;
+        $existing['age'] = $patch['age'] ?? ($existing['age'] ?? 0);
+        // Reflects the saved biological sex in the returned row.
+        $existing['sex'] = $patch['sex'] ?? ($existing['sex'] ?? '');
+        // Reflects the saved birthdate in the returned row.
+        $existing['birthdate'] = $patch['birthdate'] ?? ($existing['birthdate'] ?? null);
         // Reflects the saved gender in the returned row.
-        $existing['gender'] = $gender;
+        $existing['gender'] = $patch['gender'] ?? ($existing['gender'] ?? '');
         // Reflects the saved program in the returned row.
         $existing['program'] = $programLabel;
         // Reflects the saved track in the returned row.
@@ -309,9 +404,13 @@ function upsertStudentIdentity(array $input, int $userId): array {
             'last_name' => $last,
             // Student middle initial without a dot.
             'middle_initial' => $mi,
-            // Student age.
+            // Student age, worked out from the birthdate when one was given.
             'age' => $age,
-            // Student gender.
+            // Student biological sex.
+            'sex' => $sex,
+            // Student birthdate, or null when it was not given.
+            'birthdate' => $birthdate !== '' ? $birthdate : null,
+            // Student gender kept in sync with the sex value.
             'gender' => $gender,
             // Full program label.
             'program' => $programLabel,
@@ -563,6 +662,10 @@ function databaseStudentIdentity(): array {
             'middle_initial' => $dbStudent['middle_initial'] ?? '',
             // Sets the age as an integer.
             'age' => (int) $dbStudent['age'],
+            // Sets the biological sex, or empty text when null.
+            'sex' => $dbStudent['sex'] ?? ($dbStudent['gender'] ?? ''),
+            // Sets the birthdate, or empty text when null.
+            'birthdate' => $dbStudent['birthdate'] ?? '',
             // Sets the gender, or empty text when null.
             'gender' => $dbStudent['gender'] ?? '',
             // Finds the program code for this student.

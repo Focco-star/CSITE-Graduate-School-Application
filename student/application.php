@@ -75,7 +75,7 @@ function csiteCheckUpload($file, string $docType, string $stageKey, array $stage
 
 /** Stores the file and records it against the student. Throws RuntimeException on failure. */
 // Defines a helper that stores the file and records it as a student document.
-function csiteSaveUpload(array $file, string $docType, string $stageKey, array $stages, string $email, int $userId): void
+function csiteSaveUpload(array $file, string $docType, string $stageKey, array $stages, string $email, int $userId): ?int
 // Opens the body of the csiteSaveUpload helper.
 {
     // Moves the uploaded file into storage and returns its stored path and MIME type.
@@ -83,7 +83,7 @@ function csiteSaveUpload(array $file, string $docType, string $stageKey, array $
     // Finds the newest application of this student so the document can point to it.
     $linked = latestApplicationForEmail($email);
     // Saves the document record with its type, stage, size and stored file details.
-    recordStudentDocument([
+    return recordStudentDocument([
         // Links the document to the application id, or null when there is none yet.
         'applicationId' => $linked['id'] ?? null,
         // Stores the email of the student who owns the document.
@@ -1122,8 +1122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                 $identity = $identityStmt->fetch() ?: [];
                 // Only rewrites the identity when the row was found.
                 if ($identity) {
-                    // Works out the program code from the stored program value.
-                    $programCode = programCodeForStudent(['program' => $identity['program']]);
+                    // Works out the program code from the stored program and track.
+                    $programCode = programCodeForStudent(['program' => $identity['program'], 'track' => $identity['track']]);
                     // Prepares the identity update.
                     $pdo->prepare(
                         // Rewrites the name, age, gender, program, track and adviser of the student.
@@ -1149,8 +1149,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                         'age' => (int) $identity['age'],
                         // Gender exactly as stored.
                         'gender' => $identity['gender'],
-                        // Program code worked out above.
-                        'program' => $programCode,
+                        // Program full label worked out above.
+                        'program' => PROGRAMS[$programCode] ?? $identity['program'],
                         // Sets the track column to the student's current track so it stays unchanged.
                         'track' => $identity['track'],
                         // Saves the adviser name the student typed into students.adviser_name.
@@ -1245,14 +1245,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
             // Closes the if ($hasDetails) block.
             }
 
+            // Notifies the coordinator when the student completed a submission.
+            if ($hasDetails && $savedApplicationId > 0) {
+                // Sends the completion alert with the refreshed student name and stage.
+                notifyCoordinatorApplicationSubmission(
+                    // Passes the saved application.
+                    $savedApplicationId,
+                    // Passes the saved student name.
+                    (string) $mockStudent['name'],
+                    // Passes the readable stage label.
+                    (string) ($stages[$stageKey]['label'] ?? '')
+                );
+            // Closes the application notification check.
+            }
+
             // Runs only when the student attached a file.
             if ($hasFile) {
-                // Saves the uploaded file and its database row for the stage.
-                csiteSaveUpload($file, $docType, $stageKey, $stages, $mockStudent['email'], $userId);
+                // Saves the uploaded file and returns the stored document id.
+                $savedDocumentId = csiteSaveUpload($file, $docType, $stageKey, $stages, $mockStudent['email'], $userId);
                 // Flags that the document was saved successfully.
-                $documentSaved = true;
+                $documentSaved = $savedDocumentId !== null && $savedDocumentId > 0;
+                // Notifies the coordinator that a document is waiting for review.
+                if ($documentSaved) {
+                    // Sends the document alert with its type and stage.
+                    notifyCoordinatorDocumentSubmission(
+                        // Passes the saved document.
+                        (int) $savedDocumentId,
+                        // Passes the student name.
+                        (string) $mockStudent['name'],
+                        // Passes the document type.
+                        $docType,
+                        // Passes the readable stage label.
+                        (string) ($stages[$stageKey]['label'] ?? ''),
+                        // Passes the application id when one is known.
+                        (int) $savedApplicationId
+                    );
+                // Closes the document notification check.
+                }
             // Closes the if ($hasFile) block.
             }
+
+            // Reloads the milestone progress after the new document was saved.
+            $progress = getStudentProgress($mockStudent['email'], $track);
+            // Refreshes which document types are open for the stage.
+            $openTypesByStage = openDocumentTypesByStage($mockStudent['email'], $track, $stages, $progress);
 
             // Comment noting that the receipt details are stored with the document.
             // The receipt details the student entered are saved with the
@@ -1307,9 +1343,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                 // Starts the success popup data for this case.
                 $popup = [
                     // Sets the popup title.
-                    'title'   => 'Application submitted successfully.',
+                    'title'   => 'Application submitted successfully!',
                     // Sets the popup message with the uploaded file name.
                     'message' => 'Your application and "' . $file['name'] . '" were sent to the coordinator for review.',
+                    // Sends the student to the updated milestone tracker.
+                    'redirect' => url('student/dashboard.php#milestone-tracker'),
+                    // Keeps the confirmation visible long enough to read.
+                    'duration' => 3200,
                 // Closes the popup array.
                 ];
             // Runs when only the application details were submitted.
@@ -1317,9 +1357,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                 // Starts the success popup for details only.
                 $popup = [
                     // Sets the popup title.
-                    'title'   => 'Application submitted successfully.',
+                    'title'   => 'Application submitted successfully!',
                     // Sets the message without a file name.
                     'message' => 'Your application was sent to the coordinator for review.',
+                    // Sends the student to the updated milestone tracker.
+                    'redirect' => url('student/dashboard.php#milestone-tracker'),
+                    // Keeps the confirmation visible long enough to read.
+                    'duration' => 3200,
                 // Closes the popup array.
                 ];
             // Runs when only a document was uploaded.
@@ -1330,6 +1374,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['form'] ?? '') === 'applica
                     'title'   => 'Document uploaded successfully.',
                     // Sets the message with the uploaded file name.
                     'message' => '"' . $file['name'] . '" was sent to the coordinator for review.',
+                    // Sends the student to the updated milestone tracker.
+                    'redirect' => url('student/dashboard.php#milestone-tracker'),
+                    // Keeps the confirmation visible long enough to read.
+                    'duration' => 3200,
                 // Closes the popup array.
                 ];
             // Closes the if / elseif / else popup chain.
@@ -1885,8 +1933,6 @@ require_once __DIR__ . '/../includes/layout/header.php';
             <div class="form-actions" style="border-top:1px solid var(--gray-100);padding-top:1rem;margin-top:1rem;">
 <?php /*                 Submit button that sends the application form. */ ?>
                 <button type="submit" class="btn btn-primary" id="submitApplicationBtn"><i class="fas fa-paper-plane"></i> Submit Application</button>
-<?php /*                 Button that clears the form for another application. */ ?>
-                <button type="button" class="btn btn-outline" id="submitAnotherBtn"><i class="fas fa-plus"></i> Submit Another Application</button>
 <?php /*                 Cancel link back to the student dashboard. */ ?>
                 <a href="<?= url('student/dashboard.php') ?>" class="btn btn-outline">Cancel</a>
 <?php /*             Closes the action bar. */ ?>
@@ -1905,7 +1951,11 @@ require_once __DIR__ . '/../includes/layout/header.php';
 <?php /*      Data attribute holding the popup title. */ ?>
      data-title="<?= htmlspecialchars($popup['title']) ?>"
 <?php /*      Data attribute holding the popup message. */ ?>
-     data-message="<?= htmlspecialchars($popup['message']) ?>"></div>
+     data-message="<?= htmlspecialchars($popup['message']) ?>"
+<?php /*      Optional page to open after the confirmation is shown. */ ?>
+     <?php if (!empty($popup['redirect'])): ?>data-redirect="<?= htmlspecialchars($popup['redirect']) ?>"<?php endif; ?>
+<?php /*      Optional time the confirmation stays on screen. */ ?>
+     <?php if (!empty($popup['duration'])): ?>data-duration="<?= (int) $popup['duration'] ?>"<?php endif; ?>></div>
 <?php /* Ends the popup data condition. */ ?>
 <?php endif; ?>
 
@@ -2268,51 +2318,6 @@ require_once __DIR__ . '/../includes/layout/header.php';
         }
 <?php /*     Closes the submit event listener. */ ?>
     });
-
-<?php /*     Comment explaining the Submit Another Application button. */ ?>
-    // "Submit Another Application": clear the form for a fresh application.
-<?php /*     Finds the Submit Another Application button. */ ?>
-    var anotherBtn = document.getElementById('submitAnotherBtn');
-<?php /*     Runs only when that button exists. */ ?>
-    if (anotherBtn) {
-<?php /*         Adds a click listener for starting a new application. */ ?>
-        anotherBtn.addEventListener('click', function () {
-<?php /*             Loops over the four text fields to clear them. */ ?>
-            ['title', 'adviser', 'abstract', 'enroll_date'].forEach(function (name) {
-<?php /*                 Finds each field by name. */ ?>
-                const field = form.querySelector('[name="' + name + '"]');
-<?php /*                 Empties the field value. */ ?>
-                if (field) field.value = '';
-<?php /*             Closes the clear fields loop. */ ?>
-            });
-<?php /*             Resets the document type select. */ ?>
-            typeSelect.value = '';
-<?php /*             Clears the chosen file. */ ?>
-            if (fileInput) fileInput.value = '';
-<?php /*             Finds the draft file note. */ ?>
-            var note = document.getElementById('draftFileNote');
-<?php /*             Removes the draft file note. */ ?>
-            if (note) note.remove();
-<?php /*             Comment noting the draft is cleared for the new application. */ ?>
-            // The draft is cleared: the student explicitly starts a new one.
-<?php /*             Pauses draft saving while the form is reset. */ ?>
-            draftDisabled = true;
-<?php /*             Creates the data for an empty draft. */ ?>
-            const data = new URLSearchParams();
-<?php /*             Marks the request as a draft save. */ ?>
-            data.append('form', 'draft');
-<?php /*             Posts the empty draft to replace the saved one. */ ?>
-            fetch(window.location.pathname + window.location.search, {
-<?php /*                 Uses POST with the session cookie and keepalive. */ ?>
-                method: 'POST', body: data, credentials: 'same-origin', keepalive: true
-<?php /*             Closes the fetch call. */ ?>
-            });
-<?php /*             Scrolls back to the top of the page. */ ?>
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-<?php /*         Closes the click listener. */ ?>
-        });
-<?php /*     Closes the button exists condition. */ ?>
-    }
 
 <?php /*     Comment explaining the Discard Draft button. */ ?>
     // "Discard Draft": forget the four values the student typed. Uploaded

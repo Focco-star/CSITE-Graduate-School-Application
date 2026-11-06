@@ -131,11 +131,38 @@ function coordinatorStudentsWithApplications(): array {
     // Closes the DB availability check.
     }
 
+    // Puts the students with the newest application first, then by name.
+    usort($students, static function (array $a, array $b): int {
+        // Reads the newest application date of each student.
+        $aDate = (string) ($a['applications'][0]['date'] ?? '');
+        $bDate = (string) ($b['applications'][0]['date'] ?? '');
+        // Falls back to the name when both dates are equal.
+        if ($aDate === $bDate) {
+            // Sorts alphabetically within the same date.
+            return strcmp((string) $a['name'], (string) $b['name']);
+        // Closes the equal-date check.
+        }
+        // Students without an application go after those who applied.
+        if ($aDate === '') {
+            // Moves the student without an application down.
+            return 1;
+        // Closes the first missing-date check.
+        }
+        // Keeps the other student without an application below.
+        if ($bDate === '') {
+            // Moves the student without an application down.
+            return -1;
+        // Closes the second missing-date check.
+        }
+        // Newest application date first.
+        return strcmp($bDate, $aDate);
+    // Closes the sorting callback.
+    });
+
     // Returns the collected students.
     return $students;
 // Ends coordinatorStudentsWithApplications.
 }
-
 /**
  * Why a coordinator may not move an application to a status yet, or null when
  * the move is allowed.

@@ -20,10 +20,12 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Cleans the typed first and last names into proper name case.
     $first = formatPersonName($_POST['first_name'] ?? ''); $last = formatPersonName($_POST['last_name'] ?? '');
-    // Reads the middle initial and age, converting the age to a whole number.
-    $middle = strtoupper(trim($_POST['middle_initial'] ?? '')); $age = (int) ($_POST['age'] ?? 0);
-    // Reads the chosen gender and trims extra spaces.
-    $gender = trim($_POST['gender'] ?? '');
+    // Reads the middle initial and birthdate.
+    $middle = strtoupper(trim($_POST['middle_initial'] ?? '')); $birthdate = trim($_POST['birthdate'] ?? '');
+    // Reads the chosen biological sex and normalises it.
+    $sex = normalizeSex($_POST['sex'] ?? '');
+    // Works out the age from the birthdate.
+    $age = ageFromBirthdate($birthdate);
     // Notes that the program, track, and ADZU ID are assigned by the Graduate School.
     // The academic program, track and ADZU ID number are assigned by the
     // Continues the note about read-only fields and the saved record.
@@ -44,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     // Reads the saved ADZU ID number as text so digits are not lost.
     $adzuIdRaw = (string) ($student['student_id'] ?? '');
-    // Validates the required fields: names, program, age and gender.
-    if ($first === '' || $last === '' || !isset(PROGRAMS[$programCode]) || $age < 18 || $gender === '') {
+    // Validates the required fields: names, program, birthdate and sex.
+    if ($first === '' || $last === '' || !isset(PROGRAMS[$programCode]) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthdate) || ageFromBirthdate($birthdate) < 15 || !in_array($sex, ['Male', 'Female', 'Intersex'], true)) {
         // Stores a message asking the student to complete the required fields.
         $error = 'Complete all required profile fields with valid values.';
     // Checks again that the track belongs to the student's program.
@@ -79,7 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Closes the if block that checked for a changed ADZU ID.
             }
             // Updates the student row with the personal details and program.
-            DB::update('students', ['student_id' => $newStudentId, 'first_name' => $first, 'last_name' => $last, 'middle_initial' => rtrim($middle, '.'), 'age' => $age, 'gender' => $gender, 'program' => PROGRAMS[$programCode], 'track' => $trackCode], ['user_id' => (int) $user['user_id']]);
+            DB::update('students', ['student_id' => $newStudentId, 'first_name' => $first, 'last_name' => $last, 'middle_initial' => rtrim($middle, '.'), 'birthdate' => $birthdate, 'sex' => $sex, 'age' => $age, 'gender' => $sex, 'program' => PROGRAMS[$programCode], 'track' => $trackCode], ['user_id' => (int) $user['user_id']]);
             // Updates the matching user row so the full name stays in sync.
             DB::update('users', ['full_name' => $fullName], ['user_id' => $user['user_id']]);
             // Saves all database changes permanently.
@@ -135,7 +137,7 @@ require_once __DIR__ . '/../includes/layout/header.php';
 <?php /* If an error was set, shows a red alert box with the message. */ ?>
 <?php if ($error): ?><div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div><?php endif; ?>
 <?php /* The edit form with the student's name, age, gender, ID, program and track. */ ?>
-<form method="post" class="card" data-validate><div class="card-body"><div class="form-row"><div class="form-field"><label>First Name <span class="required">*</span></label><input name="first_name" required value="<?= htmlspecialchars($student['first_name']) ?>"></div><div class="form-field"><label>Last Name <span class="required">*</span></label><input name="last_name" required value="<?= htmlspecialchars($student['last_name']) ?>"></div></div><div class="form-row"><div class="form-field"><label>Middle Initial</label><input name="middle_initial" maxlength="5" value="<?= htmlspecialchars($student['middle_initial'] ?? '') ?>"></div><div class="form-field"><label>Age <span class="required">*</span></label><input type="number" name="age" min="18" max="99" required value="<?= (int) $student['age'] ?>"></div><div class="form-field"><label>Gender <span class="required">*</span></label><select name="gender" required><?php foreach (['Male','Female','Prefer not to say'] as $option): ?><option <?= $student['gender'] === $option ? 'selected' : '' ?>><?= $option ?></option><?php endforeach; ?></select></div></div><div class="form-field"><label>ADZU ID Number</label><input name="student_id" readonly inputmode="numeric" pattern="[0-9]{4,10}" title="Assigned by the Graduate School" aria-readonly="true" value="<?= htmlspecialchars((string) ($student['student_id'] ?? '')) ?>"><p class="field-hint">Assigned by the Graduate School and cannot be changed here.</p></div><div class="form-field"><label>Academic Program</label><select name="program" id="profileProgram" class="locked-select" disabled aria-disabled="true"><?php foreach (PROGRAMS as $code => $name): ?><option value="<?= $code ?>" <?= $programCode === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option><?php endforeach; ?></select><p class="field-hint">Locked. Contact the Graduate School to change your program.</p></div><div class="form-field"><label>Track</label><select name="track" id="profileTrack" class="locked-select" disabled aria-disabled="true"></select><p class="field-hint">Locked. Your track is set from your program and cannot be changed here.</p></div><div class="form-actions"><button class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button><a class="btn btn-outline" href="<?= url('student/dashboard.php') ?>">Cancel</a></div></div></form>
+<form method="post" class="card" data-validate><div class="card-body"><div class="form-row"><div class="form-field"><label>First Name <span class="required">*</span></label><input name="first_name" required value="<?= htmlspecialchars($student['first_name']) ?>"></div><div class="form-field"><label>Last Name <span class="required">*</span></label><input name="last_name" required value="<?= htmlspecialchars($student['last_name']) ?>"></div></div><div class="form-row"><div class="form-field"><label>Middle Initial</label><input name="middle_initial" maxlength="5" value="<?= htmlspecialchars($student['middle_initial'] ?? '') ?>"></div><div class="form-field"><label>Birthdate <span class="required">*</span></label><input type="date" name="birthdate" max="<?= date('Y-m-d') ?>" required value="<?= htmlspecialchars((string) ($student['birthdate'] ?? '')) ?>"></div><div class="form-field"><label>Sex <span class="required">*</span></label><select name="sex" required><?php foreach (['Male','Female','Intersex'] as $option): ?><option <?= normalizeSex($student['sex'] ?? ($student['gender'] ?? '')) === $option ? 'selected' : '' ?>><?= $option ?></option><?php endforeach; ?></select></div></div><div class="form-field"><label>ADZU ID Number</label><input name="student_id" readonly inputmode="numeric" pattern="[0-9]{4,10}" title="Assigned by the Graduate School" aria-readonly="true" value="<?= htmlspecialchars((string) ($student['student_id'] ?? '')) ?>"><p class="field-hint">Assigned by the Graduate School and cannot be changed here.</p></div><div class="form-field"><label>Academic Program</label><select name="program" id="profileProgram" class="locked-select" disabled aria-disabled="true"><?php foreach (PROGRAMS as $code => $name): ?><option value="<?= $code ?>" <?= $programCode === $code ? 'selected' : '' ?>><?= htmlspecialchars($name) ?></option><?php endforeach; ?></select><p class="field-hint">Locked. Contact the Graduate School to change your program.</p></div><div class="form-field"><label>Track</label><select name="track" id="profileTrack" class="locked-select" disabled aria-disabled="true"></select><p class="field-hint">Locked. Your track is set from your program and cannot be changed here.</p></div><div class="form-actions"><button class="btn btn-primary"><i class="fas fa-save"></i> Save Changes</button><a class="btn btn-outline" href="<?= url('student/dashboard.php') ?>">Cancel</a></div></div></form>
 <?php /* Starts the JavaScript that fills the track dropdown. */ ?>
 <script>
 <?php /* Starts a self-running function so its variables stay private. */ ?>

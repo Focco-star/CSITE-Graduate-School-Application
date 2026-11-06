@@ -31,3 +31,173 @@
         grid-template-columns: 1fr;
     }
 }
+/* ==================================================================
+   Home page attention card (new applications and pending accounts)
+   ================================================================== */
+.home-attention {
+    margin: 1rem 0 1.25rem;
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    padding: 1.1rem 1.2rem 1.2rem;
+}
+.home-attention-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.9rem;
+}
+.home-attention-head h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0 0 0.2rem;
+    font-size: 1rem;
+    color: var(--adzu-navy);
+}
+.home-attention-head h3 i { color: var(--adzu-gold); }
+.home-attention-head p { margin: 0; font-size: 0.8rem; color: var(--gray-500); }
+.home-attention-sync { font-size: 0.7rem; color: var(--gray-400); display: inline-flex; align-items: center; gap: 0.35rem; }
+
+.home-attention-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+.home-attention-tile {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "icon value" "icon label" "icon hint";
+    align-items: center;
+    column-gap: 0.7rem;
+    padding: 0.85rem 0.95rem;
+    border-radius: 12px;
+    border: 1px solid var(--gray-100);
+    background: var(--gray-50);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--transition), background var(--transition), transform var(--transition);
+}
+.home-attention-tile:hover { border-color: var(--adzu-gold); background: #fffdf7; transform: translateY(-1px); }
+.home-attention-icon {
+    grid-area: icon;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(6, 2, 151, 0.08);
+    color: var(--adzu-navy);
+}
+.home-attention-value { grid-area: value; font-size: 1.5rem; font-weight: 800; color: var(--adzu-navy); line-height: 1.1; }
+.home-attention-label { grid-area: label; font-size: 0.82rem; font-weight: 700; color: var(--gray-700); }
+.home-attention-hint { grid-area: hint; font-size: 0.72rem; color: var(--gray-500); }
+
+.home-attention-list { list-style: none; margin: 0.9rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.home-attention-list-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.2rem;
+    border: 1px solid var(--gray-100);
+    border-radius: 10px;
+    background: #fff;
+}
+.home-attention-list-item:hover { background: var(--gray-50); border-color: var(--gray-200); }
+.home-attention-list li a {
+    display: flex;
+    flex: 1;
+    align-items: flex-start;
+    gap: 0.6rem;
+    min-width: 0;
+    padding: 0.55rem 0.6rem;
+    text-decoration: none;
+    color: inherit;
+}
+.home-attention-remove-form { display: flex; align-items: flex-start; margin: 0; padding: 0.45rem 0.45rem 0 0; }
+.home-attention-remove {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--gray-400);
+    cursor: pointer;
+    font-size: 0.72rem;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.home-attention-remove:hover { background: #fee2e2; color: #b91c1c; }
+.home-attention-remove:focus-visible { outline: 2px solid var(--adzu-gold); outline-offset: 1px; }
+.home-attention-list-icon {
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #f6f8ff;
+    color: var(--adzu-navy);
+    font-size: 0.75rem;
+}
+.home-attention-list-body { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.home-attention-list-body strong { font-size: 0.78rem; color: var(--adzu-navy); }
+.home-attention-list-body span { font-size: 0.74rem; color: var(--gray-600); }
+.home-attention-list-time { margin-left: auto; font-size: 0.68rem; color: var(--gray-400); white-space: nowrap; }
+.home-attention-empty { margin: 0.9rem 0 0; font-size: 0.8rem; color: var(--gray-500); display: flex; align-items: center; gap: 0.4rem; }
+.home-attention-empty i { color: #16a34a; }
+
+@media (max-width: 720px) {
+    .home-attention-grid { grid-template-columns: 1fr; }
+}
+
+/* Holds the collapsible notification list under the two main tiles. */
+.home-attention-dropdown { margin-top: 0.95rem; }
+
+/* Honors the hidden attribute on the dropdown, list and empty note. */
+.home-attention-dropdown[hidden],
+.home-attention-list[hidden],
+.home-attention-empty[hidden] { display: none !important; }
+
+/* Button that opens and closes the recent notifications. */
+.home-attention-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    color: var(--adzu-navy);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition), border-color var(--transition);
+}
+.home-attention-toggle:hover { background: #ffffff; border-color: var(--adzu-gold); }
+
+/* Label and count pill inside the toggle. */
+.home-attention-toggle-label { display: inline-flex; align-items: center; gap: 0.45rem; }
+.home-attention-toggle-count {
+    min-width: 1.3rem;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--adzu-navy);
+    color: #ffffff;
+    font-size: 0.66rem;
+    font-weight: 800;
+    text-align: center;
+}
+
+/* Chevron that turns when the list opens. */
+.home-attention-caret { color: var(--gray-400); font-size: 0.72rem; transition: transform 0.18s ease; }
+.home-attention-toggle.is-open .home-attention-caret { transform: rotate(180deg); }
+
+/* Tightens the list under the toggle. */
+.home-attention-list { margin-top: 0.55rem; }
