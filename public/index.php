@@ -6,6 +6,61 @@ $pageTitle = 'Home';
 $role = 'public';
 // Includes the shared header file with the CSS, fonts and top navigation bar.
 require_once __DIR__ . '/../includes/layout/header.php';
+// Loads the same course lists the coordinator Templates/Forms page uses.
+$publicTrackCourses = templateCoursesByTrack();
+// Lists the short abbreviation shown on the landing page for each program code.
+$publicProgramAbbreviations = [
+    // Thesis-track programs.
+    'MSCS'      => 'MSCS',
+    'MSLIS'     => 'MSLIS',
+    // Capstone-track programs.
+    'MIT'       => 'MIT',
+    'MLIS'      => 'MLIS',
+    // Science Education majors shared by the capstone and seminar tracks.
+    'MSED_BIO'  => 'MSED-Bio',
+    'MSED_CHEM' => 'MSED-Chem',
+    'MSED_GS'   => 'MSED-GenSci',
+    'MSED_PHY'  => 'MSED-Phys',
+    // Engineering and Mathematics Education programs.
+    'MSME'      => 'MSME',
+    'MATH'      => 'MMEd',
+];
+// Joins the course abbreviations for one track.
+$publicCourseText = static function (array $courses) use ($publicProgramAbbreviations): string {
+    // Starts the list of abbreviations.
+    $labels = [];
+    // Loops through the courses of the track.
+    foreach ($courses as $course) {
+        // Reads the program code in uppercase.
+        $code = strtoupper(trim((string) ($course['code'] ?? '')));
+        // Uses the display abbreviation, or the code itself as a fallback.
+        $label = $publicProgramAbbreviations[$code] ?? $code;
+        // Keeps only a real label.
+        if ($label !== '') {
+            // Adds the abbreviation to the list.
+            $labels[] = $label;
+        // Closes the label check.
+        }
+    // Closes the course loop.
+    }
+    // Returns nothing when the track has no courses.
+    if (!$labels) {
+        // Returns an empty label.
+        return '';
+    // Closes the empty-course check.
+    }
+    // Returns the only course without a separator.
+    if (count($labels) === 1) {
+        // Returns the single abbreviation.
+        return $labels[0];
+    // Closes the single-course check.
+    }
+    // Removes the last label so it can follow an ampersand.
+    $last = array_pop($labels);
+    // Returns the abbreviations in the compact landing-page style.
+    return implode(', ', $labels) . ' & ' . $last;
+// Ends the course text helper.
+};
 // Closes the PHP block so the HTML below is sent to the browser as-is.
 ?>
 
@@ -214,8 +269,8 @@ require_once __DIR__ . '/../includes/layout/header.php';
                 <div class="track-card-header"><i class="fas fa-book"></i> Thesis Track</div>
 <?php /*                 Opens the card body that holds the program note and stage list. */ ?>
                 <div class="track-card-body">
-<?php /*                     Small grey note saying the thesis track is for MSCS and MSMEd students. */ ?>
-                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.75rem;">For MSCS &amp; MSMEd students</p>
+<?php /*                     Shows the same full course names as the coordinator Templates page. */ ?>
+                    <p class="track-programs"><strong>Courses using this track:</strong> <?= htmlspecialchars($publicCourseText($publicTrackCourses['thesis'] ?? [])) ?>.</p>
 <?php /*                     Opens the bullet list of thesis presentation stages. */ ?>
                     <ul class="track-stages">
 <?php /*                         Stage 1 of the thesis track: concept paper presentation. */ ?>
@@ -236,8 +291,8 @@ require_once __DIR__ . '/../includes/layout/header.php';
                 <div class="track-card-header"><i class="fas fa-laptop-code"></i> Capstone Track</div>
 <?php /*                 Opens the card body that holds the program note and stage list. */ ?>
                 <div class="track-card-body">
-<?php /*                     Small grey note listing the programs that follow the capstone track. */ ?>
-                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.75rem;">For MIT, MLIS, MSEd-Bio, MSEd-Chem, MSEd-GenSci &amp; MSEd-Phys students</p>
+<?php /*                     Shows the same full course names as the coordinator Templates page. */ ?>
+                    <p class="track-programs"><strong>Courses using this track:</strong> <?= htmlspecialchars($publicCourseText($publicTrackCourses['capstone'] ?? [])) ?>.</p>
 <?php /*                     Opens the bullet list of capstone presentation stages. */ ?>
                     <ul class="track-stages">
 <?php /*                         Stage 1 of the capstone track: capstone proposal presentation. */ ?>
@@ -256,8 +311,8 @@ require_once __DIR__ . '/../includes/layout/header.php';
                 <div class="track-card-header"><i class="fas fa-scroll"></i> Seminar Paper Track</div>
 <?php /*                 Opens the card body that holds the program note and stage list. */ ?>
                 <div class="track-card-body">
-<?php /*                     Small grey note saying the seminar paper track is for MMEd students. */ ?>
-                    <p style="font-size:0.78rem;color:var(--gray-500);margin-bottom:0.75rem;">For MMEd students</p>
+<?php /*                     Shows the same full course names as the coordinator Templates page. */ ?>
+                    <p class="track-programs"><strong>Courses using this track:</strong> <?= htmlspecialchars($publicCourseText($publicTrackCourses['seminar'] ?? [])) ?>.</p>
 <?php /*                     Opens the bullet list of seminar paper presentation stages. */ ?>
                     <ul class="track-stages">
 <?php /*                         Stage 1 of the seminar track: seminar paper proposal presentation. */ ?>

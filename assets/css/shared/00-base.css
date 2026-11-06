@@ -949,6 +949,11 @@ img { max-width: 100%; height: auto; }
 /* Adds padding and a white background to the track card body. */
 .track-card-body { padding: 1.25rem; background: var(--white); }
 
+/* Lists the full course names that follow each presentation track. */
+.track-programs { font-size: 0.78rem; color: var(--gray-500); line-height: 1.5; margin-bottom: 0.75rem; }
+/* Gives the course label a slightly stronger gray. */
+.track-programs strong { color: var(--gray-600); font-weight: 600; }
+
 /* Removes the default list bullets from track stages. */
 .track-stages { list-style: none; }
 
