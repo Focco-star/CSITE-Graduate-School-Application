@@ -325,3 +325,57 @@ $templateLibraryIcon = static function (array $template): string {
 </section>
 <?php /* <?php /* Ends the track loop, finishing the template library output. * / ?> */ ?>
 <?php endforeach; ?>
+
+<?php /* Download confirmation toast shared by the student and coordinator libraries. */ ?>
+<div id="templateDownloadToast" class="template-download-toast" role="status" aria-live="polite" hidden>
+    <i class="fas fa-circle-check" aria-hidden="true"></i>
+    <span>Template downloaded</span>
+</div>
+<style>
+    .template-download-toast {
+        position: fixed;
+        right: 28px;
+        bottom: 28px;
+        z-index: 100000;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 13px 18px;
+        border-radius: 8px;
+        background: #0b0a3d;
+        color: #fff;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        font-size: 0.92rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+        border-left: 4px solid #e5b54a;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        pointer-events: none;
+    }
+    .template-download-toast[hidden] { display: none; }
+    .template-download-toast.is-visible { opacity: 1; transform: translateY(0); }
+    .template-download-toast i { color: #e5b54a; font-size: 1.1rem; }
+</style>
+<script>
+(function () {
+    var toast = document.getElementById('templateDownloadToast');
+    if (!toast) return;
+    var timer = null;
+    document.addEventListener('click', function (event) {
+        var link = event.target.closest('.template-actions a[download]');
+        if (!link) return;
+        var card = link.closest('.template-item');
+        var name = card ? ((card.querySelector('h4') || {}).textContent || '').trim() : '';
+        toast.querySelector('span').textContent = name ? 'Downloaded: ' + name : 'Template downloaded';
+        toast.hidden = false;
+        requestAnimationFrame(function () { toast.classList.add('is-visible'); });
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+            toast.classList.remove('is-visible');
+            setTimeout(function () { toast.hidden = true; }, 220);
+        }, 3200);
+    });
+})();
+</script>
+
